@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { UserProvider } from "@/context/UserContext";
+import { Footer } from "@/components/ui/Footer";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,9 +15,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
         <UserProvider>
           {children}
+          <Footer />
         </UserProvider>
       </body>
     </html>

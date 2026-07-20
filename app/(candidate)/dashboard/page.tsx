@@ -3,11 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Crown, ArrowRight, Sparkles, FileText, CheckCircle2 } from 'lucide-react';
+import { Crown, ArrowRight, Sparkles, FileText, CheckCircle2, Briefcase, Bookmark, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
+import { useUser } from '@/context/UserContext';
 
 export default function CandidateDashboardPage() {
   const [vertical, setVertical] = useState("");
+  const { applications, savedJobs, messages, jobs } = useUser();
 
   useEffect(() => {
     const stored = localStorage.getItem('rolecraft_target_vertical');
@@ -106,6 +108,92 @@ export default function CandidateDashboardPage() {
             </Link>
           </div>
         </Card>
+
+        {/* Recent Activity Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+          
+          {/* Applications */}
+          <Card className="p-6">
+            <h3 className="font-bold text-slate-900 mb-4 flex items-center justify-between">
+              Recent Applications
+              <Link href="/jobs" className="text-xs text-primary hover:underline font-normal">Browse Jobs</Link>
+            </h3>
+            {applications.length === 0 ? (
+              <div className="text-center py-8">
+                <Briefcase className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                <p className="text-sm text-slate-500 font-medium">No applications yet</p>
+                <p className="text-xs text-slate-400 mt-1">Start applying to see your progress here.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {applications.slice(0, 3).map(app => (
+                  <div key={app.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                    <h4 className="font-bold text-slate-900 text-sm">{app.jobTitle}</h4>
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="text-xs text-slate-500">{app.companyName}</span>
+                      <span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{app.status}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Saved Jobs */}
+          <Card className="p-6">
+            <h3 className="font-bold text-slate-900 mb-4 flex items-center justify-between">
+              Saved Jobs
+              <Link href="/saved-jobs" className="text-xs text-primary hover:underline font-normal">View All</Link>
+            </h3>
+            {savedJobs.length === 0 ? (
+              <div className="text-center py-8">
+                <Bookmark className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                <p className="text-sm text-slate-500 font-medium">No saved jobs</p>
+                <p className="text-xs text-slate-400 mt-1">Bookmark jobs to apply later.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {savedJobs.slice(0, 3).map(jobId => {
+                  const job = jobs.find(j => j.id === jobId);
+                  if (!job) return null;
+                  return (
+                    <div key={job.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                      <h4 className="font-bold text-slate-900 text-sm line-clamp-1">{job.title}</h4>
+                      <div className="flex justify-between items-center mt-1">
+                        <span className="text-xs text-slate-500">{job.companyName}</span>
+                        <Link href={`/jobs/${job.id}`} className="text-xs text-primary hover:underline">Apply</Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+
+          {/* Messages */}
+          <Card className="p-6">
+            <h3 className="font-bold text-slate-900 mb-4 flex items-center justify-between">
+              Recent Messages
+              <Link href="/messages" className="text-xs text-primary hover:underline font-normal">Open Inbox</Link>
+            </h3>
+            {messages.length === 0 ? (
+              <div className="text-center py-8">
+                <MessageSquare className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                <p className="text-sm text-slate-500 font-medium">No new messages</p>
+                <p className="text-xs text-slate-400 mt-1">Employers will reach out here.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                 {messages.slice(0, 3).map(msg => (
+                  <div key={msg.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                    <h4 className="font-bold text-slate-900 text-sm">{msg.sender}</h4>
+                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{msg.text}</p>
+                  </div>
+                 ))}
+              </div>
+            )}
+          </Card>
+        </div>
 
       </div>
     </div>

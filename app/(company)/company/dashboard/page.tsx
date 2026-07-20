@@ -9,11 +9,13 @@ import { Search, Eye, Bookmark, TrendingUp, CheckCircle2, MessageCircle, MoreVer
 import { CandidateProfileModal } from '@/components/company/CandidateProfileModal';
 import { MessageModal } from '@/components/company/MessageModal';
 import Link from 'next/link';
+import { useUser } from '@/context/UserContext';
 
 const TECH_SKILLS = ['Python', 'Java', 'JavaScript', 'TypeScript', 'C++', 'Go', 'Rust', 'React', 'Next.js', 'Vue', 'Angular', 'Tailwind CSS', 'Node.js', 'FastAPI', 'Django', 'Spring Boot', 'Express', 'PostgreSQL', 'MongoDB', 'MySQL', 'Redis', 'AWS', 'GCP', 'Azure', 'Docker', 'Kubernetes', 'Terraform', 'LangChain', 'LangGraph', 'TensorFlow', 'PyTorch', 'Gemini API', 'OpenAI API', 'Git', 'Figma', 'Jira', 'Postman', 'Communication', 'Leadership', 'Problem Solving', 'Teamwork'];
 const CITIES = ['Bengaluru', 'Mumbai', 'New Delhi', 'Hyderabad', 'Pune', 'Chennai', 'Gurugram', 'Noida', 'Kolkata', 'Ahmedabad', 'Remote', 'Hybrid'];
 
 export default function CompanyDashboardPage() {
+  const { plan } = useUser();
   const [activeTab, setActiveTab] = useState('overview');
   
   // Modals state
@@ -27,6 +29,7 @@ export default function CompanyDashboardPage() {
 
   // Job Posting Form
   const [jobPosting, setJobPosting] = useState({
+    id: null as number | null,
     title: '',
     vertical: '',
     experience: '',
@@ -68,27 +71,35 @@ export default function CompanyDashboardPage() {
     setIsPosting(true);
     
     setTimeout(() => {
-      const newJobId = Date.now();
-      setJobs([{
-        id: newJobId,
-        title: jobPosting.title,
-        vertical: jobPosting.vertical,
-        status: 'Live',
-        matched: 0,
-        shortlisted: 0,
-        date: new Date().toISOString().split('T')[0]
-      }, ...jobs]);
+      if (jobPosting.id) {
+        setJobs(jobs.map(j => j.id === jobPosting.id ? {
+          ...j,
+          title: jobPosting.title,
+          vertical: jobPosting.vertical
+        } : j));
+      } else {
+        const newJobId = Date.now();
+        setJobs([{
+          id: newJobId,
+          title: jobPosting.title,
+          vertical: jobPosting.vertical,
+          status: 'Live',
+          matched: 0,
+          shortlisted: 0,
+          date: new Date().toISOString().split('T')[0]
+        }, ...jobs]);
+        setSelectedJobId(newJobId);
+      }
       
-      setSelectedJobId(newJobId);
       setIsPosting(false);
       
       // Reset form
       setJobPosting({
-        title: '', vertical: '', experience: '', skills: [], description: '', location: '', employmentType: '', salaryMin: '', salaryMax: '', salaryUndisclosed: false
+        id: null, title: '', vertical: '', experience: '', skills: [], description: '', location: '', employmentType: '', salaryMin: '', salaryMax: '', salaryUndisclosed: false
       });
       
-      setActiveTab('candidates');
-    }, 2500);
+      setActiveTab('my-postings');
+    }, 1500);
   };
 
   const toggleShortlist = (candidateId: number) => {
@@ -215,6 +226,18 @@ export default function CompanyDashboardPage() {
 
             <h2 className="text-xl font-bold text-slate-900 mb-6 border-b pb-2">Create New Job Posting</h2>
             
+            {(plan === 'free' || !plan) && jobs.length >= 2 ? (
+              <div className="bg-orange-50 border border-orange-200 p-6 rounded-lg text-center my-8">
+                <div className="text-orange-500 font-bold mb-2 text-lg">Job Posting Cap Reached</div>
+                <p className="text-orange-700 text-sm mb-4">
+                  You are currently on the Free plan, which allows up to 2 active job postings. 
+                  Upgrade to a premium plan to post unlimited jobs and access advanced applicant matching.
+                </p>
+                <Link href="/company/pricing">
+                  <Button>View Pricing Plans</Button>
+                </Link>
+              </div>
+            ) : (
             <div className="space-y-6">
               <FormField label="Job Title" required>
                 <Input placeholder="e.g. Senior Frontend Engineer" value={jobPosting.title} onChange={e => setJobPosting({...jobPosting, title: e.target.value})} />
@@ -303,6 +326,7 @@ export default function CompanyDashboardPage() {
                 </Button>
               </div>
             </div>
+            )}
           </Card>
         )}
 
@@ -345,7 +369,28 @@ export default function CompanyDashboardPage() {
                         <td className="p-4">{job.matched}</td>
                         <td className="p-4">{job.shortlisted}</td>
                         <td className="p-4">{job.date}</td>
-                        <td className="p-4 text-right space-x-2">
+                        <td className="p-4 text-right space-x-3">
+                          <button 
+                            className="text-slate-500 hover:text-primary font-medium text-sm"
+                            onClick={() => {
+                              setJobPosting({
+                                id: job.id,
+                                title: job.title,
+                                vertical: job.vertical,
+                                experience: '3-5 Years',
+                                skills: ['React', 'TypeScript'],
+                                description: 'Mock description for editing',
+                                location: 'Bengaluru',
+                                employmentType: 'Full-time',
+                                salaryMin: '',
+                                salaryMax: '',
+                                salaryUndisclosed: false
+                              });
+                              setActiveTab('post');
+                            }}
+                          >
+                            Edit
+                          </button>
                           <button 
                             className="text-primary hover:underline font-medium text-sm"
                             onClick={() => {

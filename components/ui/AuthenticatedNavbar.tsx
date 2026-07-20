@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useUser } from '@/context/UserContext';
 import { LogOut, Settings, Building2, User, RefreshCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { NotificationsDropdown } from '@/components/ui/NotificationsDropdown';
 
 export function AuthenticatedNavbar() {
   const { role, logout, switchRole } = useUser();
@@ -38,7 +39,9 @@ export function AuthenticatedNavbar() {
             </div>
           </div>
           
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
+            <NotificationsDropdown />
+            
             <div className="ml-3 relative">
               <div>
                 <button 

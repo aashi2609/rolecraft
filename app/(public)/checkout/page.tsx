@@ -1,20 +1,36 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { FormField, Input } from '@/components/ui/FormField';
 import { CreditCard, Wallet, Smartphone, Landmark, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useUser } from '@/context/UserContext';
 
-export default function CheckoutPage() {
+function CheckoutForm() {
   const [activeTab, setActiveTab] = useState('card');
   const [isAnnual, setIsAnnual] = useState(true);
+  
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { isAuthenticated, setPlan, role } = useUser();
+  const plan = searchParams.get('plan') || 'premium';
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push(`/signin?redirect=/checkout?plan=${plan}`);
+    }
+  }, [isAuthenticated, router, plan]);
 
   const handlePay = () => {
-    alert("Payment successful! Console updated.");
-    console.log("Payment processed for tab:", activeTab, isAnnual ? 'Annual' : 'Monthly');
+    setPlan(plan as 'premium' | 'growth' | 'scale');
+    alert("Payment successful! Your plan has been upgraded.");
+    router.push(role === 'company' ? '/company/dashboard' : '/dashboard');
   };
+
+  if (!isAuthenticated) return null;
 
   return (
     <div className="min-h-screen bg-slate-50 py-10">
@@ -32,7 +48,7 @@ export default function CheckoutPage() {
             <Card className="p-0 overflow-hidden">
               <div className="bg-slate-900 p-6 text-white flex justify-between items-center">
                 <div>
-                  <h2 className="text-xl font-bold">Premium Plan</h2>
+                  <h2 className="text-xl font-bold capitalize">{plan} Plan</h2>
                   <p className="text-slate-400 text-sm mt-1">Unlock your full career potential</p>
                 </div>
                 <div className="text-right">
@@ -152,5 +168,13 @@ export default function CheckoutPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <React.Suspense fallback={<div>Loading checkout...</div>}>
+      <CheckoutForm />
+    </React.Suspense>
   );
 }
