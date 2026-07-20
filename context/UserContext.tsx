@@ -8,12 +8,15 @@ interface UserState {
   isAuthenticated: boolean;
   role: Role;
   profileComplete: boolean;
+  companyProfileComplete: boolean;
 }
 
 interface UserContextType extends UserState {
   login: (role: Role) => void;
   logout: () => void;
   setProfileComplete: (status: boolean) => void;
+  setCompanyProfileComplete: (status: boolean) => void;
+  switchRole: (role: Role) => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -23,14 +26,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
     isAuthenticated: false,
     role: null,
     profileComplete: false,
+    companyProfileComplete: false,
   });
 
-  const login = (role: Role) => setState({ isAuthenticated: true, role, profileComplete: false });
-  const logout = () => setState({ isAuthenticated: false, role: null, profileComplete: false });
+  const login = (role: Role) => setState({ isAuthenticated: true, role, profileComplete: false, companyProfileComplete: false });
+  const logout = () => setState({ isAuthenticated: false, role: null, profileComplete: false, companyProfileComplete: false });
   const setProfileComplete = (status: boolean) => setState(prev => ({ ...prev, profileComplete: status }));
+  const setCompanyProfileComplete = (status: boolean) => setState(prev => ({ ...prev, companyProfileComplete: status }));
+  const switchRole = (role: Role) => setState(prev => ({ ...prev, role }));
 
   return (
-    <UserContext.Provider value={{ ...state, login, logout, setProfileComplete }}>
+    <UserContext.Provider value={{ ...state, login, logout, setProfileComplete, setCompanyProfileComplete, switchRole }}>
       {children}
     </UserContext.Provider>
   );

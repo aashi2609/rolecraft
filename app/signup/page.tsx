@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { FormField, Input } from '@/components/ui/FormField';
 import Link from 'next/link';
 import { BackgroundVideo } from '@/components/BackgroundVideo';
+import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
 
 function SignupForm() {
   const searchParams = useSearchParams();
@@ -14,15 +15,24 @@ function SignupForm() {
   const router = useRouter();
   const { login } = useUser();
 
+  const [industry, setIndustry] = React.useState('');
+
   const handleSignup = (e: React.FormEvent) => {
     e.preventDefault();
     login(role);
     if (role === 'candidate') {
       router.push('/onboarding/profile');
     } else {
-      router.push('/company/dashboard');
+      router.push('/onboarding/company-profile');
     }
   };
+
+  const INDUSTRIES = [
+    'Technology / IT Services', 'EdTech', 'FinTech', 'E-commerce', 'Healthcare', 
+    'Manufacturing', 'BFSI (Banking, Financial Services & Insurance)', 'Consulting', 
+    'Retail', 'Media & Entertainment', 'Logistics & Supply Chain', 'Real Estate', 
+    'Telecommunications', 'Automotive', 'Other'
+  ];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 relative">
@@ -45,7 +55,14 @@ function SignupForm() {
           <FormField label="Password" required><Input type="password" required /></FormField>
           
           {role === 'company' && (
-            <FormField label="Industry"><Input placeholder="e.g. Technology" /></FormField>
+            <FormField label="Industry" required>
+              <SearchableCombobox
+                options={INDUSTRIES}
+                value={industry}
+                onChange={setIndustry}
+                placeholder="Select or type your industry"
+              />
+            </FormField>
           )}
 
           <Button type="submit" className="w-full mt-4">Create Account</Button>
