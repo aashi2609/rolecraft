@@ -18,19 +18,27 @@ export default function LandingPage() {
 
       {/* Navbar */}
       <nav className="relative z-20 flex items-center justify-between px-6 md:px-12 lg:px-20 py-5 font-body">
-        <div className="text-xl font-semibold tracking-tight text-foreground">
-          ✦ RoleCraft
+        <div 
+          className="text-xl font-semibold tracking-tight text-white" 
+          style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4), 0 1px 12px rgba(0,0,0,0.15)' }}
+        >
+          RoleCraft
         </div>
         
         <div className="hidden md:flex items-center gap-8">
-          <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Home</a>
-          <a href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
-          <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">For Companies</a>
-          <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">About</a>
+          <a href="#" className="text-sm text-white/90 hover:text-white transition-colors" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4), 0 1px 12px rgba(0,0,0,0.15)' }}>Home</a>
+          <a href="/pricing" className="text-sm text-white/90 hover:text-white transition-colors" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4), 0 1px 12px rgba(0,0,0,0.15)' }}>Pricing</a>
+          <a href="#" className="text-sm text-white/90 hover:text-white transition-colors" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4), 0 1px 12px rgba(0,0,0,0.15)' }}>For Companies</a>
+          <a href="#" className="text-sm text-white/90 hover:text-white transition-colors" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4), 0 1px 12px rgba(0,0,0,0.15)' }}>About</a>
         </div>
 
         <div className="flex items-center gap-4">
-          <Button variant="ghost" className="text-sm font-medium px-4" onClick={() => setRoleModalOpen(true)}>
+          <Button 
+            variant="ghost" 
+            className="text-sm font-medium px-4 text-white hover:text-white hover:bg-white/10" 
+            style={{ textShadow: '0 1px 3px rgba(0,0,0,0.4), 0 1px 12px rgba(0,0,0,0.15)' }}
+            onClick={() => setRoleModalOpen(true)}
+          >
             Sign In
           </Button>
           <Button className="rounded-full px-5 text-sm font-medium" onClick={() => setRoleModalOpen(true)}>

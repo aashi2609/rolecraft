@@ -28,7 +28,7 @@ function SignupForm() {
     <div className="min-h-screen flex items-center justify-center bg-background px-4 relative">
       <BackgroundVideo />
       
-      <div className="w-full max-w-md p-8 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl border border-border relative z-10">
+      <div className="w-full max-w-lg p-10 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl border border-border relative z-10">
         <h1 className="text-3xl font-display text-foreground mb-2">Create an account</h1>
         <p className="text-muted-foreground mb-8 text-sm">
           Sign up as a <span className="font-semibold text-accent">{role}</span>
