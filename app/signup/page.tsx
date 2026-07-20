@@ -6,6 +6,7 @@ import { useUser } from '@/context/UserContext';
 import { Button } from '@/components/ui/Button';
 import { FormField, Input } from '@/components/ui/FormField';
 import Link from 'next/link';
+import { BackgroundVideo } from '@/components/BackgroundVideo';
 
 function SignupForm() {
   const searchParams = useSearchParams();
@@ -24,8 +25,10 @@ function SignupForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-dashboard border border-border">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 relative">
+      <BackgroundVideo />
+      
+      <div className="w-full max-w-md p-8 bg-white/90 backdrop-blur-md rounded-2xl shadow-xl border border-border relative z-10">
         <h1 className="text-3xl font-display text-foreground mb-2">Create an account</h1>
         <p className="text-muted-foreground mb-8 text-sm">
           Sign up as a <span className="font-semibold text-accent">{role}</span>

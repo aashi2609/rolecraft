@@ -5,26 +5,16 @@ import { motion } from 'framer-motion';
 import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { RoleSelectModal } from '@/components/RoleSelectModal';
+import { BackgroundVideo } from '@/components/BackgroundVideo';
 
 export default function LandingPage() {
   const [roleModalOpen, setRoleModalOpen] = useState(false);
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden relative">
+    <div className="min-h-screen flex flex-col bg-background relative">
       
       {/* Background Video */}
-      <div className="absolute inset-0 z-0">
-        <video 
-          autoPlay 
-          loop 
-          muted 
-          playsInline 
-          className="w-full h-full object-cover opacity-20"
-        >
-          <source src="https://cdn.pixabay.com/video/2020/05/25/40156-425268482_large.mp4" type="video/mp4" />
-        </video>
-        <div className="absolute inset-0 bg-background/80" />
-      </div>
+      <BackgroundVideo />
 
       {/* Navbar */}
       <nav className="relative z-20 flex items-center justify-between px-6 md:px-12 lg:px-20 py-5 font-body">
