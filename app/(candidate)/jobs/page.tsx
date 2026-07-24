@@ -366,7 +366,7 @@ export default function JobSearchPage() {
                           onClick={() => toggleSavedJob(job.id)}
                           aria-label="Save job"
                         >
-                          {savedJobs.includes(job.id) ? (
+                          {savedJobs.includes(String(job.id)) ? (
                             <BookmarkCheck className="w-4 h-4 text-primary" />
                           ) : (
                             <Bookmark className="w-4 h-4" />

@@ -10,19 +10,23 @@ import { Logo } from '@/components/Logo';
 
 export default function SigninPage() {
   const router = useRouter();
-  const { login } = useUser();
+  const { signInWithApi } = useUser();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSignin = (e: React.FormEvent) => {
+  const handleSignin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const isCompany = email.includes('@company.com');
-    const role = isCompany ? 'company' : 'candidate';
-
-    login(role, isCompany ? 'starter' : 'basic');
-    if (role === 'candidate') {
-      router.push('/dashboard');
-    } else {
-      router.push('/company/dashboard');
+    setError('');
+    setLoading(true);
+    try {
+      const res = await signInWithApi(email, password);
+      router.push(res.role === 'company' ? '/company/dashboard' : '/dashboard');
+    } catch (err: any) {
+      setError(err?.detail || err?.message || 'Sign in failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -46,15 +50,22 @@ export default function SigninPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="user@example.com (use @company.com for employer)"
+                placeholder="you@example.com"
               />
             </FormField>
             <FormField label="Password" required>
-              <Input type="password" required />
+              <Input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
             </FormField>
 
-            <Button type="submit" className="w-full mt-4">
-              Sign In
+            {error && <p className="text-sm text-red-600">{error}</p>}
+
+            <Button type="submit" className="w-full mt-4" disabled={loading}>
+              {loading ? 'Signing in…' : 'Sign In'}
             </Button>
           </form>
 

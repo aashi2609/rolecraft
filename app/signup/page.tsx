@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useUser } from '@/context/UserContext';
 import { Button } from '@/components/ui/Button';
@@ -15,23 +15,39 @@ function SignupForm() {
   const role = (searchParams.get('role') as 'candidate' | 'company') || 'candidate';
   const plan = (searchParams.get('plan') as PlanId) || (role === 'company' ? 'starter' : 'basic');
   const router = useRouter();
-  const { login, setPendingPlan, setPlan } = useUser();
-  const [industry, setIndustry] = React.useState('');
+  const { signUpWithApi, setPendingPlan, setPlan } = useUser();
+  const [industry, setIndustry] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    login(role, plan);
+    setError('');
+    setLoading(true);
+    try {
+      await signUpWithApi({
+        email,
+        password,
+        role,
+        name: role === 'company' ? name : name,
+        industry: role === 'company' ? industry : undefined,
+        plan,
+      });
 
-    if (isFreePlan(plan)) {
-      setPlan(plan);
-      if (role === 'candidate') {
-        router.push('/onboarding/profile');
+      if (isFreePlan(plan)) {
+        await setPlan(plan);
+        router.push(role === 'candidate' ? '/onboarding/profile' : '/onboarding/company-profile');
       } else {
-        router.push('/onboarding/company-profile');
+        setPendingPlan(plan);
+        router.push(`/checkout?plan=${plan}&role=${role}&next=onboarding`);
       }
-    } else {
-      setPendingPlan(plan);
-      router.push(`/checkout?plan=${plan}&role=${role}&next=onboarding`);
+    } catch (err: any) {
+      setError(err?.detail || err?.message || 'Signup failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -73,21 +89,21 @@ function SignupForm() {
           </p>
 
           <form onSubmit={handleSignup} className="space-y-4">
-            {role === 'company' ? (
-              <FormField label="Company Name" required>
-                <Input required />
-              </FormField>
-            ) : (
-              <FormField label="Full Name" required>
-                <Input required />
-              </FormField>
-            )}
+            <FormField label={role === 'company' ? 'Company Name' : 'Full Name'} required>
+              <Input required value={name} onChange={(e) => setName(e.target.value)} />
+            </FormField>
 
             <FormField label="Email" required>
-              <Input type="email" required />
+              <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
             </FormField>
             <FormField label="Password" required>
-              <Input type="password" required />
+              <Input
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
             </FormField>
 
             {role === 'company' && (
@@ -101,8 +117,14 @@ function SignupForm() {
               </FormField>
             )}
 
-            <Button type="submit" className="w-full mt-4">
-              {isFreePlan(plan) ? 'Create Account' : 'Continue to Checkout'}
+            {error && <p className="text-sm text-red-600">{error}</p>}
+
+            <Button type="submit" className="w-full mt-4" disabled={loading}>
+              {loading
+                ? 'Creating…'
+                : isFreePlan(plan)
+                  ? 'Create Account'
+                  : 'Continue to Checkout'}
             </Button>
           </form>
 

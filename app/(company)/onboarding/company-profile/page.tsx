@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { FormField, Input, Textarea } from '@/components/ui/FormField';
 import { FileDropzone } from '@/components/ui/FileDropzone';
 import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
+import { companyApi } from '@/lib/api';
 
 const CITIES = [
   'Bengaluru', 'Mumbai', 'New Delhi', 'Hyderabad', 'Pune', 'Chennai', 
@@ -32,8 +33,19 @@ export default function CompanyProfileOnboarding() {
     industry: 'Technology / IT Services', // Carried over from signup
   });
 
-  const handleSave = () => {
-    // Save to backend logic goes here
+  const handleSave = async () => {
+    try {
+      await companyApi.updateMe({
+        name: formData.name,
+        about: formData.about,
+        size: formData.size,
+        website: formData.website,
+        hq_location: formData.location,
+        industry: formData.industry,
+      });
+    } catch {
+      /* offline */
+    }
     setCompanyProfileComplete(true);
     router.push('/company/dashboard');
   };

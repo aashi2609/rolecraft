@@ -1,0 +1,5 @@
+# Cloud Run builds from source — declare Python runtime
+# Used when deploying with: gcloud run deploy --source .
+runtime: python312
+
+# Optional buildpacks entry — uvicorn is started via Procfile

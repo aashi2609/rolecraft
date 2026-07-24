@@ -12,6 +12,7 @@ import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
 import { Card } from '@/components/ui/Card';
 import { useUser } from '@/context/UserContext';
 import { SKILLS } from '@/lib/constants';
+import { candidateApi } from '@/lib/api';
 
 const STEPS = ['Basic', 'Education', 'Certifications', 'Experience', 'Skills'];
 
@@ -50,21 +51,65 @@ export default function OnboardingForm() {
     updateForm(key, newArr);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (currentStep < STEPS.length - 1) {
       nextStep();
-    } else {
-      setCandidateProfile({
-        skills: formData.skills,
-        education: formData.education,
-        experience: formData.experience,
-        certifications: formData.certifications,
-        projects: formData.projects,
-        careerLevel: formData.careerLevel,
-      });
-      setProfileComplete(true);
-      router.push('/onboarding/generate');
+      return;
     }
+    try {
+      await candidateApi.updateMe({ career_level: formData.careerLevel });
+      if (formData.skills?.length) {
+        await candidateApi.putSkills(formData.skills);
+      }
+      for (const ed of formData.education || []) {
+        await candidateApi.addEducation({
+          qualification_level: ed.level,
+          degree: ed.degree || ed.field,
+          institute: ed.institute || ed.university,
+          field_of_study: ed.field || ed.degree,
+          passing_year: ed.year ? Number(ed.year) : undefined,
+          cgpa: ed.cgpa,
+        });
+      }
+      for (const c of formData.certifications || []) {
+        if (!c.name) continue;
+        await candidateApi.addCertification({
+          name: c.name,
+          issuing_org: c.org || c.issuer,
+          description: c.desc,
+        });
+      }
+      for (const e of formData.experience || []) {
+        await candidateApi.addExperience({
+          company_name: e.company,
+          role: e.title || e.role,
+          designation: e.title || e.role,
+          responsibilities: e.desc || e.description,
+          is_current: Boolean(e.current),
+        });
+      }
+      for (const p of formData.projects || []) {
+        await candidateApi.addProject({
+          org: p.org,
+          project_name: p.name,
+          team_size: p.size ? Number(p.size) : undefined,
+          tools_used: p.tools,
+          responsibilities: p.desc,
+        });
+      }
+    } catch {
+      /* keep local profile if API offline */
+    }
+    setCandidateProfile({
+      skills: formData.skills,
+      education: formData.education,
+      experience: formData.experience,
+      certifications: formData.certifications,
+      projects: formData.projects,
+      careerLevel: formData.careerLevel,
+    });
+    setProfileComplete(true);
+    router.push('/onboarding/generate');
   };
 
   return (

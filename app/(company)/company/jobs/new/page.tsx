@@ -18,6 +18,7 @@ import {
   SKILLS,
 } from '@/lib/constants';
 import { isFreePlan, maxJobPostings } from '@/lib/plans';
+import { jobsApi } from '@/lib/api';
 
 type JobDraft = {
   id: number | null;
@@ -113,45 +114,77 @@ function PostJobContent() {
     setDraft((prev) => ({ ...prev, [key]: value }));
   };
 
-  const persist = (status: 'Live' | 'Draft') => {
+  const persist = async (status: 'Live' | 'Draft') => {
     if (atCap && status === 'Live') return;
     setSaving(true);
-    const payload = {
-      id: draft.id ?? Date.now(),
-      companyId: 1,
-      companyName: 'Your Company',
+    const apiBody = {
       title: draft.title,
-      vertical: draft.department,
       department: draft.department,
+      employment_type: draft.employmentType,
+      experience_range: draft.experience,
+      min_salary: draft.salaryMin ? Number(draft.salaryMin) : undefined,
+      max_salary: draft.salaryMax ? Number(draft.salaryMax) : undefined,
+      salary_unit: draft.salaryUnit,
       location: draft.location,
-      employmentType: draft.employmentType,
-      jobType: draft.jobType,
-      salaryMin: draft.salaryMin,
-      salaryMax: draft.salaryMax,
-      salaryUnit: draft.salaryUnit,
-      salaryUndisclosed: !draft.salaryMin && !draft.salaryMax,
-      experience: draft.experience,
-      skills: draft.skills,
+      job_type: draft.jobType?.toLowerCase(),
+      required_skills: draft.skills,
+      num_openings: Number(draft.openings) || 1,
+      application_deadline: draft.deadline || undefined,
       description: draft.description,
       responsibilities: draft.responsibilities,
       requirements: draft.requirements,
       benefits: draft.benefits,
-      openings: Number(draft.openings) || 1,
-      deadline: draft.deadline,
-      status,
-      matched: draft.id ? jobs.find((j) => j.id === draft.id)?.matched ?? 0 : 0,
-      shortlisted: draft.id ? jobs.find((j) => j.id === draft.id)?.shortlisted ?? 0 : 0,
-      date: draft.id
-        ? jobs.find((j) => j.id === draft.id)?.date ?? new Date().toISOString().split('T')[0]
-        : new Date().toISOString().split('T')[0],
+      status: status.toLowerCase(),
     };
 
-    setTimeout(() => {
+    try {
+      if (draft.id) {
+        const updated = await jobsApi.update(String(draft.id), apiBody);
+        if (status !== (jobs.find((j) => String(j.id) === String(draft.id))?.status || '')) {
+          await jobsApi.setStatus(String(draft.id), status.toLowerCase());
+        }
+        updateJob({
+          id: updated.id,
+          title: updated.title,
+          department: updated.department,
+          status: status,
+        });
+      } else {
+        const created = await jobsApi.create(apiBody);
+        addJob({
+          id: created.id,
+          title: created.title,
+          department: created.department,
+          location: created.location,
+          employmentType: created.employment_type,
+          status: status,
+          matched: 0,
+          shortlisted: 0,
+          date: created.created_at?.slice?.(0, 10),
+          skills: created.required_skills || [],
+        });
+      }
+      router.push('/company/jobs');
+    } catch {
+      // Fallback local persist if API offline
+      const payload = {
+        id: draft.id ?? Date.now(),
+        title: draft.title,
+        department: draft.department,
+        location: draft.location,
+        employmentType: draft.employmentType,
+        status,
+        matched: 0,
+        shortlisted: 0,
+        date: new Date().toISOString().split('T')[0],
+        skills: draft.skills,
+      };
       if (draft.id) updateJob(payload);
       else addJob(payload);
-      setSaving(false);
       router.push('/company/jobs');
-    }, 600);
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (atCap) {

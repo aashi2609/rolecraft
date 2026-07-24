@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useMemo, useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -10,85 +10,36 @@ import { UpsellPrompt } from '@/components/UpsellPrompt';
 import { useUser } from '@/context/UserContext';
 import { VERTICALS } from '@/lib/constants';
 import { maxTargetRoles, isFreePlan } from '@/lib/plans';
-import {
-  tailorResumesForVerticals,
-  type CandidateProfile,
-  type TailoredResume,
-} from '@/lib/resume-tailor';
+import { resumesApi } from '@/lib/api';
 
 type Phase = 'select' | 'generating' | 'summary';
+
+type GeneratedResume = {
+  vertical: string;
+  score: number;
+  date: string;
+  summary?: string;
+  mappingNotes?: string;
+  highlightedSkills?: string[];
+  emphasis?: string[];
+  id?: string;
+};
 
 function GenerateContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const skipProfile = searchParams.get('skipProfile') === 'true';
-  const { plan, resumes, addResume, candidateProfile, setCandidateProfile } = useUser();
+  const { plan, resumes, addResume, setCandidateProfile, refreshResumes } = useUser();
 
   const [roles, setRoles] = useState<string[]>([]);
   const [phase, setPhase] = useState<Phase>('select');
   const [currentRoleIndex, setCurrentRoleIndex] = useState(0);
-  const [generated, setGenerated] = useState<TailoredResume[]>([]);
+  const [generated, setGenerated] = useState<GeneratedResume[]>([]);
+  const [error, setError] = useState('');
 
   const freeCapped = isFreePlan(plan);
   const roleLimit = maxTargetRoles(plan);
   const atCap = freeCapped && resumes.length >= 1;
-
-  const profile = useMemo<CandidateProfile>(() => {
-    const p = candidateProfile || {};
-    const rawProjects = (p.projects as Array<Record<string, string>>) || [];
-    const rawExperience = (p.experience as Array<Record<string, unknown>>) || [];
-    return {
-      name: (p.name as string) || 'Jane Doe',
-      skills: (p.skills as string[]) || [
-        'Python',
-        'C',
-        'Communication',
-        'MATLAB',
-        'Git',
-        'Presentation',
-      ],
-      education: (p.education as CandidateProfile['education']) || [
-        {
-          degree: 'B.Tech',
-          field: 'Electronics & Communication',
-          school: 'NIT',
-          highlights: ['Circuits lab', 'Embedded systems'],
-        },
-      ],
-      experience:
-        rawExperience.length > 0
-          ? rawExperience.map((e) => ({
-              title: String(e.title || e.role || 'Role'),
-              company: String(e.company || e.org || ''),
-              description: String(e.description || e.desc || e.responsibilities || ''),
-              skills: Array.isArray(e.skills) ? (e.skills as string[]) : undefined,
-            }))
-          : [
-              {
-                title: 'Intern',
-                company: 'Hardware Co',
-                description:
-                  'Built circuit prototypes and wrote Python scripts to automate lab measurements; presented findings to clients.',
-                skills: ['MATLAB', 'Python', 'Communication'],
-              },
-            ],
-      projects:
-        rawProjects.length > 0
-          ? rawProjects.map((proj) => ({
-              name: proj.name || 'Project',
-              description: proj.desc || proj.description || '',
-              tags: proj.tools ? proj.tools.split(/[,\s]+/).filter(Boolean) : [],
-            }))
-          : [
-              {
-                name: 'Smart IoT Sensor',
-                description: 'Embedded + cloud dashboard',
-                tags: ['IoT', 'Python', 'Hardware'],
-              },
-            ],
-      certifications: (p.certifications as CandidateProfile['certifications']) || [],
-    };
-  }, [candidateProfile]);
 
   const onRolesChange = (next: string[]) => {
     if (Number.isFinite(roleLimit) && next.length > roleLimit) {
@@ -98,46 +49,43 @@ function GenerateContent() {
     setRoles(next);
   };
 
-  const startGenerate = () => {
+  const startGenerate = async () => {
     if (roles.length === 0 || atCap) return;
     const selected = freeCapped ? roles.slice(0, 1) : roles;
     setRoles(selected);
     setPhase('generating');
     setCurrentRoleIndex(0);
     setGenerated([]);
+    setError('');
 
-    const results: TailoredResume[] = [];
-    let i = 0;
+    // Animate per-role progress while API runs
+    selected.forEach((_, idx) => {
+      setTimeout(() => setCurrentRoleIndex(idx), idx * 600);
+    });
 
-    const tick = () => {
-      if (i >= selected.length) {
-        setGenerated(results);
-        setPhase('summary');
-        results.forEach((r) => {
-          addResume({
-            id: Date.now() + Math.random(),
-            vertical: r.vertical,
-            score: r.score,
-            date: r.date,
-            summary: r.summary,
-            emphasis: r.emphasis,
-            mappingNotes: r.mappingNotes,
-            highlightedSkills: r.highlightedSkills,
-          });
-        });
-        localStorage.setItem('rolecraft_target_verticals', JSON.stringify(selected));
-        localStorage.setItem('rolecraft_target_vertical', selected[0] || '');
-        setCandidateProfile({ targetVerticals: selected });
-        return;
-      }
-      setCurrentRoleIndex(i);
-      const tailored = tailorResumesForVerticals(profile, [selected[i]])[0];
-      results.push(tailored);
-      i += 1;
-      setTimeout(tick, 1400);
-    };
-
-    setTimeout(tick, 400);
+    try {
+      const raw = await resumesApi.generate(selected);
+      const results: GeneratedResume[] = (raw || []).map((r: any) => ({
+        id: r.id,
+        vertical: r.target_vertical,
+        score: r.ats_score,
+        date: r.created_at?.slice?.(0, 10) || new Date().toISOString().slice(0, 10),
+        summary: r.content?.summary,
+        mappingNotes: r.content?.mappingNotes,
+        highlightedSkills: r.content?.highlightedSkills,
+        emphasis: r.content?.emphasis,
+      }));
+      results.forEach((r) => addResume(r));
+      setGenerated(results);
+      localStorage.setItem('rolecraft_target_verticals', JSON.stringify(selected));
+      localStorage.setItem('rolecraft_target_vertical', selected[0] || '');
+      setCandidateProfile({ targetVerticals: selected });
+      await refreshResumes();
+      setPhase('summary');
+    } catch (err: any) {
+      setError(err?.detail || err?.message || 'Generation failed');
+      setPhase('select');
+    }
   };
 
   const goNext = () => {
@@ -198,6 +146,8 @@ function GenerateContent() {
                 </p>
               )}
             </div>
+
+            {error && <p className="text-sm text-red-600 mb-4 text-left">{error}</p>}
 
             <Button
               className="w-full"

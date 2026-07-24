@@ -14,9 +14,17 @@ export default function MyJobsPage() {
   // Show company-owned + seeded jobs for demo
   const myJobs = jobs;
 
-  const closeJob = (id: number) => {
-    const job = jobs.find((j) => j.id === id);
-    if (job) updateJob({ ...job, status: 'Closed' });
+  const closeJob = async (id: number | string) => {
+    const job = jobs.find((j) => String(j.id) === String(id));
+    if (job) {
+      try {
+        const { jobsApi } = await import('@/lib/api');
+        await jobsApi.setStatus(String(id), 'closed');
+      } catch {
+        /* offline */
+      }
+      updateJob({ ...job, status: 'Closed' });
+    }
     setMenuOpen(null);
   };
 

@@ -6,16 +6,21 @@ import { Button } from '@/components/ui/Button';
 import { FormField, Input } from '@/components/ui/FormField';
 import Link from 'next/link';
 import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { authApi } from '@/lib/api';
 
 export default function ForgotPasswordPage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [email, setEmail] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) {
-      setIsSubmitted(true);
+    if (!email) return;
+    try {
+      await authApi.forgotPassword(email);
+    } catch {
+      /* always show success */
     }
+    setIsSubmitted(true);
   };
 
   return (
