@@ -10,18 +10,21 @@ import { TagInput } from '@/components/ui/TagInput';
 import { RepeatableSection } from '@/components/ui/RepeatableSection';
 import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
 import { Card } from '@/components/ui/Card';
+import { useUser } from '@/context/UserContext';
+import { SKILLS } from '@/lib/constants';
 
 const STEPS = ['Basic', 'Education', 'Certifications', 'Experience', 'Skills'];
 
 const EDU_LEVELS = ['10th', '12th', 'Diploma', 'B.Tech/B.E.', 'B.Sc', 'B.Com', 'BA', 'BBA', 'BCA', 'M.Tech/M.E.', 'M.Sc', 'MBA', 'MCA', 'PhD', 'Other'];
-const DEGREES = ['Computer Science', 'Information Technology', 'Electronics', 'Mechanical', 'Commerce', 'Business Administration', 'Physics', 'Mathematics'];
+const DEGREES = ['Computer Science', 'Information Technology', 'Electronics', 'Electronics & Communication', 'Mechanical', 'Commerce', 'Business Administration', 'Physics', 'Mathematics'];
 const UNIVERSITIES = ['IIT Bombay', 'IIT Delhi', 'IIT Madras', 'BITS Pilani', 'NIT Trichy', 'Delhi University', 'Mumbai University', 'Anna University', 'CBSE Board', 'ICSE Board'];
 const CERT_NAMES = ['AWS Certified Solutions Architect', 'Google Cloud Professional', 'Meta Front-End Developer', 'PMP', 'Scrum Master/CSM'];
 const ORGS = ['Coursera', 'Udemy', 'edX', 'Google', 'AWS', 'Microsoft', 'Meta', 'IBM'];
-const TECH_SKILLS = ['Python', 'Java', 'JavaScript', 'TypeScript', 'C++', 'Go', 'Rust', 'React', 'Next.js', 'Vue', 'Angular', 'Tailwind CSS', 'Node.js', 'FastAPI', 'Django', 'Spring Boot', 'Express', 'PostgreSQL', 'MongoDB', 'MySQL', 'Redis', 'AWS', 'GCP', 'Azure', 'Docker', 'Kubernetes', 'Terraform', 'LangChain', 'LangGraph', 'TensorFlow', 'PyTorch', 'Gemini API', 'OpenAI API', 'Git', 'Figma', 'Jira', 'Postman', 'Communication', 'Leadership', 'Problem Solving', 'Teamwork'];
+const TECH_SKILLS = SKILLS;
 
 export default function OnboardingForm() {
   const router = useRouter();
+  const { setCandidateProfile, setProfileComplete } = useUser();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<any>({
     careerLevel: '',
@@ -48,10 +51,18 @@ export default function OnboardingForm() {
   };
 
   const handleSave = () => {
-    console.log('Saved form data:', formData);
     if (currentStep < STEPS.length - 1) {
       nextStep();
     } else {
+      setCandidateProfile({
+        skills: formData.skills,
+        education: formData.education,
+        experience: formData.experience,
+        certifications: formData.certifications,
+        projects: formData.projects,
+        careerLevel: formData.careerLevel,
+      });
+      setProfileComplete(true);
       router.push('/onboarding/generate');
     }
   };

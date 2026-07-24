@@ -1,22 +1,25 @@
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&display=swap');
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
 
 :root {
   --background: 0 0% 100%;
-  --foreground: 210 14% 17%;
-  --primary: 210 14% 17%;
+  --foreground: 222 47% 11%;
+  --primary: 217 91% 53%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 96%;
-  --secondary-foreground: 0 0% 9%;
-  --muted: 0 0% 96%;
-  --muted-foreground: 184 5% 55%;
-  --accent: 239 84% 67%;
+  --secondary: 214 32% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 217 91% 53%;
   --accent-foreground: 0 0% 100%;
-  --border: 0 0% 90%;
-  --ring: 239 84% 67%;
-  --radius: 0.5rem;
-  --shadow-dashboard: 0 25px 80px -12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  --border: 214 32% 91%;
+  --ring: 217 91% 53%;
+  --radius: 0.625rem;
+  --sidebar: 0 0% 100%;
+  --sidebar-border: 214 32% 91%;
+  --card-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-dashboard: 0 25px 80px -12px rgba(37, 99, 235, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.06);
 }
 
 @theme inline {
@@ -32,20 +35,32 @@
   --color-accent-foreground: hsl(var(--accent-foreground));
   --color-border: hsl(var(--border));
   --color-ring: hsl(var(--ring));
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-border: hsl(var(--sidebar-border));
   --radius: var(--radius);
-  
-  --font-display: 'Instrument Serif', serif;
-  --font-body: 'Inter', sans-serif;
-  
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
   --shadow-dashboard: var(--shadow-dashboard);
+  --shadow-card: var(--card-shadow);
 }
 
 body {
-  background: var(--color-background);
-  color: var(--color-foreground);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
   font-family: var(--font-body);
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Soft blue wash for atmosphere without breaking the white SaaS look */
+.bg-app-surface {
+  background:
+    radial-gradient(ellipse 80% 50% at 100% -20%, rgba(37, 99, 235, 0.06), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 0% 100%, rgba(37, 99, 235, 0.04), transparent 45%),
+    #ffffff;
 }
