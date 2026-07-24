@@ -7,14 +7,14 @@ import { FormField, Input } from '@/components/ui/FormField';
 
 export default function CandidateSettingsPage() {
   return (
-    <div className="min-h-screen bg-slate-50 py-10">
+    <div className="min-h-screen bg-surface-soft py-10">
       <div className="max-w-4xl mx-auto px-4">
         
-        <h1 className="text-3xl font-bold text-slate-900 mb-8">Settings</h1>
+        <h1 className="text-3xl font-bold text-ink mb-8">Settings</h1>
 
         <div className="space-y-8">
           <Card className="p-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-6 border-b pb-2">Account Info</h2>
+            <h2 className="text-xl font-bold text-ink mb-6 border-b pb-2">Account Info</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField label="Full Name"><Input defaultValue="Candidate User" /></FormField>
               <FormField label="Email Address"><Input defaultValue="candidate@example.com" disabled /></FormField>
@@ -23,7 +23,7 @@ export default function CandidateSettingsPage() {
           </Card>
 
           <Card className="p-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-6 border-b pb-2">Change Password</h2>
+            <h2 className="text-xl font-bold text-ink mb-6 border-b pb-2">Change Password</h2>
             <div className="space-y-4 max-w-md">
               <FormField label="Current Password"><Input type="password" /></FormField>
               <FormField label="New Password"><Input type="password" /></FormField>
@@ -34,7 +34,7 @@ export default function CandidateSettingsPage() {
 
           <Card className="p-6 border-red-200">
             <h2 className="text-xl font-bold text-red-600 mb-2">Danger Zone</h2>
-            <p className="text-slate-600 mb-4 text-sm">Once you delete your account, there is no going back. Please be certain.</p>
+            <p className="text-ink-muted mb-4 text-sm">Once you delete your account, there is no going back. Please be certain.</p>
             <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700">Delete Account</Button>
           </Card>
         </div>

@@ -19,25 +19,25 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-surface-soft flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8 relative overflow-hidden">
         
         {/* Decorative element */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -z-10"></div>
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-100/50 rounded-tr-full -z-10"></div>
 
-        <Link href="/signin" className="inline-flex items-center text-sm text-slate-500 hover:text-primary mb-6 transition-colors">
+        <Link href="/signin" className="inline-flex items-center text-sm text-ink-muted hover:text-primary mb-6 transition-colors">
           <ArrowLeft className="w-4 h-4 mr-1" /> Back to Sign In
         </Link>
 
         {!isSubmitted ? (
           <>
-            <div className="w-12 h-12 bg-blue-50 text-primary rounded-xl flex items-center justify-center mb-6">
+            <div className="w-12 h-12 bg-brand-blue/10 text-primary rounded-xl flex items-center justify-center mb-6">
               <Mail className="w-6 h-6" />
             </div>
             
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">Forgot Password?</h1>
-            <p className="text-slate-500 mb-8 text-sm">
+            <h1 className="text-2xl font-bold text-ink mb-2">Forgot Password?</h1>
+            <p className="text-ink-muted mb-8 text-sm">
               No worries, we'll send you reset instructions. Enter the email associated with your account.
             </p>
 
@@ -62,9 +62,9 @@ export default function ForgotPasswordPage() {
             <div className="w-16 h-16 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle2 className="w-8 h-8" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">Check your email</h2>
-            <p className="text-slate-500 mb-8 text-sm">
-              We've sent a password reset link to <span className="font-medium text-slate-700">{email}</span>.
+            <h2 className="text-2xl font-bold text-ink mb-2">Check your email</h2>
+            <p className="text-ink-muted mb-8 text-sm">
+              We've sent a password reset link to <span className="font-medium text-ink">{email}</span>.
             </p>
             <Link href="/signin">
               <Button variant="outline" className="w-full">Return to Sign In</Button>

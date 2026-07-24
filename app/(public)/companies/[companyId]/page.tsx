@@ -18,7 +18,7 @@ export default function CompanyPublicProfilePage() {
   
   if (companyJobs.length === 0) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center text-slate-500">
+      <div className="min-h-[80vh] flex items-center justify-center text-ink-muted">
         Company not found or has no active listings.
       </div>
     );
@@ -35,22 +35,22 @@ export default function CompanyPublicProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-10">
+    <div className="min-h-screen bg-surface-soft py-10">
       <div className="max-w-4xl mx-auto px-4">
         
-        <button onClick={() => router.back()} className="text-sm text-slate-500 hover:text-primary mb-6 inline-block">
+        <button onClick={() => router.back()} className="text-sm text-ink-muted hover:text-primary mb-6 inline-block">
           ← Back
         </button>
 
         {/* Header */}
         <Card className="p-8 mb-8">
           <div className="flex flex-col md:flex-row gap-6 items-start">
-            <div className="w-24 h-24 bg-slate-100 rounded-2xl flex items-center justify-center text-4xl font-bold text-slate-600 shrink-0 shadow-sm border border-slate-200">
+            <div className="w-24 h-24 bg-surface-soft rounded-2xl flex items-center justify-center text-4xl font-bold text-ink-muted shrink-0 shadow-sm border border-border-soft">
               {company.name.charAt(0)}
             </div>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-slate-900 mb-2">{company.name}</h1>
-              <div className="flex flex-wrap gap-4 text-sm text-slate-600 mb-4">
+              <h1 className="text-3xl font-bold text-ink mb-2">{company.name}</h1>
+              <div className="flex flex-wrap gap-4 text-sm text-ink-muted mb-4">
                 <div className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {company.hq}</div>
                 <div className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> {company.industry}</div>
                 <div className="flex items-center gap-1"><Users className="w-4 h-4" /> {company.size}</div>
@@ -66,20 +66,20 @@ export default function CompanyPublicProfilePage() {
           {/* Main Column */}
           <div className="md:col-span-2 space-y-8">
             <Card className="p-8">
-              <h2 className="text-xl font-bold text-slate-900 mb-4">About Us</h2>
-              <div className="prose text-slate-600 max-w-none">
+              <h2 className="text-xl font-bold text-ink mb-4">About Us</h2>
+              <div className="prose text-ink-muted max-w-none">
                 <p>{company.about}</p>
               </div>
             </Card>
 
             <div>
-              <h2 className="text-xl font-bold text-slate-900 mb-4">Open Positions ({companyJobs.length})</h2>
+              <h2 className="text-xl font-bold text-ink mb-4">Open Positions ({companyJobs.length})</h2>
               <div className="space-y-4">
                 {companyJobs.map(job => (
                   <Card key={job.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-primary transition-colors">
                     <div>
-                      <h3 className="font-bold text-slate-900">{job.title}</h3>
-                      <div className="flex items-center gap-3 text-sm text-slate-500 mt-2">
+                      <h3 className="font-bold text-ink">{job.title}</h3>
+                      <div className="flex items-center gap-3 text-sm text-ink-muted mt-2">
                         <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {job.location}</span>
                         <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" /> {job.employmentType}</span>
                       </div>
@@ -101,7 +101,7 @@ export default function CompanyPublicProfilePage() {
                 Create a tailored AI resume specifically optimized for their open roles.
               </p>
               <Link href="/onboarding/generate?skipProfile=true">
-                <Button variant="secondary" className="w-full text-primary bg-white hover:bg-slate-100">
+                <Button variant="secondary" className="w-full text-primary bg-white hover:bg-surface-soft">
                   Generate Tailored Resume
                 </Button>
               </Link>

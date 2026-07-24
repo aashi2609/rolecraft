@@ -12,12 +12,12 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 const buttonVariants = {
-  default: "bg-primary text-primary-foreground hover:bg-primary/90",
-  primary: "bg-primary text-primary-foreground hover:bg-primary/90",
-  secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-  outline: "border border-border bg-background hover:bg-secondary hover:text-foreground",
-  ghost: "hover:bg-secondary text-foreground",
-  link: "text-primary underline-offset-4 hover:underline",
+  default: "bg-brand-blue text-white hover:bg-brand-blue-deep",
+  primary: "bg-brand-blue text-white hover:bg-brand-blue-deep",
+  secondary: "bg-surface-soft text-ink hover:bg-border-soft/60",
+  outline: "border border-border-soft bg-surface-white hover:bg-surface-soft text-ink",
+  ghost: "hover:bg-surface-soft text-ink",
+  link: "text-brand-blue underline-offset-4 hover:underline",
 };
 
 const buttonSizes = {

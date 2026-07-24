@@ -25,7 +25,7 @@ export function RepeatableSection<T>({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+        <h3 className="text-lg font-bold text-ink">{title}</h3>
       </div>
       
       {items.map((item, index) => (
@@ -33,7 +33,7 @@ export function RepeatableSection<T>({
           <button
             type="button"
             onClick={() => onRemove(index)}
-            className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+            className="absolute top-4 right-4 p-1.5 text-ink-muted hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
             title="Remove item"
           >
             <Trash2 className="w-4 h-4" />

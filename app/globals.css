@@ -1,66 +1,171 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&display=swap');
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
 
 :root {
+  /* Exact design tokens */
+  --surface-white: #FFFFFF;
+  --surface-soft: #F5F8FF;
+  --ink: #0F172A;
+  --ink-muted: #64748B;
+  --brand-blue: #2563EB;
+  --brand-blue-deep: #1D4ED8;
+  --glow-blue: #60A5FA;
+  --border-soft: #E2E8F0;
+
+  /* Semantic aliases (HSL for existing utilities) */
   --background: 0 0% 100%;
-  --foreground: 222 47% 11%;
-  --primary: 217 91% 53%;
+  --foreground: 222 47% 11%; /* #0F172A */
+  --primary: 217 91% 60%; /* #2563EB */
   --primary-foreground: 0 0% 100%;
-  --secondary: 214 32% 96%;
+  --secondary: 220 100% 98%; /* ~#F5F8FF */
   --secondary-foreground: 222 47% 11%;
-  --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
-  --accent: 217 91% 53%;
+  --muted: 220 100% 98%;
+  --muted-foreground: 215 16% 47%; /* #64748B */
+  --accent: 217 91% 60%;
   --accent-foreground: 0 0% 100%;
-  --border: 214 32% 91%;
-  --ring: 217 91% 53%;
+  --border: 214 32% 91%; /* #E2E8F0 */
+  --ring: 217 91% 60%;
   --radius: 0.625rem;
   --sidebar: 0 0% 100%;
   --sidebar-border: 214 32% 91%;
   --card-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-dashboard: 0 25px 80px -12px rgba(37, 99, 235, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  --shadow-dashboard: 0 25px 80px -12px rgba(37, 99, 235, 0.12), 0 0 0 1px rgba(226, 232, 240, 1);
+  --shadow-soft: 0 4px 24px -4px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
 @theme inline {
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-border: hsl(var(--border));
-  --color-ring: hsl(var(--ring));
-  --color-sidebar: hsl(var(--sidebar));
-  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-background: var(--surface-white);
+  --color-foreground: var(--ink);
+  --color-primary: var(--brand-blue);
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: var(--surface-soft);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--surface-soft);
+  --color-muted-foreground: var(--ink-muted);
+  --color-accent: var(--brand-blue);
+  --color-accent-foreground: #FFFFFF;
+  --color-border: var(--border-soft);
+  --color-ring: var(--brand-blue);
+  --color-sidebar: var(--surface-white);
+  --color-sidebar-border: var(--border-soft);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-surface-white: var(--surface-white);
+  --color-surface-soft: var(--surface-soft);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-blue-deep: var(--brand-blue-deep);
+  --color-glow-blue: var(--glow-blue);
+  --color-border-soft: var(--border-soft);
   --radius: var(--radius);
-  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-body: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --shadow-dashboard: var(--shadow-dashboard);
   --shadow-card: var(--card-shadow);
+  --shadow-soft: var(--shadow-soft);
 }
 
 body {
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
-  font-family: var(--font-body);
+  background: var(--surface-white);
+  color: var(--ink);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-display);
+/* Type scale — display for headings, Inter for body */
+h1, h2, h3, h4, h5, h6,
+.font-display {
+  font-family: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+h1 {
+  font-size: clamp(2.25rem, 4vw, 2.5rem); /* ~36-40 section default; hero overrides */
+  line-height: 1.15;
+}
+
+h2 {
+  font-size: clamp(1.75rem, 3vw, 2.25rem); /* ~28-36 */
+  line-height: 1.2;
+}
+
+h3 {
+  font-size: 1.25rem; /* 20px card titles */
+  line-height: 1.3;
+}
+
+.text-hero {
+  font-family: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(2.5rem, 6vw, 4.5rem); /* 40 → 72 */
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+
+.text-section {
+  font-family: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(1.875rem, 3.5vw, 2.5rem); /* 30 → 40 */
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.text-card-title {
+  font-family: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.125rem; /* 18px */
   font-weight: 700;
   letter-spacing: -0.02em;
+  line-height: 1.3;
 }
 
-/* Soft blue wash for atmosphere without breaking the white SaaS look */
+.text-body {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.text-caption {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.8125rem; /* 13px */
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+label,
+input,
+textarea,
+select,
+button {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Soft page wash */
 .bg-app-surface {
   background:
-    radial-gradient(ellipse 80% 50% at 100% -20%, rgba(37, 99, 235, 0.06), transparent 50%),
-    radial-gradient(ellipse 60% 40% at 0% 100%, rgba(37, 99, 235, 0.04), transparent 45%),
-    #ffffff;
+    radial-gradient(ellipse 70% 45% at 100% -10%, rgba(96, 165, 250, 0.08), transparent 55%),
+    radial-gradient(ellipse 50% 35% at 0% 100%, rgba(37, 99, 235, 0.04), transparent 50%),
+    var(--surface-white);
+}
+
+/* Hero product glow — intentional, anchored behind mockup (~18% glow-blue) */
+.hero-glow {
+  background: radial-gradient(
+    ellipse 50% 48% at 50% 42%,
+    rgba(96, 165, 250, 0.2) 0%,
+    rgba(96, 165, 250, 0.1) 32%,
+    rgba(37, 99, 235, 0.04) 58%,
+    transparent 72%
+  );
+  filter: blur(48px);
+  pointer-events: none;
+}
+
+/* Primary hover → brand-blue-deep */
+.hover\:bg-brand-deep:hover {
+  background-color: var(--brand-blue-deep);
 }

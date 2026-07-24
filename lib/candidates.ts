@@ -114,5 +114,5 @@ export function matchLabel(pct: number): { label: string; tone: string } {
   if (pct >= 85) return { label: 'Excellent Match', tone: 'text-green-700 bg-green-50 border-green-200' };
   if (pct >= 70) return { label: 'Good Match', tone: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
   if (pct >= 50) return { label: 'Fair Match', tone: 'text-amber-700 bg-amber-50 border-amber-200' };
-  return { label: 'Low Match', tone: 'text-slate-600 bg-slate-50 border-slate-200' };
+  return { label: 'Low Match', tone: 'text-ink-muted bg-surface-soft border-border-soft' };
 }

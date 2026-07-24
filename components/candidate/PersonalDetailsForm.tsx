@@ -19,14 +19,14 @@ export default function PersonalDetailsForm() {
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-4">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8 space-y-8">
+      <div className="bg-white rounded-xl shadow-sm border border-border-soft p-8 space-y-8">
         
         <section>
-          <h2 className="text-xl font-bold text-slate-900 border-b pb-2 mb-4">Basic Information</h2>
+          <h2 className="text-xl font-bold text-ink border-b pb-2 mb-4">Basic Information</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField label="Date of Birth"><Input type="date" /></FormField>
             <FormField label="Gender">
-              <select className="px-3 py-2 bg-white border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-slate-900">
+              <select className="px-3 py-2 bg-white border border-border-soft rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-ink">
                 <option>Select</option>
                 <option>Male</option>
                 <option>Female</option>
@@ -34,7 +34,7 @@ export default function PersonalDetailsForm() {
               </select>
             </FormField>
             <FormField label="Marital Status">
-              <select className="px-3 py-2 bg-white border border-slate-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-slate-900">
+              <select className="px-3 py-2 bg-white border border-border-soft rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-ink">
                 <option>Select</option>
                 <option>Single</option>
                 <option>Married</option>
@@ -43,7 +43,7 @@ export default function PersonalDetailsForm() {
             <FormField label="Religion">
               <div className="flex flex-col gap-2">
                 <Input placeholder="Enter religion" />
-                <label className="flex items-center gap-2 text-sm text-slate-600">
+                <label className="flex items-center gap-2 text-sm text-ink-muted">
                   <input type="checkbox" /> Prefer not to say
                 </label>
               </div>
@@ -52,10 +52,10 @@ export default function PersonalDetailsForm() {
         </section>
 
         <section>
-          <h2 className="text-xl font-bold text-slate-900 border-b pb-2 mb-4">Address & Preferences</h2>
+          <h2 className="text-xl font-bold text-ink border-b pb-2 mb-4">Address & Preferences</h2>
           <div className="space-y-4">
             <FormField label="Present Address"><Textarea className="min-h-[60px]" /></FormField>
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-800">
+            <label className="flex items-center gap-2 text-sm font-medium text-ink">
               <input type="checkbox" /> Permanent address same as present
             </label>
             <FormField label="Permanent Address"><Textarea className="min-h-[60px]" /></FormField>
@@ -65,7 +65,7 @@ export default function PersonalDetailsForm() {
         </section>
 
         <section>
-          <h2 className="text-xl font-bold text-slate-900 border-b pb-2 mb-4">Professional Info</h2>
+          <h2 className="text-xl font-bold text-ink border-b pb-2 mb-4">Professional Info</h2>
           <div className="space-y-4">
             <FormField label="Strengths"><TagInput tags={[]} onChange={()=>{}} /></FormField>
             <FormField label="Weaknesses"><TagInput tags={[]} onChange={()=>{}} /></FormField>
@@ -79,7 +79,7 @@ export default function PersonalDetailsForm() {
               onRemove={() => {}}
               renderItem={() => (
                 <div className="flex gap-4">
-                  <select className="w-1/3 px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-900">
+                  <select className="w-1/3 px-3 py-2 bg-white border border-border-soft rounded-lg text-ink">
                     <option>LinkedIn</option><option>GitHub</option><option>Portfolio</option>
                   </select>
                   <Input className="w-2/3" placeholder="URL" />
@@ -90,7 +90,7 @@ export default function PersonalDetailsForm() {
         </section>
 
         <section>
-          <h2 className="text-xl font-bold text-slate-900 border-b pb-2 mb-4">Family Members</h2>
+          <h2 className="text-xl font-bold text-ink border-b pb-2 mb-4">Family Members</h2>
           <RepeatableSection
             title="Family"
             addLabel="Add Family Member"
@@ -109,7 +109,7 @@ export default function PersonalDetailsForm() {
           />
         </section>
 
-        <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
+        <div className="mt-8 pt-6 border-t border-border-soft flex items-center justify-between">
           <Button variant="ghost">Cancel</Button>
           <div className="space-x-4">
             <Button variant="outline" onClick={handleSave}>Save as Draft</Button>

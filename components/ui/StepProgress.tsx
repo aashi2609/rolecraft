@@ -22,14 +22,14 @@ export function StepProgress({ steps, currentStep }: StepProgressProps) {
                     ? 'bg-primary border-primary text-white'
                     : isCurrent
                     ? 'bg-white border-primary text-primary'
-                    : 'bg-white border-slate-200 text-slate-400'
+                    : 'bg-white border-border-soft text-ink-muted'
                 }`}
               >
                 {isCompleted ? <Check className="w-5 h-5" /> : index + 1}
               </div>
               <span
                 className={`mt-2 text-xs font-medium text-center max-w-[80px] ${
-                  isCurrent || isCompleted ? 'text-slate-900' : 'text-slate-400'
+                  isCurrent || isCompleted ? 'text-ink' : 'text-ink-muted'
                 }`}
               >
                 {step}
@@ -40,7 +40,7 @@ export function StepProgress({ steps, currentStep }: StepProgressProps) {
       </div>
       {/* Background track line */}
       <div className="relative -mt-[52px] mb-[32px] w-[calc(100%-40px)] mx-auto">
-        <div className="h-1 bg-slate-200 w-full absolute top-1/2 transform -translate-y-1/2 -z-10 rounded-full">
+        <div className="h-1 bg-border-soft w-full absolute top-1/2 transform -translate-y-1/2 -z-10 rounded-full">
           <div
             className="h-1 bg-primary absolute left-0 top-0 rounded-full transition-all duration-300"
             style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}

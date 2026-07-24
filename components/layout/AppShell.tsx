@@ -71,16 +71,16 @@ function PlanCard({ role }: { role: 'candidate' | 'company' }) {
   const { plan, planValidTill } = useUser();
   const subscribeHref = `/subscribe?role=${role}`;
   return (
-    <div className="mx-3 mb-4 rounded-xl border border-border bg-secondary/60 p-3.5">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="mx-3 mb-4 rounded-xl border border-border-soft bg-surface-soft p-3.5">
+      <p className="text-caption uppercase tracking-wider text-ink-muted">
         Your Plan
       </p>
-      <p className="mt-1 text-sm font-bold text-foreground">{planDisplayName(plan)}</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">
+      <p className="mt-1 text-sm font-bold font-display text-ink">{planDisplayName(plan)}</p>
+      <p className="mt-0.5 text-xs text-ink-muted">
         {isFreePlan(plan) ? 'Free forever' : `Valid till ${planValidTill || '24 Aug'}`}
       </p>
       <Link href={subscribeHref} className="mt-3 block">
-        <Button variant="outline" size="sm" className="w-full border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground">
+        <Button variant="outline" size="sm" className="w-full border-brand-blue/30 text-brand-blue hover:bg-brand-blue hover:text-white">
           View Plan
         </Button>
       </Link>
@@ -100,13 +100,13 @@ export function DashboardSidebar({ role }: { role: 'candidate' | 'company' }) {
   };
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
-      <div className="flex h-16 items-center px-5 border-b border-sidebar-border">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border-soft bg-surface-white">
+      <div className="flex h-16 items-center px-5 border-b border-border-soft">
         <Logo href={role === 'company' ? '/company/dashboard' : '/dashboard'} />
       </div>
 
       <div className="px-4 pt-5 pb-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-2">
+        <p className="text-caption uppercase tracking-wider text-ink-muted px-2">
           Dashboard
         </p>
       </div>
@@ -192,8 +192,8 @@ export function AppShell({
 
   if (isOnboarding) {
     return (
-      <div className="min-h-screen flex flex-col bg-app-surface">
-        <header className="h-14 border-b border-border bg-white flex items-center px-6">
+      <div className="min-h-screen flex flex-col bg-surface-soft">
+        <header className="h-14 border-b border-border-soft bg-surface-white flex items-center px-6">
           <Logo href={role === 'company' ? '/company/dashboard' : '/dashboard'} />
         </header>
         <main className="flex-1">{children}</main>
@@ -202,12 +202,12 @@ export function AppShell({
   }
 
   return (
-    <div className="flex min-h-screen bg-app-surface">
+    <div className="flex min-h-screen bg-surface-soft">
       <div className="sticky top-0 h-screen hidden md:block">
         <DashboardSidebar role={role} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-white/90 backdrop-blur px-4 md:px-8">
+        <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border-soft bg-surface-white/95 backdrop-blur px-4 md:px-8">
           <div className="md:hidden">
             <Logo href={role === 'company' ? '/company/dashboard' : '/dashboard'} />
           </div>
@@ -220,17 +220,17 @@ export function AppShell({
                 logout();
                 router.push('/');
               }}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-ink-muted hover:bg-surface-soft hover:text-ink"
               aria-label="Sign out"
             >
               <LogOut className="h-4 w-4" />
             </button>
-            <div className="ml-1 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+            <div className="ml-1 flex h-8 w-8 items-center justify-center rounded-full bg-brand-blue/10 text-sm font-bold text-brand-blue font-display">
               {role === 'company' ? 'C' : 'U'}
             </div>
           </div>
         </header>
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 bg-surface-soft/40">{children}</main>
       </div>
     </div>
   );

@@ -73,10 +73,10 @@ export default function OnboardingForm() {
         <StepProgress steps={STEPS} currentStep={currentStep} />
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8">
+      <div className="bg-white rounded-xl shadow-sm border border-border-soft p-8">
         {currentStep === 0 && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-900">Basic Information</h2>
+            <h2 className="text-2xl font-bold text-ink">Basic Information</h2>
             <FormField label="Photo Upload">
               <FileDropzone onFileSelect={(f) => console.log(f)} accept="image/*" />
             </FormField>
@@ -89,8 +89,8 @@ export default function OnboardingForm() {
                     onClick={() => updateForm('careerLevel', level)}
                     className={`p-4 rounded-xl border-2 text-center transition-all ${
                       formData.careerLevel === level 
-                        ? 'border-primary bg-blue-50 text-primary font-bold' 
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                        ? 'border-primary bg-brand-blue/10 text-primary font-bold' 
+                        : 'border-border-soft text-ink-muted hover:border-border-soft'
                     }`}
                   >
                     {level}
@@ -107,7 +107,7 @@ export default function OnboardingForm() {
 
         {currentStep === 1 && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-900">Education Details</h2>
+            <h2 className="text-2xl font-bold text-ink">Education Details</h2>
             <RepeatableSection
               title="Education History"
               addLabel="Add Education"
@@ -159,7 +159,7 @@ export default function OnboardingForm() {
 
         {currentStep === 2 && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-900">Certifications</h2>
+            <h2 className="text-2xl font-bold text-ink">Certifications</h2>
             <RepeatableSection
               title="Certifications & Licenses"
               addLabel="Add Certification"
@@ -206,7 +206,7 @@ export default function OnboardingForm() {
 
         {currentStep === 3 && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-900">Work Experience</h2>
+            <h2 className="text-2xl font-bold text-ink">Work Experience</h2>
             <RepeatableSection
               title="Experience"
               addLabel="Add Experience"
@@ -234,7 +234,7 @@ export default function OnboardingForm() {
                     <FormField label="To Date">
                       <div className="flex flex-col gap-2">
                          <Input type="date" disabled={item.currentlyWorking} value={item.toDate || ""} onChange={(e) => updateArrayItem('experience', index, 'toDate', e.target.value)} />
-                         <label className="flex items-center gap-2 text-sm text-slate-600">
+                         <label className="flex items-center gap-2 text-sm text-ink-muted">
                            <input type="checkbox" checked={item.currentlyWorking || false} onChange={(e) => {
                              updateArrayItem('experience', index, 'currentlyWorking', e.target.checked);
                            }} />
@@ -246,7 +246,7 @@ export default function OnboardingForm() {
                   <FormField label="Responsibilities">
                     <Textarea placeholder="What did you do? (Max 1000 chars)" maxLength={1000} value={item.desc || ""} onChange={(e) => updateArrayItem('experience', index, 'desc', e.target.value)} />
                   </FormField>
-                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 mt-4">
+                  <div className="p-4 bg-surface-soft rounded-lg border border-border-soft mt-4">
                     <FormField label="Employment Gap (if any)">
                       <Input placeholder="Reason for gap before/after this role" value={item.gap || ""} onChange={(e) => updateArrayItem('experience', index, 'gap', e.target.value)} />
                     </FormField>
@@ -259,7 +259,7 @@ export default function OnboardingForm() {
 
         {currentStep === 4 && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-900">Skills & Additional Info</h2>
+            <h2 className="text-2xl font-bold text-ink">Skills & Additional Info</h2>
             <FormField label="Skills">
               <SearchableCombobox 
                 options={TECH_SKILLS} 
@@ -299,7 +299,7 @@ export default function OnboardingForm() {
           </div>
         )}
 
-        <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
+        <div className="mt-8 pt-6 border-t border-border-soft flex items-center justify-between">
           <Button variant="ghost" onClick={prevStep} disabled={currentStep === 0}>
             Back
           </Button>

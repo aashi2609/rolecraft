@@ -31,11 +31,11 @@ export function TagInput({ tags, onChange, placeholder = 'Add a tag...', classNa
   };
 
   return (
-    <div className={`flex flex-wrap gap-2 p-2 bg-white border border-slate-200 rounded-lg shadow-sm focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-shadow ${className}`}>
+    <div className={`flex flex-wrap gap-2 p-2 bg-white border border-border-soft rounded-lg shadow-sm focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-shadow ${className}`}>
       {tags.map((tag, index) => (
         <span
           key={index}
-          className="flex items-center gap-1 px-2.5 py-1 text-sm font-medium bg-blue-50 text-blue-700 rounded-full"
+          className="flex items-center gap-1 px-2.5 py-1 text-sm font-medium bg-brand-blue/10 text-blue-700 rounded-full"
         >
           {tag}
           <button
@@ -53,7 +53,7 @@ export function TagInput({ tags, onChange, placeholder = 'Add a tag...', classNa
         onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={tags.length === 0 ? placeholder : ''}
-        className="flex-grow px-1 py-1 text-sm text-slate-900 bg-transparent border-none focus:outline-none min-w-[120px] placeholder:text-slate-400"
+        className="flex-grow px-1 py-1 text-sm text-ink bg-transparent border-none focus:outline-none min-w-[120px] placeholder:text-ink-muted"
       />
     </div>
   );

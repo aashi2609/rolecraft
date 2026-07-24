@@ -63,7 +63,7 @@ export function FileDropzone({ onFileSelect, accept = '*/*', maxSizeMB = 5, clas
       {!selectedFile ? (
         <div
           className={`relative flex flex-col items-center justify-center w-full p-6 border-2 border-dashed rounded-xl transition-colors cursor-pointer ${
-            dragActive ? 'border-primary bg-blue-50' : 'border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-slate-400'
+            dragActive ? 'border-primary bg-brand-blue/10' : 'border-border-soft bg-surface-soft hover:bg-surface-soft hover:border-ink-muted'
           }`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -71,9 +71,9 @@ export function FileDropzone({ onFileSelect, accept = '*/*', maxSizeMB = 5, clas
           onDrop={handleDrop}
           onClick={() => inputRef.current?.click()}
         >
-          <UploadCloud className="w-10 h-10 text-slate-400 mb-3" />
-          <p className="text-sm font-semibold text-slate-700">Click to upload or drag and drop</p>
-          <p className="text-xs text-slate-500 mt-1">SVG, PNG, JPG or PDF (max. {maxSizeMB}MB)</p>
+          <UploadCloud className="w-10 h-10 text-ink-muted mb-3" />
+          <p className="text-sm font-semibold text-ink">Click to upload or drag and drop</p>
+          <p className="text-xs text-ink-muted mt-1">SVG, PNG, JPG or PDF (max. {maxSizeMB}MB)</p>
           <input
             ref={inputRef}
             type="file"
@@ -83,20 +83,20 @@ export function FileDropzone({ onFileSelect, accept = '*/*', maxSizeMB = 5, clas
           />
         </div>
       ) : (
-        <div className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-xl shadow-sm">
+        <div className="flex items-center justify-between p-4 bg-white border border-border-soft rounded-xl shadow-sm">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-50 rounded-lg">
+            <div className="p-2 bg-brand-blue/10 rounded-lg">
               <File className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-900 truncate max-w-[200px]">{selectedFile.name}</p>
-              <p className="text-xs text-slate-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+              <p className="text-sm font-medium text-ink truncate max-w-[200px]">{selectedFile.name}</p>
+              <p className="text-xs text-ink-muted">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
             </div>
           </div>
           <button
             type="button"
             onClick={removeFile}
-            className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+            className="p-1 text-ink-muted hover:text-red-500 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
