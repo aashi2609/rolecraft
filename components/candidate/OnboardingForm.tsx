@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StepProgress } from '@/components/ui/StepProgress';
+import { StrengthMeter } from '@/components/ui/StrengthMeter';
 import { Button } from '@/components/ui/Button';
 import { FormField, Input, Textarea } from '@/components/ui/FormField';
 import { FileDropzone } from '@/components/ui/FileDropzone';
@@ -114,9 +115,15 @@ export default function OnboardingForm() {
 
   return (
     <div className="max-w-3xl mx-auto py-10 px-4">
-      <div className="mb-12">
-        <StepProgress steps={STEPS} currentStep={currentStep} />
-      </div>
+        <div className="flex flex-col items-center mb-6">
+          <StrengthMeter 
+            completionPercentage={Math.round(((currentStep) / STEPS.length) * 100) || 10} 
+            nextStepTip={`Add your ${STEPS[currentStep].toLowerCase()} to strengthen your profile.`} 
+          />
+          <div className="mt-4 w-full max-w-md scale-90 opacity-70 origin-top">
+            <StepProgress steps={STEPS} currentStep={currentStep} />
+          </div>
+        </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-border-soft p-8">
         {currentStep === 0 && (

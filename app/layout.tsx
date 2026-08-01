@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Space_Grotesk, Inter } from "next/font/google";
 import { UserProvider } from "@/context/UserContext";
 import { Footer } from "@/components/ui/Footer";
+import { CommandPalette } from "@/components/ui/CommandPalette";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -33,6 +34,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
         <UserProvider>
           {children}
+          <CommandPalette />
           <Footer />
         </UserProvider>
       </body>

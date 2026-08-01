@@ -8,6 +8,7 @@ import { useUser } from '@/context/UserContext';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { UpsellPrompt } from '@/components/UpsellPrompt';
+import { FitmentRing } from '@/components/ui/FitmentRing';
 import { isFreePlan } from '@/lib/plans';
 
 export default function ResumesPage() {
@@ -91,17 +92,9 @@ export default function ResumesPage() {
                   <p className="text-xs text-primary/80 mb-4 line-clamp-2">{resume.mappingNotes}</p>
                 )}
 
-                <div className="bg-secondary/60 p-4 rounded-lg mb-6 border border-border">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-foreground">ATS Score</span>
-                    <span className="text-green-600 font-bold">{resume.score || 92} / 100</span>
-                  </div>
-                  <div className="w-full bg-border rounded-full h-2 mt-2 overflow-hidden">
-                    <div
-                      className="bg-green-500 h-2 rounded-full"
-                      style={{ width: `${resume.score || 92}%` }}
-                    />
-                  </div>
+                <div className="bg-secondary/60 p-4 rounded-lg mb-6 border border-border flex items-center gap-4">
+                  <FitmentRing score={resume.score || 92} size="small" />
+                  <span className="text-sm font-medium text-foreground">ATS Score</span>
                 </div>
 
                 <div className="space-y-3">
