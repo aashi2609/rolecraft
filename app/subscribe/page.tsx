@@ -19,7 +19,7 @@ import {
 function SubscribeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { isAuthenticated, setPlan, setPendingPlan, plan: currentPlan } = useUser();
+  const { isAuthenticated, setPlan, setPendingPlan, plan: currentPlan, profileComplete, companyProfileComplete } = useUser();
   const roleParam = searchParams.get('role');
   const role: Role = roleParam === 'company' ? 'company' : 'candidate';
   const [isAnnual, setIsAnnual] = useState(false);
@@ -31,7 +31,12 @@ function SubscribeContent() {
     if (isAuthenticated) {
       if (isFreePlan(planId)) {
         setPlan(planId);
-        router.push(role === 'company' ? '/company/dashboard' : '/dashboard');
+        // Route to onboarding if profile is not complete, otherwise to dashboard
+        if (role === 'company') {
+          router.push(companyProfileComplete ? '/company/dashboard' : '/onboarding/company-profile');
+        } else {
+          router.push(profileComplete ? '/dashboard' : '/onboarding/profile');
+        }
         return;
       }
       setPendingPlan(planId);

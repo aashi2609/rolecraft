@@ -22,7 +22,12 @@ export default function SigninPage() {
     setLoading(true);
     try {
       const res = await signInWithApi(email, password);
-      router.push(res.role === 'company' ? '/company/dashboard' : '/dashboard');
+      // Route to onboarding if profile is incomplete, otherwise to dashboard
+      if (res.role === 'company') {
+        router.push(res.companyProfileComplete ? '/company/dashboard' : '/onboarding/company-profile');
+      } else {
+        router.push(res.profileComplete ? '/dashboard' : '/onboarding/profile');
+      }
     } catch (err: any) {
       setError(err?.detail || err?.message || 'Sign in failed');
     } finally {

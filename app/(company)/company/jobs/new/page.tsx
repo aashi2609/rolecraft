@@ -139,7 +139,7 @@ function PostJobContent() {
 
     try {
       if (draft.id) {
-        const updated = await jobsApi.update(String(draft.id), apiBody);
+        const updated: any = await jobsApi.update(String(draft.id), apiBody);
         if (status !== (jobs.find((j) => String(j.id) === String(draft.id))?.status || '')) {
           await jobsApi.setStatus(String(draft.id), status.toLowerCase());
         }
@@ -150,7 +150,7 @@ function PostJobContent() {
           status: status,
         });
       } else {
-        const created = await jobsApi.create(apiBody);
+        const created: any = await jobsApi.create(apiBody);
         addJob({
           id: created.id,
           title: created.title,

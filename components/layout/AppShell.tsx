@@ -42,7 +42,7 @@ function buildCandidateNav(): NavItem[] {
     { label: 'Saved Jobs', href: '/saved-jobs', icon: Bookmark },
     { label: 'Messages', href: '/messages', icon: MessageSquare },
     { label: 'My Profile', href: '/profile/personal-details', icon: User },
-    { label: 'Analytics', href: '/dashboard', icon: BarChart3 },
+    { label: 'Analytics', href: '/analytics', icon: BarChart3 },
     { label: 'Settings', href: '/settings', icon: Settings },
   ];
 }
@@ -60,9 +60,9 @@ function buildCompanyNav(): NavItem[] {
         { label: 'Candidates', href: '/company/candidates' },
       ],
     },
-    { label: 'Messages', href: '/company/dashboard', icon: MessageSquare },
-    { label: 'Company Profile', href: '/onboarding/company-profile', icon: User },
-    { label: 'Analytics', href: '/company/dashboard', icon: BarChart3 },
+    { label: 'Messages', href: '/company/messages', icon: MessageSquare },
+    { label: 'Company Profile', href: '/company/profile', icon: User },
+    { label: 'Analytics', href: '/company/analytics', icon: BarChart3 },
     { label: 'Settings', href: '/company/settings', icon: Settings },
   ];
 }
@@ -202,12 +202,12 @@ export function AppShell({
   }
 
   return (
-    <div className="flex min-h-screen bg-surface-soft">
+    <div className="flex h-screen overflow-hidden bg-surface-soft">
       <div className="sticky top-0 h-screen hidden md:block">
         <DashboardSidebar role={role} />
       </div>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border-soft bg-surface-white/95 backdrop-blur px-4 md:px-8">
+      <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border-soft bg-surface-white/95 backdrop-blur px-4 md:px-8">
           <div className="md:hidden">
             <Logo href={role === 'company' ? '/company/dashboard' : '/dashboard'} />
           </div>
@@ -225,12 +225,9 @@ export function AppShell({
             >
               <LogOut className="h-4 w-4" />
             </button>
-            <div className="ml-1 flex h-8 w-8 items-center justify-center rounded-full bg-brand-blue/10 text-sm font-bold text-brand-blue font-display">
-              {role === 'company' ? 'C' : 'U'}
-            </div>
           </div>
         </header>
-        <main className="flex-1 bg-surface-soft/40">{children}</main>
+        <main className="flex-1 bg-surface-soft/40 overflow-y-auto">{children}</main>
       </div>
     </div>
   );

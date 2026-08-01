@@ -68,7 +68,7 @@ interface UserContextType extends UserState {
   hideJob: (jobId: string | number) => void;
   toggleSavedCandidate: (id: string | number) => void;
   /** Real auth helpers used by signin/signup pages */
-  signInWithApi: (email: string, password: string) => Promise<{ role: string; plan?: string }>;
+  signInWithApi: (email: string, password: string) => Promise<{ role: string; plan?: string; profileComplete: boolean; companyProfileComplete: boolean }>;
   signUpWithApi: (payload: {
     email: string;
     password: string;
@@ -230,7 +230,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
         role = 'candidate';
         userId = me.user_id;
         candidateProfile = me;
-        profileComplete = Boolean(me.career_level || (me.skills && me.skills.length));
+        profileComplete = Boolean(
+          me.career_level && String(me.career_level).trim().length > 0 &&
+          me.skills && Array.isArray(me.skills) && me.skills.length > 0
+        );
       } catch {
         try {
           const me: any = await companyApi.me();
@@ -297,7 +300,26 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const res = await authApi.signin({ email, password });
     setToken(res.access_token);
     await refreshSession();
-    return { role: res.role, plan: res.plan };
+
+    // Determine profile completeness from fresh backend data
+    let isProfileComplete = false;
+    let isCompanyProfileComplete = false;
+    try {
+      if (res.role === 'candidate') {
+        const me: any = await candidateApi.me();
+        isProfileComplete = Boolean(
+          me.career_level && String(me.career_level).trim().length > 0 &&
+          me.skills && Array.isArray(me.skills) && me.skills.length > 0
+        );
+      } else if (res.role === 'company') {
+        const me: any = await companyApi.me();
+        isCompanyProfileComplete = Boolean(me.name);
+      }
+    } catch {
+      /* profile probe failed — treat as incomplete */
+    }
+
+    return { role: res.role, plan: res.plan, profileComplete: isProfileComplete, companyProfileComplete: isCompanyProfileComplete };
   };
 
   const signUpWithApi = async (payload: {

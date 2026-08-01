@@ -93,7 +93,7 @@ export default function LandingPage() {
               Sign In
             </Button>
             <Button
-              className="rounded-full px-5 text-sm font-semibold shadow-sm bg-brand-blue hover:bg-brand-blue-deep text-white"
+              className="rounded-full px-5 text-sm font-semibold shadow-[0_4px_14px_rgba(37,99,235,0.25)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.35)] transition-shadow bg-brand-blue hover:bg-brand-blue-deep text-white"
               onClick={() => setRoleModalOpen(true)}
             >
               Get Started
@@ -140,7 +140,7 @@ export default function LandingPage() {
           className="mt-8 flex flex-wrap items-center justify-center gap-3"
         >
           <Button
-            className="rounded-full px-8 h-12 text-[15px] font-semibold bg-brand-blue hover:bg-brand-blue-deep text-white shadow-[0_8px_24px_-6px_rgba(37,99,235,0.45)]"
+            className="rounded-full px-8 h-12 text-[15px] font-semibold bg-brand-blue hover:bg-brand-blue-deep text-white shadow-[0_4px_14px_rgba(37,99,235,0.25)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.35)] transition-shadow"
             onClick={() => setRoleModalOpen(true)}
           >
             Get Started Free
@@ -158,8 +158,13 @@ export default function LandingPage() {
 
         {/* Product mockup + glow */}
         <div className="relative w-full max-w-5xl mt-14 md:mt-20 px-2 md:px-6">
+          {/* Radial Glow */}
           <div
-            className="hero-glow absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[42%] w-[120%] h-[110%] max-w-none"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[42%] w-[800px] h-[800px] rounded-full pointer-events-none z-0"
+            style={{
+              background: 'radial-gradient(circle, rgba(96, 165, 250, 0.18) 0%, transparent 65%)',
+              filter: 'blur(60px)',
+            }}
             aria-hidden
           />
 
@@ -168,7 +173,7 @@ export default function LandingPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.25 }}
             transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-            className="relative z-10"
+            className="relative z-10 drop-shadow-[0_16px_40px_rgba(37,99,235,0.12)]"
           >
             {/* Floating stat chips */}
             <motion.div
@@ -203,8 +208,32 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Stats Strip */}
+      <section className="relative z-10 bg-surface-soft py-12 px-4 border-t border-border-soft shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8 md:gap-4 text-center">
+          {[
+            { value: "1,200+", label: "Tailored resumes generated" },
+            { value: "300+", label: "Verified companies" },
+            { value: "92%", label: "Average match accuracy" },
+            { value: "4.8/5", label: "Candidate rating" }
+          ].map((stat, idx) => (
+            <motion.div 
+              key={idx}
+              initial={{ opacity: 0, scale: 0.9, y: 10 }}
+              whileInView={{ opacity: 1, scale: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: idx * 0.1, duration: 0.5 }}
+              className="flex-1"
+            >
+              <div className="text-4xl md:text-5xl font-display font-bold text-brand-blue mb-1 tracking-tight">{stat.value}</div>
+              <div className="text-[13px] text-ink-muted font-semibold uppercase tracking-wide">{stat.label}</div>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
       {/* Features */}
-      <section id="features" className="relative z-10 bg-surface-white py-20 md:py-28 px-4 border-t border-border-soft">
+      <section id="features" className="relative z-10 bg-surface-soft py-16 md:py-24 px-4 border-t border-border-soft shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]">
         <div className="max-w-6xl mx-auto">
           <motion.h2
             initial={{ opacity: 0, y: 16 }}
@@ -222,16 +251,31 @@ export default function LandingPage() {
             {FEATURES.map((f, i) => (
               <motion.div
                 key={f.title}
-                initial={{ opacity: 0, y: 18 }}
+                initial={{ opacity: 0, y: 24 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.2 }}
-                transition={{ delay: i * 0.06, duration: 0.4 }}
-                className="rounded-2xl bg-surface-soft p-6 border border-transparent hover:border-border-soft transition-colors"
+                viewport={{ once: true, amount: 0.15 }}
+                transition={{ delay: i * 0.08, duration: 0.5 }}
+                className={`rounded-2xl bg-surface-white p-6 border transition-all duration-300 shadow-[0_4px_16px_rgba(37,99,235,0.03)] hover:shadow-[0_8px_24px_rgba(37,99,235,0.08)] hover:-translate-y-1 ${
+                  i === 2 
+                    ? 'md:scale-105 border-brand-blue/30' 
+                    : 'border-border-soft hover:border-brand-blue/20'
+                }`}
               >
-                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-brand-blue/10 text-brand-blue">
+                <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-lg ${
+                  i % 3 === 0 ? 'bg-brand-blue/10 text-brand-blue' : 
+                  i % 3 === 1 ? 'bg-sky-500/10 text-sky-500' : 
+                  'bg-indigo-500/10 text-indigo-500'
+                }`}>
                   <f.icon className="h-5 w-5" />
                 </div>
-                <h3 className="text-card-title text-ink mb-2">{f.title}</h3>
+                <h3 className="text-card-title text-ink mb-2 flex items-center gap-2">
+                  {f.title}
+                  {i === 2 && (
+                    <span className="inline-flex px-2 py-0.5 rounded-full bg-brand-blue/10 text-brand-blue text-[10px] font-bold uppercase tracking-wider">
+                      Core
+                    </span>
+                  )}
+                </h3>
                 <p className="text-sm text-ink-muted leading-relaxed">{f.body}</p>
               </motion.div>
             ))}

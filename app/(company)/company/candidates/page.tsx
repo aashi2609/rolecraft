@@ -328,14 +328,16 @@ export default function SearchCandidatesPage() {
   );
 
   return (
-    <div className="py-8 px-4 md:px-8 max-w-7xl mx-auto">
-      <div className="flex flex-col lg:flex-row gap-6">
+    <div className="py-6 px-4 md:px-8 max-w-7xl mx-auto h-[calc(100vh-56px)] overflow-hidden">
+      <div className="flex flex-col lg:flex-row gap-6 h-full">
         {/* Desktop filter sidebar */}
-        <aside className="hidden lg:block w-72 shrink-0">
-          <Card className="p-5 sticky top-20">{FilterPanel}</Card>
+        <aside className="hidden lg:block w-72 shrink-0 h-full pb-8">
+          <Card className="p-5 h-full overflow-y-auto scrollbar-none hover:scrollbar-thin transition-colors">
+            {FilterPanel}
+          </Card>
         </aside>
 
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 h-full overflow-y-auto pb-8 pr-2 scrollbar-none hover:scrollbar-thin transition-colors">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-1">Search Candidate</h1>
           <p className="text-sm text-muted-foreground mb-5">
             Browse and filter candidates across all roles — not scoped to a single job.
