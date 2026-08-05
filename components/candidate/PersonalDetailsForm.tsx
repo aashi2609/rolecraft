@@ -15,7 +15,7 @@ export default function PersonalDetailsForm() {
     setFormData((prev: any) => ({ ...prev, [key]: value }));
   };
 
-  const handleSave = () => console.log('Save', formData);
+  const handleSave = () => {/* TODO: Implement save functionality */};
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-4">

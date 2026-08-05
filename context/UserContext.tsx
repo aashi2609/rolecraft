@@ -98,6 +98,9 @@ function mapResume(r: any) {
     highlightedSkills: r.content?.highlightedSkills,
     emphasis: r.content?.emphasis,
     content: r.content,
+    atsBreakdown: r.ats_breakdown,
+    version: r.version || 1,
+    generationMethod: r.generation_metadata?.method || 'deterministic',
   };
 }
 
@@ -365,14 +368,25 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const setCompanyProfileComplete = (status: boolean) =>
     setState((prev) => ({ ...prev, companyProfileComplete: status }));
   const switchRole = (role: Role) => setState((prev) => ({ ...prev, role }));
-  const setPlan = (plan: PlanId) => {
-    void subscriptionsApi.set(plan).catch(() => undefined);
-    setState((prev) => ({
-      ...prev,
-      plan,
-      pendingPlan: null,
-      planValidTill: defaultValidTill(),
-    }));
+  const setPlan = async (plan: PlanId) => {
+    try {
+      await subscriptionsApi.set(plan);
+      setState((prev) => ({
+        ...prev,
+        plan,
+        pendingPlan: null,
+        planValidTill: defaultValidTill(),
+      }));
+    } catch (error) {
+      console.error('Failed to update subscription:', error);
+      // Still update local state for UX, API call might be optional during checkout
+      setState((prev) => ({
+        ...prev,
+        plan,
+        pendingPlan: null,
+        planValidTill: defaultValidTill(),
+      }));
+    }
   };
   const setPendingPlan = (plan: PlanId | null) =>
     setState((prev) => ({ ...prev, pendingPlan: plan }));

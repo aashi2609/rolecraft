@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from core.dependencies import CurrentUser, DbSession, get_user_plan
 from models import Notification, PlanTier, Subscription, SubscriptionStatus
+from models import UserRole
 from schemas import NotificationOut, SubscriptionCreate, SubscriptionOut, UploadOut
 from services.storage_service import upload_file
 from fastapi import File, UploadFile
@@ -57,7 +58,13 @@ async def upsert_subscription(body: SubscriptionCreate, user: CurrentUser, db: D
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid plan_tier") from exc
 
-    # Cancel existing
+    # Validate plan tier matches user role
+    if user.role == UserRole.candidate and tier not in [PlanTier.free, PlanTier.basic, PlanTier.premium, PlanTier.elite]:
+        raise HTTPException(status_code=400, detail="Invalid plan tier for candidate role")
+    if user.role == UserRole.company and tier not in [PlanTier.starter, PlanTier.growth, PlanTier.scale]:
+        raise HTTPException(status_code=400, detail="Invalid plan tier for company role")
+
+    # Cancel existing active subscriptions
     existing = (
         await db.execute(
             select(Subscription).where(
@@ -68,6 +75,7 @@ async def upsert_subscription(body: SubscriptionCreate, user: CurrentUser, db: D
     for s in existing:
         s.status = SubscriptionStatus.cancelled
 
+    # Create new subscription
     sub = Subscription(
         user_id=user.id,
         role=user.role,
@@ -77,6 +85,7 @@ async def upsert_subscription(body: SubscriptionCreate, user: CurrentUser, db: D
     )
     db.add(sub)
     await db.flush()
+    await db.refresh(sub)
     return SubscriptionOut.model_validate(sub)
 
 

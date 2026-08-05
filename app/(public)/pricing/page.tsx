@@ -76,7 +76,7 @@ export default function PricingPage() {
                   </li>
                 ))}
               </ul>
-              <Link href={`/signup?role=candidate&plan=${plan.id}`} className="mt-auto block">
+              <Link href={plan.isFree ? `/signup?role=candidate&plan=${plan.id}` : `/checkout?plan=${plan.id}&role=candidate`} className="mt-auto block">
                 <Button variant={plan.popular ? 'primary' : 'outline'} className="w-full">
                   {plan.isFree ? 'Get Started' : `Choose ${plan.name}`}
                 </Button>

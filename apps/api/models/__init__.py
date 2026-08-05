@@ -234,8 +234,12 @@ class Resume(Base):
     target_vertical: Mapped[str] = mapped_column(String(128), nullable=False)
     content: Mapped[dict] = mapped_column(JSONB, default=dict)
     ats_score: Mapped[Optional[int]] = mapped_column(Integer)
+    ats_breakdown: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    generation_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
     embedding = mapped_column(Vector(1536), nullable=True)
     gcs_path: Mapped[Optional[str]] = mapped_column(String(1024))
+    pdf_path: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

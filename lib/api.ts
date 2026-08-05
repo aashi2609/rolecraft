@@ -142,6 +142,32 @@ export const resumesApi = {
     }),
   get: (id: string) => api(`/resumes/${id}`),
   regenerate: (id: string) => api(`/resumes/${id}/regenerate`, { method: 'POST' }),
+  improve: (id: string) => api(`/resumes/${id}/improve`, { method: 'POST' }),
+  downloadPdf: async (id: string, filename?: string) => {
+    const headers = new Headers();
+    const token = getToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+
+    const res = await fetch(`${API_URL}/resumes/${id}/pdf`, { headers });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const data = await res.json();
+        detail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+      } catch { /* ignore */ }
+      throw new ApiError(res.status, detail);
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || `resume.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
 };
 
 export const applicationsApi = {

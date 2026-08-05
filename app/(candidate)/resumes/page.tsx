@@ -3,20 +3,24 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { FileText, Download, RotateCcw, CheckCircle2 } from 'lucide-react';
+import { FileText, Download, RotateCcw, CheckCircle2, Sparkles, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { UpsellPrompt } from '@/components/UpsellPrompt';
 import { FitmentRing } from '@/components/ui/FitmentRing';
 import { isFreePlan } from '@/lib/plans';
+import { resumesApi } from '@/lib/api';
 
 export default function ResumesPage() {
-  const { resumes, plan } = useUser();
+  const { resumes, plan, refreshResumes } = useUser();
   const router = useRouter();
   const [defaultResumeId, setDefaultResumeId] = useState<number | string | null>(
     resumes[0]?.id ?? null
   );
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  const [expandedBreakdown, setExpandedBreakdown] = useState<string | null>(null);
 
   const free = isFreePlan(plan);
   const reachedCap = free && resumes.length >= 1;
@@ -27,6 +31,32 @@ export default function ResumesPage() {
       return;
     }
     router.push('/onboarding/generate?skipProfile=true');
+  };
+
+  const handleDownload = async (resume: any) => {
+    const id = String(resume.id);
+    setDownloadingId(id);
+    try {
+      const vertical = (resume.vertical || 'resume').replace(/\s+/g, '_').toLowerCase();
+      await resumesApi.downloadPdf(id, `resume_${vertical}.pdf`);
+    } catch (err: any) {
+      console.error('Download failed:', err);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleRegenerate = async (resume: any) => {
+    const id = String(resume.id);
+    setRegeneratingId(id);
+    try {
+      await resumesApi.regenerate(id);
+      await refreshResumes();
+    } catch (err: any) {
+      console.error('Regenerate failed:', err);
+    } finally {
+      setRegeneratingId(null);
+    }
   };
 
   return (
@@ -65,6 +95,12 @@ export default function ResumesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {resumes.map((resume) => {
             const isDefault = defaultResumeId === resume.id;
+            const isDownloading = downloadingId === String(resume.id);
+            const isRegenerating = regeneratingId === String(resume.id);
+            const hasBreakdown = resume.atsBreakdown || resume.content?.ats_breakdown;
+            const breakdown = resume.atsBreakdown || resume.content?.ats_breakdown;
+            const isExpanded = expandedBreakdown === String(resume.id);
+
             return (
               <Card
                 key={resume.id}
@@ -87,26 +123,98 @@ export default function ResumesPage() {
                 </h3>
                 <p className="text-sm text-muted-foreground mb-2">
                   Generated on {resume.date || 'Today'}
+                  {resume.version && resume.version > 1 && (
+                    <span className="text-xs text-primary ml-2">v{resume.version}</span>
+                  )}
                 </p>
                 {resume.mappingNotes && (
                   <p className="text-xs text-primary/80 mb-4 line-clamp-2">{resume.mappingNotes}</p>
                 )}
 
-                <div className="bg-secondary/60 p-4 rounded-lg mb-6 border border-border flex items-center gap-4">
-                  <FitmentRing score={resume.score || 92} size="small" />
-                  <span className="text-sm font-medium text-foreground">ATS Score</span>
+                {/* ATS Score */}
+                <div className="bg-secondary/60 p-4 rounded-lg mb-4 border border-border">
+                  <div className="flex items-center gap-4">
+                    <FitmentRing score={resume.score || 0} size="small" />
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-foreground">ATS Score</span>
+                      {resume.generationMethod === 'ai' ? (
+                        <span className="ml-2 inline-flex items-center gap-1 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
+                          <Sparkles className="w-2.5 h-2.5" /> AI
+                        </span>
+                      ) : (
+                        <span className="ml-2 inline-flex items-center gap-1 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium" title="Generated using fallback deterministic logic (likely due to API rate limits)">
+                          ⚠️ Fallback
+                        </span>
+                      )}
+                    </div>
+                    {hasBreakdown && (
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground hover:text-primary"
+                        onClick={() => setExpandedBreakdown(isExpanded ? null : String(resume.id))}
+                      >
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* ATS Breakdown */}
+                  {isExpanded && breakdown && (
+                    <div className="mt-3 pt-3 border-t border-border space-y-2">
+                      {Object.entries(breakdown).map(([key, val]) => (
+                        <div key={key} className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground capitalize">
+                            {key.replace(/_/g, ' ')}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-20 h-1.5 bg-border rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all"
+                                style={{
+                                  width: `${val}%`,
+                                  backgroundColor:
+                                    (val as number) >= 80
+                                      ? '#22c55e'
+                                      : (val as number) >= 60
+                                        ? '#f59e0b'
+                                        : '#ef4444',
+                                }}
+                              />
+                            </div>
+                            <span className="font-medium w-6 text-right">{val as number}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-3">
-                  <Button variant="outline" className="w-full justify-start gap-3">
-                    <Download className="w-4 h-4 text-muted-foreground" /> Download PDF
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-3"
+                    onClick={() => handleDownload(resume)}
+                    disabled={isDownloading}
+                  >
+                    {isDownloading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4 text-muted-foreground" />
+                    )}
+                    {isDownloading ? 'Generating PDF…' : 'Download PDF'}
                   </Button>
                   <Button
                     variant="outline"
                     className="w-full justify-start gap-3"
-                    onClick={() => router.push('/onboarding/generate?skipProfile=true')}
+                    onClick={() => handleRegenerate(resume)}
+                    disabled={isRegenerating}
                   >
-                    <RotateCcw className="w-4 h-4" /> Regenerate AI
+                    {isRegenerating ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RotateCcw className="w-4 h-4" />
+                    )}
+                    {isRegenerating ? 'Regenerating…' : 'Regenerate AI'}
                   </Button>
 
                   {!isDefault && (

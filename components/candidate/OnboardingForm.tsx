@@ -130,7 +130,7 @@ export default function OnboardingForm() {
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-ink">Basic Information</h2>
             <FormField label="Photo Upload">
-              <FileDropzone onFileSelect={(f) => console.log(f)} accept="image/*" />
+              <FileDropzone onFileSelect={(f) => {/* TODO: Implement file upload */}} accept="image/*" />
             </FormField>
             
             <FormField label="Career Level" required>
@@ -152,7 +152,7 @@ export default function OnboardingForm() {
             </FormField>
 
             <FormField label="Resume Upload">
-              <FileDropzone onFileSelect={(f) => console.log(f)} accept=".pdf,.doc,.docx" maxSizeMB={10} />
+              <FileDropzone onFileSelect={(f) => {/* TODO: Implement file upload */}} accept=".pdf,.doc,.docx" maxSizeMB={10} />
             </FormField>
           </div>
         )}
@@ -201,7 +201,7 @@ export default function OnboardingForm() {
                     </FormField>
                   </div>
                   <FormField label="Marksheet / Certificate Upload">
-                    <FileDropzone onFileSelect={(f) => console.log(f)} accept=".pdf,.jpg,.png" />
+                    <FileDropzone onFileSelect={(f) => {/* TODO: Implement file upload */}} accept=".pdf,.jpg,.png" />
                   </FormField>
                 </div>
               )}
@@ -248,7 +248,7 @@ export default function OnboardingForm() {
                     <Textarea placeholder="Brief description of what you learned" className="min-h-[80px]" value={item.desc || ""} onChange={(e) => updateArrayItem('certifications', index, 'desc', e.target.value)} />
                   </FormField>
                   <FormField label="Certificate File (Optional)">
-                    <FileDropzone onFileSelect={(f) => console.log(f)} />
+                    <FileDropzone onFileSelect={(f) => {/* TODO: Implement file upload */}} />
                   </FormField>
                 </div>
               )}

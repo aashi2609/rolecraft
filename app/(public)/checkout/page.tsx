@@ -4,16 +4,29 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { FormField, Input } from '@/components/ui/FormField';
-import { CreditCard, Wallet, Smartphone, Landmark, CheckCircle } from 'lucide-react';
+import { CreditCard, Wallet, Smartphone, Landmark, CheckCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUser } from '@/context/UserContext';
 import { getPlanById, formatPlanPrice, type PlanId } from '@/lib/plans';
 import { Logo } from '@/components/Logo';
+import { processPayment, validatePaymentDetails, type PaymentDetails } from '@/lib/payment';
 
 function CheckoutForm() {
   const [activeTab, setActiveTab] = useState('card');
   const [isAnnual, setIsAnnual] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+
+  // Form state
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [cardName, setCardName] = useState('');
+  const [upiId, setUpiId] = useState('');
+  const [selectedBank, setSelectedBank] = useState('');
+  const [selectedWallet, setSelectedWallet] = useState('');
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -30,13 +43,66 @@ function CheckoutForm() {
     }
   }, [isAuthenticated, router, planId, role, next]);
 
-  const handlePay = () => {
-    setPlan(planId);
-    if (next === 'onboarding') {
-      router.push(role === 'company' ? '/onboarding/company-profile' : '/onboarding/profile');
+  const handlePay = async () => {
+    setPaymentError('');
+    setIsProcessing(true);
+
+    const amount = isAnnual ? (planDef?.priceAnnual || 0) : (planDef?.priceMonthly || 0);
+    const currency = planDef?.currency || 'USD';
+
+    const paymentDetails: PaymentDetails = {
+      planId,
+      amount,
+      currency,
+      isAnnual,
+      paymentMethod: activeTab as any,
+      paymentData: {
+        ...(activeTab === 'card' && {
+          cardNumber,
+          expiry: cardExpiry,
+          cvv: cardCvv,
+          name: cardName,
+        }),
+        ...(activeTab === 'upi' && { upiId }),
+        ...(activeTab === 'netbanking' && { bank: selectedBank }),
+        ...(activeTab === 'wallet' && { wallet: selectedWallet }),
+      },
+    };
+
+    // Validate payment details
+    const validationError = validatePaymentDetails(paymentDetails);
+    if (validationError) {
+      setPaymentError(validationError);
+      setIsProcessing(false);
       return;
     }
-    router.push(role === 'company' ? '/company/dashboard' : '/dashboard');
+
+    try {
+      // Process payment
+      const result = await processPayment(paymentDetails);
+
+      if (result.success) {
+        setPaymentSuccess(true);
+        // Update subscription
+        await setPlan(planId);
+
+        // Redirect after successful payment
+        setTimeout(() => {
+          if (next === 'onboarding') {
+            router.push(role === 'company' ? '/onboarding/company-profile' : '/onboarding/profile');
+            return;
+          }
+          router.push(role === 'company' ? '/company/dashboard' : '/dashboard');
+        }, 1500);
+      } else {
+        setPaymentError(result.error || 'Payment failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('Payment processing error:', error);
+      setPaymentError('An unexpected error occurred. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   if (!isAuthenticated) return null;
@@ -140,18 +206,39 @@ function CheckoutForm() {
               {activeTab === 'card' && (
                 <div className="space-y-4">
                   <FormField label="Card Number">
-                    <Input placeholder="0000 0000 0000 0000" />
+                    <Input
+                      placeholder="0000 0000 0000 0000"
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(e.target.value)}
+                      disabled={isProcessing}
+                    />
                   </FormField>
                   <div className="grid grid-cols-2 gap-4">
                     <FormField label="Expiry Date">
-                      <Input placeholder="MM/YY" />
+                      <Input
+                        placeholder="MM/YY"
+                        value={cardExpiry}
+                        onChange={(e) => setCardExpiry(e.target.value)}
+                        disabled={isProcessing}
+                      />
                     </FormField>
                     <FormField label="CVV">
-                      <Input type="password" placeholder="123" />
+                      <Input
+                        type="password"
+                        placeholder="123"
+                        value={cardCvv}
+                        onChange={(e) => setCardCvv(e.target.value)}
+                        disabled={isProcessing}
+                      />
                     </FormField>
                   </div>
                   <FormField label="Name on Card">
-                    <Input placeholder="John Doe" />
+                    <Input
+                      placeholder="John Doe"
+                      value={cardName}
+                      onChange={(e) => setCardName(e.target.value)}
+                      disabled={isProcessing}
+                    />
                   </FormField>
                 </div>
               )}
@@ -159,17 +246,30 @@ function CheckoutForm() {
                 <div className="space-y-4 py-4 text-center">
                   <p className="text-muted-foreground mb-4">Enter your UPI ID to receive a payment request.</p>
                   <FormField label="UPI ID">
-                    <Input placeholder="username@upi" />
+                    <Input
+                      placeholder="username@upi"
+                      value={upiId}
+                      onChange={(e) => setUpiId(e.target.value)}
+                      disabled={isProcessing}
+                    />
                   </FormField>
                 </div>
               )}
               {activeTab === 'netbanking' && (
                 <div className="space-y-4 py-4">
                   <FormField label="Select Bank">
-                    <select className="w-full px-3 py-2 bg-white border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground">
+                    <select
+                      className="w-full px-3 py-2 bg-white border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+                      value={selectedBank}
+                      onChange={(e) => setSelectedBank(e.target.value)}
+                      disabled={isProcessing}
+                    >
+                      <option value="">Select a bank</option>
                       <option>HDFC Bank</option>
                       <option>SBI</option>
                       <option>ICICI Bank</option>
+                      <option>Axis Bank</option>
+                      <option>Kotak Mahindra Bank</option>
                     </select>
                   </FormField>
                 </div>
@@ -177,19 +277,51 @@ function CheckoutForm() {
               {activeTab === 'wallet' && (
                 <div className="space-y-4 py-4">
                   <FormField label="Wallet">
-                    <select className="w-full px-3 py-2 bg-white border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground">
+                    <select
+                      className="w-full px-3 py-2 bg-white border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+                      value={selectedWallet}
+                      onChange={(e) => setSelectedWallet(e.target.value)}
+                      disabled={isProcessing}
+                    >
+                      <option value="">Select a wallet</option>
                       <option>Amazon Pay</option>
                       <option>Paytm</option>
                       <option>PhonePe</option>
+                      <option>Google Pay</option>
                     </select>
                   </FormField>
                 </div>
               )}
             </Card>
 
-            <Button variant="primary" size="lg" className="w-full text-lg" onClick={handlePay}>
-              Pay Securely &amp; Continue
+            <Button
+              variant="primary"
+              size="lg"
+              className="w-full text-lg"
+              onClick={handlePay}
+              disabled={isProcessing || paymentSuccess}
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : paymentSuccess ? (
+                <>
+                  <CheckCircle className="w-5 h-5 mr-2" />
+                  Payment Successful!
+                </>
+              ) : (
+                `Pay ${priceLabel} & Continue`
+              )}
             </Button>
+
+            {paymentError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {paymentError}
+              </div>
+            )}
+
             <p className="text-center text-sm text-muted-foreground flex items-center justify-center gap-1">
               <CheckCircle className="w-4 h-4 text-green-500" /> Secure 256-bit SSL encryption
             </p>

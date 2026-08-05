@@ -60,7 +60,7 @@ export default function CompanyProfileOnboarding() {
 
         <div className="space-y-6">
           <FormField label="Company Logo">
-            <FileDropzone onFileSelect={(f) => console.log(f)} accept="image/*" />
+            <FileDropzone onFileSelect={(f) => {/* TODO: Implement file upload */}} accept="image/*" />
           </FormField>
 
           <FormField label="Company Name" required>

@@ -169,7 +169,10 @@ class ResumeOut(ORMModel):
     target_vertical: str
     content: dict[str, Any]
     ats_score: Optional[int] = None
+    ats_breakdown: Optional[dict[str, Any]] = None
+    version: int = 1
     gcs_path: Optional[str] = None
+    pdf_path: Optional[str] = None
     is_default: bool = False
     created_at: datetime
 
