@@ -351,3 +351,19 @@ class SubscriptionCreate(BaseModel):
 class UploadOut(BaseModel):
     url: str
     path: str
+
+
+# ── Candidate Search ─────────────────────────────────────────────────────────────
+
+class CandidateSearchOut(ORMModel):
+    id: UUID
+    name: Optional[str] = None
+    title: Optional[str] = None
+    experience_years: Optional[int] = None
+    location: Optional[str] = None
+    skills: list[str] = []
+    match_percent: float = 0.0
+    education: Optional[str] = None
+    expected_salary_lpa: Optional[int] = None
+    notice_period_days: Optional[int] = None
+    photo_url: Optional[str] = None

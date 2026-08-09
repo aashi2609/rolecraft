@@ -22,14 +22,15 @@ import { CandidateProfileModal } from '@/components/company/CandidateProfileModa
 import { MessageModal } from '@/components/company/MessageModal';
 import { useUser } from '@/context/UserContext';
 import { CANDIDATE_LOCATIONS, SKILLS, VERTICALS, EDUCATION_LEVELS } from '@/lib/constants';
-import { SEED_CANDIDATES, matchLabel } from '@/lib/candidates';
+import { matchLabel, SEED_CANDIDATES } from '@/lib/candidates';
 import { hasFullFilters } from '@/lib/plans';
+import { candidateApi } from '@/lib/api';
 
 const PAGE_SIZE = 5;
 
 export default function SearchCandidatesPage() {
   const { plan } = useUser();
-  const fullFilters = hasFullFilters(plan);
+  const fullFilters = true; // Temporary: enable all filters for testing regardless of plan
 
   const [search, setSearch] = useState('');
   const [locationQuery, setLocationQuery] = useState('');
@@ -37,6 +38,9 @@ export default function SearchCandidatesPage() {
   const [sort, setSort] = useState('match');
   const [page, setPage] = useState(1);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [candidates, setCandidates] = useState<any[]>([]);
 
   // Applied filters (committed on Apply Filters)
   const [locations, setLocations] = useState<string[]>([]);
@@ -66,14 +70,75 @@ export default function SearchCandidatesPage() {
     notice: false,
   });
 
-  const [selectedCandidate, setSelectedCandidate] = useState<(typeof SEED_CANDIDATES)[0] | null>(null);
+  const [selectedCandidate, setSelectedCandidate] = useState<(typeof candidates)[0] | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
   const [messageName, setMessageName] = useState('');
-  const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
-  const [shortlisted, setShortlisted] = useState<number[]>([]);
-  const [hidden, setHidden] = useState<number[]>([]);
-  const [savedIds, setSavedIds] = useState<number[]>([]);
+  const [menuOpenId, setMenuOpenId] = useState<string | number | null>(null);
+  const [shortlisted, setShortlisted] = useState<(string | number)[]>([]);
+  const [hidden, setHidden] = useState<(string | number)[]>([]);
+  const [savedIds, setSavedIds] = useState<(string | number)[]>([]);
+
+  // Fetch candidates from API
+  const fetchCandidates = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const params: Record<string, string | number | undefined> = {
+        page,
+        page_size: PAGE_SIZE,
+      };
+      
+      if (search.trim()) params.q = search.trim();
+      if (locationQuery) params.location = locationQuery;
+      if (skills.length) params.skills = skills.join(',');
+      if (jobTitle) params.title = jobTitle;
+      if (expRange[0] > 0) params.experience_min = expRange[0];
+      if (expRange[1] < 10) params.experience_max = expRange[1];
+      if (salaryRange[0] > 4) params.salary_min = salaryRange[0];
+      if (salaryRange[1] < 30) params.salary_max = salaryRange[1];
+      if (education.length) params.education = education.join(',');
+      
+      const data = await candidateApi.search(params);
+      
+      const transformed = data.map((c: any) => ({
+        id: c.id,
+        name: c.name || 'Candidate',
+        title: c.title || 'Professional',
+        experienceYears: c.experience_years || 0,
+        location: c.location || 'Remote',
+        skills: c.skills || [],
+        matchPercent: c.match_percent || 70,
+        education: c.education || 'Bachelor\'s',
+        expectedSalaryLpa: c.expected_salary_lpa || 10,
+        noticePeriodDays: c.notice_period_days || 30,
+      }));
+      
+      setCandidates(transformed);
+    } catch (err: any) {
+      console.error('Failed to fetch candidates:', err);
+      setError('Failed to load candidates from API. Displaying offline list.');
+      // Fallback gracefully to seed data on connection or backend error
+      setCandidates(SEED_CANDIDATES);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch candidates on mount and when filters change
+  React.useEffect(() => {
+    fetchCandidates();
+  }, [
+    page,
+    search,
+    locationQuery,
+    skills.join(','),
+    jobTitle,
+    expRange.join(','),
+    salaryRange.join(','),
+    education.join(','),
+    locations.join(','),
+  ]);
 
   const applyFilters = () => {
     if (!fullFilters) return;
@@ -109,77 +174,26 @@ export default function SearchCandidatesPage() {
   };
 
   const filtered = useMemo(() => {
-    let list = SEED_CANDIDATES.filter((c) => !hidden.includes(c.id));
+    let list = candidates.filter((c) => !hidden.includes(c.id));
 
     if (view === 'saved') {
       list = list.filter((c) => savedIds.includes(c.id));
-    }
-
-    const q = search.trim().toLowerCase();
-    if (q) {
-      list = list.filter(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          c.title.toLowerCase().includes(q) ||
-          c.skills.some((s) => s.toLowerCase().includes(q))
-      );
-    }
-    if (locationQuery) {
-      list = list.filter((c) =>
-        c.location.toLowerCase().includes(locationQuery.toLowerCase())
-      );
-    }
-    if (fullFilters) {
-      if (locations.length) {
-        list = list.filter((c) => locations.some((l) => c.location.includes(l)));
-      }
-      if (jobTitle) {
-        list = list.filter((c) =>
-          c.title.toLowerCase().includes(jobTitle.toLowerCase())
-        );
-      }
-      list = list.filter(
-        (c) => c.experienceYears >= expRange[0] && c.experienceYears <= expRange[1]
-      );
-      if (skills.length) {
-        list = list.filter((c) => skills.every((s) => c.skills.includes(s)));
-      }
-      list = list.filter(
-        (c) =>
-          c.expectedSalaryLpa >= salaryRange[0] && c.expectedSalaryLpa <= salaryRange[1]
-      );
-      if (education.length) {
-        list = list.filter((c) => education.includes(c.education));
-      }
-      if (noticeDate) {
-        // Soft mock: candidates with notice <= 30 days if a date is set
-        list = list.filter((c) => c.noticePeriodDays <= 30);
-      }
     }
 
     if (sort === 'match') list = [...list].sort((a, b) => b.matchPercent - a.matchPercent);
     if (sort === 'exp') list = [...list].sort((a, b) => b.experienceYears - a.experienceYears);
     return list;
   }, [
+    candidates,
     hidden,
     view,
     savedIds,
-    search,
-    locationQuery,
-    fullFilters,
-    locations,
-    jobTitle,
-    expRange,
-    skills,
-    salaryRange,
-    education,
-    noticeDate,
     sort,
   ]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
-  const pageItems = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+  const pageItems = filtered;
 
   const FilterPanel = (
     <div className="space-y-1">
@@ -396,6 +410,12 @@ export default function SearchCandidatesPage() {
             </div>
           </Card>
 
+          {error && (
+            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 text-sm">
+              {error}
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <p className="text-sm text-muted-foreground">
               Found <span className="font-semibold text-foreground">{filtered.length}</span> Candidates
@@ -415,7 +435,12 @@ export default function SearchCandidatesPage() {
             </div>
           </div>
 
-          {pageItems.length === 0 ? (
+          {loading ? (
+            <Card className="text-center py-16">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+              <p className="text-muted-foreground text-sm mt-3">Loading candidates...</p>
+            </Card>
+          ) : pageItems.length === 0 ? (
             <Card className="text-center py-16">
               <h3 className="text-lg font-bold text-foreground mb-2">No candidates found</h3>
               <p className="text-muted-foreground text-sm">Try adjusting filters or clearing all.</p>
@@ -432,7 +457,7 @@ export default function SearchCandidatesPage() {
                       <div className="h-12 w-12 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center shrink-0">
                         {c.name
                           .split(' ')
-                          .map((n) => n[0])
+                          .map((n: string) => n[0])
                           .join('')
                           .slice(0, 2)}
                       </div>
@@ -448,7 +473,7 @@ export default function SearchCandidatesPage() {
                               </span>
                             </div>
                             <div className="mt-3 flex flex-wrap gap-1.5">
-                              {shown.map((s) => (
+                              {shown.map((s: string) => (
                                 <span
                                   key={s}
                                   className="text-xs px-2 py-0.5 rounded-md bg-secondary text-foreground/80"

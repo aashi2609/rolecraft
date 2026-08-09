@@ -1,7 +1,8 @@
 from uuid import UUID
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import delete, select
+from fastapi import APIRouter, HTTPException, Query
+from sqlalchemy import delete, select, or_, and_
 from sqlalchemy.orm import selectinload
 
 from core.dependencies import CandidateUser, CurrentUser, DbSession
@@ -18,6 +19,7 @@ from models import (
 from schemas import (
     CandidateProfileOut,
     CandidateProfileUpdate,
+    CandidateSearchOut,
     CertificationIn,
     CertificationOut,
     EducationIn,
@@ -249,6 +251,237 @@ async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
         db.add(CandidateSkill(candidate_id=user.id, skill_id=skill.id))
     await db.flush()
     return {"skills": body.skills}
+
+
+# ── Public Candidate Search ─────────────────────────────────────────────────────
+
+@router.get("/search", response_model=list[CandidateSearchOut])
+async def search_candidates(
+    db: DbSession,
+    q: Optional[str] = Query(None),
+    location: Optional[str] = Query(None),
+    skills: Optional[str] = Query(None),
+    experience_min: Optional[int] = Query(None),
+    experience_max: Optional[int] = Query(None),
+    salary_min: Optional[int] = Query(None),
+    salary_max: Optional[int] = Query(None),
+    education: Optional[str] = Query(None),
+    title: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    """
+    Public candidate search endpoint with advanced filtering and pagination.
+    This replaces the frontend SEED_CANDIDATES mock data.
+    """
+    # Build base query with skills preloaded
+    query = (
+        select(CandidateProfile)
+        .options(
+            selectinload(CandidateProfile.skills).selectinload(CandidateSkill.skill),
+            selectinload(CandidateProfile.education),
+            selectinload(CandidateProfile.experience),
+            selectinload(CandidateProfile.user),
+        )
+    )
+    
+    # Apply filters
+    conditions = []
+    
+    # General keyword search (q)
+    if q:
+        q_pattern = f"%{q.lower()}%"
+        query = query.outerjoin(User, CandidateProfile.user_id == User.id).outerjoin(
+            Experience, CandidateProfile.user_id == Experience.candidate_id
+        )
+        q_skill_subq = (
+            select(CandidateSkill.candidate_id)
+            .join(Skill, CandidateSkill.skill_id == Skill.id)
+            .where(Skill.name.ilike(q_pattern))
+        )
+        conditions.append(
+            or_(
+                User.email.ilike(q_pattern),
+                Experience.role.ilike(q_pattern),
+                Experience.designation.ilike(q_pattern),
+                CandidateProfile.career_level.ilike(q_pattern),
+                CandidateProfile.user_id.in_(q_skill_subq),
+            )
+        )
+
+    # Location filter (matches present_address)
+    if location:
+        location_lower = f"%{location.lower()}%"
+        conditions.append(CandidateProfile.present_address.ilike(location_lower))
+    
+    # Skills filter (requires at least one specified skill)
+    if skills:
+        skill_list = [s.strip().lower() for s in skills.split(",") if s.strip()]
+        skill_conditions = []
+        for skill_name in skill_list:
+            skill_conditions.append(
+                select(CandidateSkill.candidate_id)
+                .join(Skill, CandidateSkill.skill_id == Skill.id)
+                .where(Skill.name.ilike(f"%{skill_name}%"))
+            )
+        if skill_conditions:
+            # Use OR for skills (candidates with at least one matching skill)
+            skills_union = skill_conditions[0]
+            for sc in skill_conditions[1:]:
+                skills_union = skills_union.union(sc)
+            conditions.append(CandidateProfile.user_id.in_(skills_union))
+    
+    # Experience range filter (simplified - checks career_level)
+    if experience_min is not None or experience_max is not None:
+        exp_conditions = []
+        if experience_min is not None:
+            if experience_min >= 5:
+                exp_conditions.append(CandidateProfile.career_level.in_(["Experienced", "Senior"]))
+            elif experience_min >= 3:
+                exp_conditions.append(CandidateProfile.career_level.in_(["Mid Career", "Experienced", "Senior"]))
+            elif experience_min >= 1:
+                exp_conditions.append(CandidateProfile.career_level.in_(["Early Career", "Mid Career", "Experienced", "Senior"]))
+        if experience_max is not None:
+            if experience_max < 1:
+                exp_conditions.append(CandidateProfile.career_level == "Fresher")
+            elif experience_max < 3:
+                exp_conditions.append(CandidateProfile.career_level.in_(["Fresher", "Early Career"]))
+        if exp_conditions:
+            conditions.append(or_(*exp_conditions))
+    
+    # Education filter
+    if education:
+        query = query.outerjoin(Education, CandidateProfile.user_id == Education.candidate_id)
+        education_lower = f"%{education.lower()}%"
+        conditions.append(
+            or_(
+                Education.qualification_level.ilike(education_lower),
+                Education.degree.ilike(education_lower),
+                Education.field_of_study.ilike(education_lower),
+            )
+        )
+    
+    # Title/role filter (from experience)
+    if title:
+        query = query.outerjoin(Experience, CandidateProfile.user_id == Experience.candidate_id)
+        title_lower = f"%{title.lower()}%"
+        conditions.append(
+            or_(
+                Experience.role.ilike(title_lower),
+                Experience.designation.ilike(title_lower),
+            )
+        )
+
+    # Use distinct to avoid duplicate profiles from outer joins
+    query = query.distinct()
+    
+    # Apply all conditions
+    if conditions:
+        query = query.where(and_(*conditions))
+    
+    # Get total count for pagination
+    from sqlalchemy import func
+    count_query = select(func.count()).select_from(query.subquery())
+    total_count = (await db.execute(count_query)).scalar() or 0
+    
+    # Apply pagination
+    offset = (page - 1) * page_size
+    query = query.offset(offset).limit(page_size)
+    
+    # Execute query
+    result = await db.execute(query)
+    profiles = result.scalars().all()
+    
+    # Transform to output format
+    candidates = []
+    for profile in profiles:
+        # Calculate experience years (simplified)
+        exp_years = 0
+        if profile.experience:
+            latest_exp = max(profile.experience, key=lambda e: e.from_date or "", default=None)
+            if latest_exp and latest_exp.from_date:
+                from datetime import datetime
+                end_date = latest_exp.to_date if latest_exp.to_date else datetime.now()
+                start_date = latest_exp.from_date
+                if isinstance(start_date, str):
+                    try:
+                        start_date = datetime.strptime(start_date, "%Y-%m-%d")
+                    except:
+                        start_date = None
+                if isinstance(end_date, str):
+                    try:
+                        end_date = datetime.strptime(end_date, "%Y-%m-%d")
+                    except:
+                        end_date = datetime.now()
+                if start_date and end_date:
+                    exp_years = (end_date - start_date).days // 365
+        
+        # Get skills
+        skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
+        
+        # Get latest job title
+        job_title = None
+        if profile.experience:
+            latest_exp = max(profile.experience, key=lambda e: e.from_date or "", default=None)
+            if latest_exp:
+                job_title = latest_exp.role or latest_exp.designation
+        
+        # Get education level
+        education_level = None
+        if profile.education:
+            latest_edu = max(profile.education, key=lambda e: e.passing_year or 0, default=None)
+            if latest_edu:
+                education_level = latest_edu.qualification_level or latest_edu.degree
+        
+        # Parse expected salary (simplified)
+        expected_salary = None
+        if profile.experience:
+            for exp in profile.experience:
+                if exp.expected_salary:
+                    try:
+                        # Extract number from salary string like "8-12 LPA" or "8 LPA"
+                        import re
+                        salary_match = re.search(r'\d+', exp.expected_salary)
+                        if salary_match:
+                            expected_salary = int(salary_match.group())
+                            break
+                    except:
+                        pass
+        
+        # Apply salary filters after parsing
+        if salary_min is not None and expected_salary is not None:
+            if expected_salary < salary_min:
+                continue
+        if salary_max is not None and expected_salary is not None:
+            if expected_salary > salary_max:
+                continue
+        
+        # Calculate match score (simplified - in production use fitment service)
+        match_score = 70.0  # Base score
+        if skill_names:
+            match_score += min(20, len(skill_names) * 2)  # Up to 20 points for skills
+        if exp_years > 0:
+            match_score += min(10, exp_years)  # Up to 10 points for experience
+        match_score = min(98.0, match_score)  # Cap at 98
+        
+        candidates.append(
+            CandidateSearchOut(
+                id=profile.user_id,
+                name=profile.user.email.split("@")[0].replace(".", " ").title() if profile.user else None,
+                title=job_title,
+                experience_years=exp_years if exp_years > 0 else None,
+                location=profile.preferred_locations[0] if profile.preferred_locations else profile.present_address,
+                skills=skill_names[:10],  # Limit to top 10 skills
+                match_percent=round(match_score, 1),
+                education=education_level,
+                expected_salary_lpa=expected_salary,
+                notice_period_days=30,  # Default notice period (can be calculated from gaps)
+                photo_url=profile.photo_url,
+            )
+        )
+    
+    # Return candidates
+    return candidates
 
 
 @router.get("/{candidate_id}", response_model=CandidateProfileOut)

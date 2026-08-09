@@ -1,5 +1,5 @@
 export interface SearchCandidate {
-  id: number;
+  id: string | number;
   name: string;
   title: string;
   experienceYears: number;
