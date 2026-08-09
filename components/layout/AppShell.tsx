@@ -56,8 +56,7 @@ function buildCompanyNav(): NavItem[] {
       children: [
         { label: 'My Jobs', href: '/company/jobs' },
         { label: 'Post a New Job', href: '/company/jobs/new' },
-        { label: 'Applications', href: '/company/applications' },
-        { label: 'Candidates', href: '/company/candidates' },
+        { label: 'Search Candidates', href: '/company/candidates' },
       ],
     },
     { label: 'Messages', href: '/company/messages', icon: MessageSquare },

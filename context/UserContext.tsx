@@ -10,6 +10,7 @@ import React, {
 } from 'react';
 import type { PlanId } from '@/lib/plans';
 import { isFreePlan } from '@/lib/plans';
+import { useApplicationSocket } from '@/hooks/useApplicationSocket';
 import {
   applicationsApi,
   authApi,
@@ -299,6 +300,35 @@ export function UserProvider({ children }: { children: ReactNode }) {
     refreshSession();
   }, [refreshSession]);
 
+  // ── Real-time application status updates via WebSocket ──────────────
+  const handleWsEvent = useCallback(
+    (event: { type: string; payload: Record<string, unknown> }) => {
+      if (event.type === 'application_status_updated' && event.payload) {
+        setState((prev) => ({
+          ...prev,
+          applications: prev.applications.map((app) =>
+            String(app.id) === String(event.payload.id)
+              ? {
+                  ...app,
+                  status: event.payload.status
+                    ? String(event.payload.status).charAt(0).toUpperCase() +
+                      String(event.payload.status).slice(1)
+                    : app.status,
+                }
+              : app
+          ),
+        }));
+      }
+    },
+    []
+  );
+
+  useApplicationSocket({
+    onEvent: handleWsEvent,
+    onPollFallback: refreshApplications,
+    enabled: state.isAuthenticated && state.role === 'candidate',
+  });
+
   const signInWithApi = async (email: string, password: string) => {
     const res = await authApi.signin({ email, password });
     setToken(res.access_token);
@@ -427,8 +457,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
         ...prev,
         applications: [mapApplication(created), ...prev.applications],
       }));
-    } catch {
-      setState((prev) => ({ ...prev, applications: [application, ...prev.applications] }));
+    } catch (err: any) {
+      // Don't add a local copy on failure — it creates duplicates in state.
+      // Re-throw so callers can handle UI feedback (e.g. "Already applied" toast).
+      throw err;
     }
   };
 

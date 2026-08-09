@@ -302,6 +302,7 @@ class ApplicationOut(ORMModel):
     applied_at: datetime
     job_title: Optional[str] = None
     company_name: Optional[str] = None
+    candidate_name: Optional[str] = None
 
 
 # ── Messages / Notifications / Subscriptions ──────────────────────────────────

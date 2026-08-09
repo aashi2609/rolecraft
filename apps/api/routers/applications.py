@@ -1,12 +1,18 @@
+import asyncio
+import logging
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from sqlalchemy import select, exc
 from sqlalchemy.orm import selectinload
 
 from core.dependencies import CandidateUser, CompanyUser, CurrentUser, DbSession
-from models import Application, ApplicationStatus, Company, JobPosting, Resume, SavedJob
+from core.security import decode_access_token
+from core.ws_manager import ws_manager
+from models import Application, ApplicationStatus, Company, JobPosting, Resume, SavedJob, User
 from schemas import ApplicationCreate, ApplicationOut, ApplicationStatusUpdate, JobOut
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["applications"])
 
@@ -14,6 +20,9 @@ router = APIRouter(tags=["applications"])
 async def _app_out(db, app: Application) -> ApplicationOut:
     job = await db.get(JobPosting, app.job_id)
     company = await db.get(Company, job.company_id) if job else None
+    user = await db.get(User, app.candidate_id)
+    # Use email prefix as display name (no dedicated name column exists yet)
+    candidate_name = user.email.split("@")[0].replace(".", " ").title() if user else None
     return ApplicationOut(
         id=app.id,
         candidate_id=app.candidate_id,
@@ -23,6 +32,7 @@ async def _app_out(db, app: Application) -> ApplicationOut:
         applied_at=app.applied_at,
         job_title=job.title if job else None,
         company_name=company.name if company else None,
+        candidate_name=candidate_name,
     )
 
 
@@ -54,7 +64,10 @@ async def apply(body: ApplicationCreate, user: CandidateUser, db: DbSession):
 
     app = Application(candidate_id=user.id, job_id=body.job_id, resume_id=resume_id)
     db.add(app)
-    await db.flush()
+    try:
+        await db.flush()
+    except exc.IntegrityError:
+        raise HTTPException(status_code=400, detail="You have already applied for this job")
     return await _app_out(db, app)
 
 
@@ -96,7 +109,68 @@ async def update_status(application_id: UUID, body: ApplicationStatusUpdate, use
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid status") from exc
     await db.flush()
-    return await _app_out(db, app)
+
+    result = await _app_out(db, app)
+
+    # Broadcast real-time update to the candidate
+    await ws_manager.send_to_user(app.candidate_id, {
+        "type": "application_status_updated",
+        "payload": {
+            "id": str(result.id),
+            "job_id": str(result.job_id),
+            "status": result.status,
+            "job_title": result.job_title,
+            "company_name": result.company_name,
+        },
+    })
+
+    return result
+
+
+# ── WebSocket: real-time application events ────────────────────────────
+@router.websocket("/ws/applications")
+async def ws_applications(websocket: WebSocket):
+    """Authenticated WebSocket endpoint for real-time application updates.
+
+    The client must send a JSON message with {"token": "<jwt>"} immediately
+    after connecting.  The server validates the token, registers the
+    connection, and keeps it alive.  Events are pushed as JSON objects with
+    a "type" field (e.g. "application_status_updated").
+    """
+    await websocket.accept()
+    # Wait for the client to send their auth token
+    try:
+        auth_msg = await asyncio.wait_for(websocket.receive_json(), timeout=10.0)
+    except Exception:
+        await websocket.close(code=4001, reason="Auth timeout")
+        return
+
+    token = auth_msg.get("token")
+    if not token:
+        await websocket.close(code=4002, reason="Missing token")
+        return
+
+    try:
+        payload = decode_access_token(token)
+        user_id = UUID(payload["sub"])
+    except (ValueError, KeyError):
+        await websocket.close(code=4003, reason="Invalid token")
+        return
+
+    await ws_manager.connect(user_id, websocket)
+    try:
+        # Keep the connection alive — listen for pings or client messages
+        while True:
+            data = await websocket.receive_json()
+            # Handle client-side ping to keep the connection alive
+            if data.get("type") == "ping":
+                await websocket.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        logger.warning("WS error for user=%s: %s", user_id, exc)
+    finally:
+        await ws_manager.disconnect(user_id, websocket)
 
 
 # Saved jobs

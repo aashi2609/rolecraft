@@ -127,15 +127,18 @@ export default function JobSearchPage() {
   const pageSafe = Math.min(page, totalPages);
   const pageItems = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
-  const handleApply = (job: (typeof jobs)[0]) => {
-    applyToJob({
-      id: Date.now(),
-      jobId: job.id,
-      jobTitle: job.title,
-      companyName: job.companyName,
-      status: 'Applied',
-      date: new Date().toISOString().split('T')[0],
-    });
+  const handleApply = async (job: (typeof jobs)[0]) => {
+    try {
+      await applyToJob({
+        jobId: job.id,
+        jobTitle: job.title,
+        companyName: job.companyName,
+        status: 'Applied',
+        date: new Date().toISOString().split('T')[0],
+      });
+    } catch {
+      alert('You have already applied for this job.');
+    }
   };
 
   return (
@@ -375,14 +378,6 @@ export default function JobSearchPage() {
                         <Button size="sm" onClick={() => handleApply(job)}>
                           Apply Now
                         </Button>
-                        <button
-                          type="button"
-                          className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground"
-                          onClick={() => hideJob(job.id)}
-                          aria-label="Hide job"
-                        >
-                          <EyeOff className="w-4 h-4" />
-                        </button>
                       </div>
                     </div>
                   </div>

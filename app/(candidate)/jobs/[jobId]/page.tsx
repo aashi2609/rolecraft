@@ -35,15 +35,18 @@ export default function JobDetailPage() {
     }
   };
 
-  const confirmApply = () => {
-    applyToJob({
-      id: Date.now(),
-      jobId: job.id,
-      jobTitle: job.title,
-      companyName: job.companyName,
-      status: 'Applied',
-      appliedAt: new Date().toISOString()
-    });
+  const confirmApply = async () => {
+    try {
+      await applyToJob({
+        jobId: job.id,
+        jobTitle: job.title,
+        companyName: job.companyName,
+        status: 'Applied',
+        appliedAt: new Date().toISOString()
+      });
+    } catch {
+      alert('You have already applied for this job.');
+    }
     setIsApplyModalOpen(false);
   };
 

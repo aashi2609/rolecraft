@@ -42,7 +42,7 @@ _db_url, _connect_args = asyncpg_engine_kwargs(settings.database_url)
 
 engine = create_async_engine(
     _db_url,
-    echo=settings.environment == "development",
+    echo=False,
     # Neon scale-to-zero can drop idle connections; ping before checkout.
     pool_pre_ping=True,
     connect_args=_connect_args,
