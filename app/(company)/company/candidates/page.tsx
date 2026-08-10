@@ -21,15 +21,20 @@ import { UpsellPrompt } from '@/components/UpsellPrompt';
 import { CandidateProfileModal } from '@/components/company/CandidateProfileModal';
 import { MessageModal } from '@/components/company/MessageModal';
 import { useUser } from '@/context/UserContext';
+import { useToast } from '@/components/ui/Toast';
+import { useOffline } from '@/hooks/useOffline';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { CANDIDATE_LOCATIONS, SKILLS, VERTICALS, EDUCATION_LEVELS } from '@/lib/constants';
 import { matchLabel, SEED_CANDIDATES } from '@/lib/candidates';
 import { hasFullFilters } from '@/lib/plans';
-import { candidateApi } from '@/lib/api';
+import { candidateApi, ApiError } from '@/lib/api';
 
 const PAGE_SIZE = 5;
 
 export default function SearchCandidatesPage() {
   const { plan } = useUser();
+  const { showToast } = useToast();
+  const isOffline = useOffline();
   const fullFilters = true; // Temporary: enable all filters for testing regardless of plan
 
   const [search, setSearch] = useState('');
@@ -39,8 +44,14 @@ export default function SearchCandidatesPage() {
   const [page, setPage] = useState(1);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [candidates, setCandidates] = useState<any[]>([]);
+
+  // Warn user if offline
+  React.useEffect(() => {
+    if (isOffline) {
+      showToast('warning', 'You are offline. Some features may not work properly.');
+    }
+  }, [isOffline, showToast]);
 
   // Applied filters (committed on Apply Filters)
   const [locations, setLocations] = useState<string[]>([]);
@@ -82,7 +93,6 @@ export default function SearchCandidatesPage() {
   // Fetch candidates from API
   const fetchCandidates = async () => {
     setLoading(true);
-    setError('');
     try {
       const params: Record<string, string | number | undefined> = {
         page,
@@ -117,7 +127,25 @@ export default function SearchCandidatesPage() {
       setCandidates(transformed);
     } catch (err: any) {
       console.error('Failed to fetch candidates:', err);
-      setError('Failed to load candidates from API. Displaying offline list.');
+      
+      if (err instanceof ApiError) {
+        switch (err.type) {
+          case 'network':
+            showToast('error', 'Network error. Using offline data.');
+            break;
+          case 'auth':
+            showToast('error', 'Authentication failed. Please sign in again.');
+            break;
+          case 'validation':
+            showToast('warning', 'Invalid search parameters.');
+            break;
+          default:
+            showToast('error', 'Failed to load candidates. Using offline data.');
+        }
+      } else {
+        showToast('error', 'Unexpected error occurred.');
+      }
+      
       // Fallback gracefully to seed data on connection or backend error
       setCandidates(SEED_CANDIDATES);
     } finally {
@@ -410,12 +438,6 @@ export default function SearchCandidatesPage() {
             </div>
           </Card>
 
-          {error && (
-            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 text-sm">
-              {error}
-            </div>
-          )}
-
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <p className="text-sm text-muted-foreground">
               Found <span className="font-semibold text-foreground">{filtered.length}</span> Candidates
@@ -437,8 +459,8 @@ export default function SearchCandidatesPage() {
 
           {loading ? (
             <Card className="text-center py-16">
-              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
-              <p className="text-muted-foreground text-sm mt-3">Loading candidates...</p>
+              <LoadingSpinner size="lg" className="mx-auto mb-3" />
+              <p className="text-muted-foreground text-sm">Loading candidates...</p>
             </Card>
           ) : pageItems.length === 0 ? (
             <Card className="text-center py-16">

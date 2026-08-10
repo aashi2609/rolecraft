@@ -3,6 +3,9 @@ import { Space_Grotesk, Inter } from "next/font/google";
 import { UserProvider } from "@/context/UserContext";
 import { Footer } from "@/components/ui/Footer";
 import { CommandPalette } from "@/components/ui/CommandPalette";
+import { ToastProvider } from "@/components/ui/Toast";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -32,11 +35,16 @@ export default function RootLayout({
   return (
     <html lang="en" className={`h-full antialiased ${spaceGrotesk.variable} ${inter.variable}`}>
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
-        <UserProvider>
-          {children}
-          <CommandPalette />
-          <Footer />
-        </UserProvider>
+        <ErrorBoundary>
+          <ToastProvider>
+            <OfflineBanner />
+            <UserProvider>
+              {children}
+              <CommandPalette />
+              <Footer />
+            </UserProvider>
+          </ToastProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
