@@ -82,3 +82,72 @@ export const CANDIDATE_LOCATIONS = [
   'Chennai',
   'Remote',
 ];
+
+export const JOB_LEVELS = [
+  'Intern',
+  'Entry Level',
+  'Junior',
+  'Mid Level',
+  'Senior',
+  'Lead',
+  'Staff',
+  'Principal',
+  'Manager',
+  'Director',
+  'VP',
+  'C-Level',
+] as const;
+
+export const JOB_ROLES = [
+  'Software Engineer',
+  'Frontend Developer',
+  'Backend Developer',
+  'Full Stack Developer',
+  'Data Scientist',
+  'Data Analyst',
+  'DevOps Engineer',
+  'Product Manager',
+  'UI/UX Designer',
+  'QA Engineer',
+  'Mobile Developer',
+  'Cloud Architect',
+  'ML Engineer',
+  'Security Engineer',
+  'Business Analyst',
+  'Marketing Manager',
+  'Sales Executive',
+  'HR Manager',
+  'Financial Analyst',
+  'Operations Manager',
+] as const;
+
+export const COUNTRIES = [
+  'India',
+  'United States',
+  'United Kingdom',
+  'Canada',
+  'Germany',
+  'Australia',
+  'Singapore',
+  'UAE',
+  'Netherlands',
+  'Japan',
+] as const;
+
+export const STATES_INDIA = [
+  'Karnataka',
+  'Maharashtra',
+  'Tamil Nadu',
+  'Telangana',
+  'Delhi',
+  'Uttar Pradesh',
+  'Gujarat',
+  'West Bengal',
+  'Rajasthan',
+  'Haryana',
+  'Kerala',
+  'Madhya Pradesh',
+  'Andhra Pradesh',
+  'Punjab',
+  'Bihar',
+] as const;

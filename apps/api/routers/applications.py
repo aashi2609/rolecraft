@@ -55,12 +55,51 @@ async def apply(body: ApplicationCreate, user: CandidateUser, db: DbSession):
         if not resume or resume.candidate_id != user.id:
             raise HTTPException(status_code=400, detail="Invalid resume")
     else:
-        resume = await db.scalar(
-            select(Resume)
-            .where(Resume.candidate_id == user.id)
-            .order_by(Resume.is_default.desc(), Resume.created_at.desc())
+        # Dynamically generate a tailored resume for this job
+        from models import CandidateProfile, CandidateSkill
+        from services.resume_service import generate_resume_for_vertical
+        
+        profile = await db.scalar(
+            select(CandidateProfile)
+            .options(
+                selectinload(CandidateProfile.education),
+                selectinload(CandidateProfile.experience),
+                selectinload(CandidateProfile.projects),
+                selectinload(CandidateProfile.certifications),
+                selectinload(CandidateProfile.skills).selectinload(CandidateSkill.skill),
+            )
+            .where(CandidateProfile.user_id == user.id)
         )
-        resume_id = resume.id if resume else None
+        if not profile:
+            raise HTTPException(status_code=400, detail="Complete your profile first to generate a resume")
+            
+        skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
+        target_vertical = job.title or "Job Application"
+        
+        try:
+            payload = await generate_resume_for_vertical(profile, target_vertical, skill_names)
+            resume = Resume(
+                candidate_id=user.id,
+                target_vertical=target_vertical,
+                content=payload["content"],
+                ats_score=payload["ats_score"],
+                ats_breakdown=payload.get("ats_breakdown"),
+                generation_metadata=payload.get("generation_metadata"),
+                embedding=payload["embedding"],
+                is_default=False,
+            )
+            db.add(resume)
+            await db.flush()
+            resume_id = resume.id
+        except Exception as exc:
+            logger.error("Failed to dynamically generate resume: %s", exc)
+            # Fallback to default resume
+            resume = await db.scalar(
+                select(Resume)
+                .where(Resume.candidate_id == user.id)
+                .order_by(Resume.is_default.desc(), Resume.created_at.desc())
+            )
+            resume_id = resume.id if resume else None
 
     app = Application(candidate_id=user.id, job_id=body.job_id, resume_id=resume_id)
     db.add(app)

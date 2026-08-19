@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -167,3 +167,131 @@ async def download_pdf(resume_id: UUID, user: CandidateUser, db: DbSession):
             "Content-Disposition": f'attachment; filename="{filename}"',
         },
     )
+
+from pydantic import BaseModel
+
+class TailoredResumeRequest(BaseModel):
+    target_role: str
+
+@router.post("/download-tailored")
+async def download_tailored_resume(body: TailoredResumeRequest, user: CandidateUser, db: DbSession):
+    """Generate and return a PDF of a resume tailored to a specific role without saving it."""
+    profile = await _profile_with_skills(db, user.id)
+    skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
+    
+    # Generate content using AI
+    payload = await generate_resume_for_vertical(profile, body.target_role, skill_names)
+    content = payload["content"]
+
+    from services.pdf_service import generate_pdf
+    
+    # Get candidate name from profile
+    candidate_name = user.email.split("@")[0].replace(".", " ").title()
+    weblinks = profile.weblinks or {}
+
+    try:
+        pdf_bytes = generate_pdf(
+            resume_content=content,
+            candidate_name=candidate_name,
+            email=user.email,
+            weblinks=weblinks,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}")
+
+    is_pdf = pdf_bytes[:4] == b"%PDF"
+    media_type = "application/pdf" if is_pdf else "text/html"
+    ext = "pdf" if is_pdf else "html"
+    filename = f"resume_{body.target_role.replace(' ', '_').lower()}.{ext}"
+
+    return Response(
+        content=pdf_bytes,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
+@router.post("/parse")
+async def parse_resume(file: UploadFile = File(...), user: CandidateUser = None):
+    import pypdf
+    from services.ai_client import generate_content
+
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    
+    try:
+        reader = pypdf.PdfReader(file.file)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Failed to read PDF: {exc}")
+
+    prompt = f"""
+    You are an expert resume parser. Extract the following information from the provided resume text and return it as a structured JSON object.
+    
+    The JSON object MUST have this exact schema:
+    {{
+        "career_level": "Entry Level, Mid Level, or Senior Level",
+        "gender": "Male, Female, or Other",
+        "marital_status": "Single, Married, etc",
+        "present_address": "Full address",
+        "strengths": ["list", "of", "strengths"],
+        "weblinks": {{"LinkedIn": "url", "GitHub": "url"}},
+        "education": [
+            {{
+                "qualification_level": "Bachelor, Master, etc",
+                "degree": "Degree name",
+                "institute": "Institution name",
+                "field_of_study": "Major",
+                "passing_year": 2020,
+                "cgpa": "Grade"
+            }}
+        ],
+        "experience": [
+            {{
+                "company_name": "Company",
+                "role": "Role name",
+                "designation": "Designation",
+                "from_date": "YYYY-MM-DD",
+                "to_date": "YYYY-MM-DD",
+                "is_current": true/false,
+                "responsibilities": "Description of work"
+            }}
+        ],
+        "projects": [
+            {{
+                "project_name": "Project name",
+                "tools_used": "Tools used",
+                "from_date": "YYYY-MM-DD",
+                "to_date": "YYYY-MM-DD",
+                "responsibilities": "What they did"
+            }}
+        ],
+        "certifications": [
+            {{
+                "name": "Cert name",
+                "issuing_org": "Org"
+            }}
+        ],
+        "skills": ["Python", "React", "SQL"]
+    }}
+
+    If a field is not found in the resume, omit it or set it to null. Ensure dates are in YYYY-MM-DD format if possible, or null.
+    
+    RESUME TEXT:
+    {text[:15000]}
+    """
+    
+    try:
+        parsed_data = await generate_content(
+            prompt=prompt,
+            system_instruction="You are a strict JSON returning AI. You must return only the JSON.",
+            response_mime_type="application/json"
+        )
+        return parsed_data
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to parse resume with AI: {exc}")
+

@@ -8,7 +8,7 @@ import random
 from typing import Optional
 from uuid import UUID
 
-import httpx
+
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,29 +29,9 @@ def _mock_embedding(text: str) -> list[float]:
 
 
 async def embed_text(text: str) -> list[float]:
-    if not settings.gemini_api_key:
-        return _mock_embedding(text)
-
-    # Gemini text-embedding-004 (fallback to mock on failure)
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"text-embedding-004:embedContent?key={settings.gemini_api_key}"
-    )
-    payload = {
-        "model": "models/text-embedding-004",
-        "content": {"parts": [{"text": text[:8000]}]},
-    }
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
-            values = resp.json()["embedding"]["values"]
-            # Pad/truncate to 1536
-            if len(values) < EMBED_DIM:
-                values = values + [0.0] * (EMBED_DIM - len(values))
-            return values[:EMBED_DIM]
-    except Exception:
-        return _mock_embedding(text)
+    # Groq does not currently support embeddings via the OpenAI API format
+    # Using deterministic mock embeddings for now
+    return _mock_embedding(text)
 
 
 async def ensure_job_embedding(db: AsyncSession, job: JobPosting) -> list[float]:

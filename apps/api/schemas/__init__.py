@@ -211,6 +211,11 @@ class JobCreate(BaseModel):
     max_salary: Optional[int] = None
     salary_unit: Optional[str] = "Per annum"
     location: Optional[str] = None
+    country: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    job_role: Optional[str] = None
+    job_level: Optional[str] = None
     job_type: Optional[str] = None  # onsite|remote|hybrid
     required_skills: list[str] = []
     num_openings: int = 1
@@ -231,6 +236,11 @@ class JobUpdate(BaseModel):
     max_salary: Optional[int] = None
     salary_unit: Optional[str] = None
     location: Optional[str] = None
+    country: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    job_role: Optional[str] = None
+    job_level: Optional[str] = None
     job_type: Optional[str] = None
     required_skills: Optional[list[str]] = None
     num_openings: Optional[int] = None
@@ -257,6 +267,11 @@ class JobOut(ORMModel):
     max_salary: Optional[int] = None
     salary_unit: Optional[str] = None
     location: Optional[str] = None
+    country: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    job_role: Optional[str] = None
+    job_level: Optional[str] = None
     job_type: Optional[str] = None
     required_skills: Optional[list[str]] = None
     num_openings: int = 1

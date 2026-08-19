@@ -55,6 +55,11 @@ async def create_job(body: JobCreate, user: CompanyUser, db: DbSession):
         max_salary=body.max_salary,
         salary_unit=body.salary_unit,
         location=body.location,
+        country=body.country,
+        state=body.state,
+        city=body.city,
+        job_role=body.job_role,
+        job_level=body.job_level,
         job_type=_job_type(body.job_type),
         required_skills=body.required_skills,
         num_openings=body.num_openings,
@@ -75,12 +80,21 @@ async def list_jobs(
     db: DbSession,
     title: str | None = None,
     location: str | None = None,
+    country: str | None = None,
+    state: str | None = None,
+    city: str | None = None,
+    exclude_country: str | None = Query(None, description="Comma-separated countries to exclude"),
+    exclude_state: str | None = Query(None, description="Comma-separated states to exclude"),
+    exclude_city: str | None = Query(None, description="Comma-separated cities to exclude"),
     employment_type: str | None = None,
     experience_range: str | None = None,
     vertical: str | None = None,
+    job_role: str | None = None,
+    job_level: str | None = None,
     status: str | None = None,
     mine: bool = False,
     salary_min: int | None = Query(None),
+    salary_max: int | None = Query(None),
 ):
     # Public browse endpoint (no auth). Company "my jobs" is GET /jobs/mine.
     q = select(JobPosting).options(selectinload(JobPosting.company))
@@ -101,14 +115,43 @@ async def list_jobs(
         )
     if location:
         q = q.where(JobPosting.location.ilike(f"%{location}%"))
+    if country:
+        q = q.where(JobPosting.country.ilike(f"%{country}%"))
+    if state:
+        q = q.where(JobPosting.state.ilike(f"%{state}%"))
+    if city:
+        q = q.where(JobPosting.city.ilike(f"%{city}%"))
     if employment_type:
         q = q.where(JobPosting.employment_type == employment_type)
     if experience_range:
         q = q.where(JobPosting.experience_range.ilike(f"%{experience_range}%"))
     if vertical:
         q = q.where(JobPosting.department.ilike(f"%{vertical}%"))
+    if job_role:
+        q = q.where(JobPosting.job_role.ilike(f"%{job_role}%"))
+    if job_level:
+        q = q.where(JobPosting.job_level.ilike(f"%{job_level}%"))
     if salary_min is not None:
         q = q.where(JobPosting.max_salary >= salary_min)
+    if salary_max is not None:
+        q = q.where(JobPosting.min_salary <= salary_max)
+
+    # Negative filters — exclude locations
+    if exclude_country:
+        for val in exclude_country.split(","):
+            val = val.strip()
+            if val:
+                q = q.where(~JobPosting.country.ilike(f"%{val}%"))
+    if exclude_state:
+        for val in exclude_state.split(","):
+            val = val.strip()
+            if val:
+                q = q.where(~JobPosting.state.ilike(f"%{val}%"))
+    if exclude_city:
+        for val in exclude_city.split(","):
+            val = val.strip()
+            if val:
+                q = q.where(~JobPosting.city.ilike(f"%{val}%"))
 
     q = q.order_by(JobPosting.created_at.desc())
     jobs = (await db.execute(q)).scalars().all()
@@ -202,3 +245,31 @@ async def ranked_candidates(job_id: UUID, user: CompanyUser, db: DbSession):
         )
     out.sort(key=lambda x: x.score, reverse=True)
     return out
+
+
+from core.dependencies import CandidateUser
+from models import HiddenJob
+
+@router.post("/{job_id}/hide")
+async def hide_job(job_id: UUID, user: CandidateUser, db: DbSession):
+    job = await db.get(JobPosting, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    hidden = await db.scalar(
+        select(HiddenJob).where(HiddenJob.job_id == job_id, HiddenJob.candidate_id == user.id)
+    )
+    if not hidden:
+        db.add(HiddenJob(candidate_id=user.id, job_id=job_id))
+        await db.flush()
+    return {"status": "ok"}
+
+@router.delete("/{job_id}/hide")
+async def unhide_job(job_id: UUID, user: CandidateUser, db: DbSession):
+    hidden = await db.scalar(
+        select(HiddenJob).where(HiddenJob.job_id == job_id, HiddenJob.candidate_id == user.id)
+    )
+    if hidden:
+        await db.delete(hidden)
+        await db.flush()
+    return {"status": "ok"}

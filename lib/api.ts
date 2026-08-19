@@ -232,6 +232,29 @@ export const jobsApi = {
 
 export const resumesApi = {
   list: () => api<any[]>('/resumes'),
+  parse: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const headers = new Headers();
+    const token = getToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    
+    const res = await fetch(`${API_URL}/resumes/parse`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (body.detail) detail = body.detail;
+      } catch {}
+      throw new Error(detail);
+    }
+    return res.json();
+  },
   generate: (target_verticals: string[]) =>
     api<any[]>('/resumes/generate', {
       method: 'POST',
@@ -265,6 +288,35 @@ export const resumesApi = {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   },
+  downloadTailored: async (targetRole: string, filename?: string) => {
+    const headers = new Headers();
+    headers.set('Content-Type', 'application/json');
+    const token = getToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+
+    const res = await fetch(`${API_URL}/resumes/download-tailored`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ target_role: targetRole })
+    });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (body.detail) detail = body.detail;
+      } catch {}
+      throw new Error(detail);
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || `resume_${targetRole.replace(/\s+/g, '_').toLowerCase()}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  },
 };
 
 export const applicationsApi = {
@@ -283,6 +335,11 @@ export const savedJobsApi = {
   list: () => api<{ job_ids: string[] }>('/saved-jobs/me'),
   save: (jobId: string) => api(`/saved-jobs/${jobId}`, { method: 'POST' }),
   unsave: (jobId: string) => api(`/saved-jobs/${jobId}`, { method: 'DELETE' }),
+};
+
+export const hiddenJobsApi = {
+  hide: (jobId: string) => api(`/jobs/${jobId}/hide`, { method: 'POST' }),
+  unhide: (jobId: string) => api(`/jobs/${jobId}/hide`, { method: 'DELETE' }),
 };
 
 export const messagesApi = {

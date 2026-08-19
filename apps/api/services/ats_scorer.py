@@ -1,4 +1,4 @@
-"""ATS (Applicant Tracking System) resume scorer powered by Gemini."""
+"""ATS (Applicant Tracking System) resume scorer powered by Groq."""
 
 from __future__ import annotations
 
@@ -72,7 +72,7 @@ Return ONLY valid JSON matching this schema:
 
 
 def _fallback_score(vertical: str, skills: list[str]) -> ATSResult:
-    """Deterministic fallback score when Gemini is unavailable."""
+    """Deterministic fallback score when Groq is unavailable."""
     seed = int(hashlib.md5(f"{vertical}:{','.join(skills)}".encode()).hexdigest()[:8], 16)
     rng = random.Random(seed)
     base = 78 + rng.randint(0, 18) + min(6, len(skills))
@@ -98,7 +98,7 @@ async def score_resume(
 ) -> ATSResult:
     """Score a structured resume against ATS criteria for the target vertical.
 
-    Falls back to a deterministic hash-based score when the Gemini API key
+    Falls back to a deterministic hash-based score when the Groq API key
     is empty or the call fails.
     """
     skills = resume_content.get("skills", {})
@@ -128,7 +128,7 @@ async def score_resume(
         data = await generate_content(
             prompt,
             system_instruction=_SCORER_SYSTEM,
-            model=settings.gemini_ats_model,
+            model=settings.groq_ats_model,
             temperature=0.3,
             max_output_tokens=2048,
         )

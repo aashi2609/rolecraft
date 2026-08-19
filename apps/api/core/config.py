@@ -14,9 +14,9 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24 * 7
     gcs_bucket_name: str = "rolecraft-uploads"
     gcs_project_id: str = ""
-    gemini_api_key: str = ""
-    gemini_model: str = "gemini-1.5-flash"
-    gemini_ats_model: str = "gemini-1.5-flash"
+    groq_api_key: str = ""
+    groq_model: str = "openai/gpt-oss-20b"
+    groq_ats_model: str = "openai/gpt-oss-20b"
     resume_max_fix_iterations: int = 3
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     environment: str = "development"

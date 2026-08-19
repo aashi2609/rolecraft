@@ -17,6 +17,7 @@ import {
   candidateApi,
   companyApi,
   getToken,
+  hiddenJobsApi,
   jobsApi,
   resumesApi,
   savedJobsApi,
@@ -468,13 +469,25 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, resumes: [resume, ...prev.resumes] }));
   const addMessage = (message: any) =>
     setState((prev) => ({ ...prev, messages: [...prev.messages, message] }));
-  const hideJob = (jobId: string | number) =>
+  const hideJob = (jobId: string | number) => {
+    const sid = String(jobId);
+    // Optimistic update
     setState((prev) => ({
       ...prev,
-      hiddenJobIds: prev.hiddenJobIds.includes(String(jobId))
+      hiddenJobIds: prev.hiddenJobIds.includes(sid)
         ? prev.hiddenJobIds
-        : [...prev.hiddenJobIds, String(jobId)],
+        : [...prev.hiddenJobIds, sid],
     }));
+    // Fire-and-forget API call
+    hiddenJobsApi.hide(sid).catch((err) => {
+      console.error('Failed to hide job:', err);
+      // Rollback
+      setState((prev) => ({
+        ...prev,
+        hiddenJobIds: prev.hiddenJobIds.filter((id) => id !== sid),
+      }));
+    });
+  };
   const toggleSavedCandidate = (id: string | number) =>
     setState((prev) => {
       const sid = String(id);

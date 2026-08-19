@@ -13,7 +13,7 @@ import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
 import { Card } from '@/components/ui/Card';
 import { useUser } from '@/context/UserContext';
 import { SKILLS } from '@/lib/constants';
-import { candidateApi } from '@/lib/api';
+import { candidateApi, resumesApi } from '@/lib/api';
 
 const STEPS = ['Basic', 'Education', 'Certifications', 'Experience', 'Skills'];
 
@@ -28,6 +28,7 @@ export default function OnboardingForm() {
   const router = useRouter();
   const { setCandidateProfile, setProfileComplete } = useUser();
   const [currentStep, setCurrentStep] = useState(0);
+  const [isParsing, setIsParsing] = useState(false);
   const [formData, setFormData] = useState<any>({
     careerLevel: '',
     education: [],
@@ -44,6 +45,46 @@ export default function OnboardingForm() {
 
   const updateForm = (key: string, value: any) => {
     setFormData((prev: any) => ({ ...prev, [key]: value }));
+  };
+
+  const handleResumeUpload = async (file: File) => {
+    setIsParsing(true);
+    try {
+      const parsed = await resumesApi.parse(file);
+      setFormData((prev: any) => ({
+        ...prev,
+        careerLevel: parsed.career_level || prev.careerLevel,
+        skills: parsed.skills || prev.skills,
+        education: parsed.education?.map((e: any) => ({
+          level: e.qualification_level,
+          degree: e.degree,
+          institute: e.institute,
+          field: e.field_of_study,
+          year: e.passing_year ? String(e.passing_year) : '',
+          cgpa: e.cgpa
+        })) || prev.education,
+        experience: parsed.experience?.map((e: any) => ({
+          company: e.company_name,
+          role: e.role,
+          current: e.is_current,
+          desc: e.responsibilities,
+        })) || prev.experience,
+        certifications: parsed.certifications?.map((c: any) => ({
+          name: c.name,
+          org: c.issuing_org
+        })) || prev.certifications,
+        projects: parsed.projects?.map((p: any) => ({
+          name: p.project_name,
+          tools: p.tools_used,
+          desc: p.responsibilities
+        })) || prev.projects,
+      }));
+    } catch (error) {
+      console.error('Failed to parse resume', error);
+      alert('Failed to parse resume: ' + (error as Error).message);
+    } finally {
+      setIsParsing(false);
+    }
   };
 
   const updateArrayItem = (key: string, index: number, field: string, value: any) => {
@@ -129,6 +170,22 @@ export default function OnboardingForm() {
         {currentStep === 0 && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-ink">Basic Information</h2>
+            
+            <div className="bg-brand-blue/5 border border-brand-blue/20 rounded-xl p-6 mb-6">
+              <h3 className="text-lg font-semibold text-brand-blue mb-2">⚡ Magic Auto-fill</h3>
+              <p className="text-ink-muted text-sm mb-4">Upload your existing resume and let AI fill out all the tedious details for you!</p>
+              <FileDropzone 
+                onFileSelect={handleResumeUpload} 
+                accept="application/pdf"
+                maxSize={5}
+              />
+              {isParsing && (
+                <div className="mt-4 flex items-center justify-center text-primary font-medium animate-pulse">
+                  🤖 AI is reading your resume... this might take a few seconds...
+                </div>
+              )}
+            </div>
+
             <FormField label="Photo Upload">
               <FileDropzone onFileSelect={(f) => {/* TODO: Implement file upload */}} accept="image/*" />
             </FormField>

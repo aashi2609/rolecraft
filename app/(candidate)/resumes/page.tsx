@@ -21,6 +21,9 @@ export default function ResumesPage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [expandedBreakdown, setExpandedBreakdown] = useState<string | null>(null);
+  const [isCustomDownloadOpen, setIsCustomDownloadOpen] = useState(false);
+  const [customRole, setCustomRole] = useState('');
+  const [isCustomDownloading, setIsCustomDownloading] = useState(false);
 
   const free = isFreePlan(plan);
   const reachedCap = free && resumes.length >= 1;
@@ -59,6 +62,21 @@ export default function ResumesPage() {
     }
   };
 
+  const handleCustomDownload = async () => {
+    if (!customRole) return;
+    setIsCustomDownloading(true);
+    try {
+      await resumesApi.downloadTailored(customRole);
+      setIsCustomDownloadOpen(false);
+      setCustomRole('');
+    } catch (err: any) {
+      console.error('Custom download failed', err);
+      alert('Failed: ' + err.message);
+    } finally {
+      setIsCustomDownloading(false);
+    }
+  };
+
   return (
     <div className="py-8 px-4 md:px-8 max-w-6xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
@@ -68,11 +86,46 @@ export default function ResumesPage() {
             Manage AI-tailored resume versions across different verticals.
           </p>
         </div>
-        <Button onClick={handleGenerateClick} className="gap-2">
-          <FileText className="w-4 h-4" />
-          + Generate New Version
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsCustomDownloadOpen(true)} className="gap-2">
+            <Download className="w-4 h-4" />
+            Download Custom Tailored PDF
+          </Button>
+          <Button onClick={handleGenerateClick} className="gap-2">
+            <FileText className="w-4 h-4" />
+            + Generate New Version
+          </Button>
+        </div>
       </div>
+
+      {isCustomDownloadOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-md p-6 m-4 animate-in fade-in zoom-in-95">
+            <h3 className="text-xl font-bold mb-2">Custom Tailored Resume</h3>
+            <p className="text-muted-foreground text-sm mb-4">
+              Enter a specific job role (e.g. "Senior React Developer") and our AI will generate a tailored resume PDF on the fly based on your profile!
+            </p>
+            <input 
+              type="text" 
+              className="w-full border rounded-md p-2 mb-4" 
+              placeholder="Target Role"
+              value={customRole}
+              onChange={(e) => setCustomRole(e.target.value)}
+              disabled={isCustomDownloading}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsCustomDownloadOpen(false)} disabled={isCustomDownloading}>Cancel</Button>
+              <Button onClick={handleCustomDownload} disabled={isCustomDownloading || !customRole}>
+                {isCustomDownloading ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating PDF...</>
+                ) : (
+                  'Download PDF'
+                )}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {reachedCap && (
         <UpsellPrompt

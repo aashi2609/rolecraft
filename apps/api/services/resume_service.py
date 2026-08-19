@@ -1,6 +1,6 @@
-"""Stage-2 resume generation — Gemini-powered AI with auto-fix loop.
+"""Stage-2 resume generation — Groq-powered AI with auto-fix loop.
 
-Falls back to the deterministic Stage-1 logic when GEMINI_API_KEY is empty.
+Falls back to the deterministic Stage-1 logic when GROQ_API_KEY is empty.
 """
 
 from __future__ import annotations
@@ -276,7 +276,7 @@ async def _generate_ai(
     data = await generate_content(
         prompt,
         system_instruction=_WRITER_SYSTEM,
-        model=settings.gemini_model,
+        model=settings.groq_model,
         temperature=0.7,
         max_output_tokens=4096,
     )
@@ -333,7 +333,7 @@ async def _fix_with_ai(
     data = await generate_content(
         prompt,
         system_instruction=_FIX_SYSTEM,
-        model=settings.gemini_model,
+        model=settings.groq_model,
         temperature=0.5,
         max_output_tokens=4096,
     )
@@ -373,7 +373,7 @@ async def generate_resume_for_vertical(
 ) -> dict[str, Any]:
     """Generate a single vertical resume — AI with auto-fix, or deterministic fallback."""
     # Try AI path
-    if settings.gemini_api_key:
+    if settings.groq_api_key:
         try:
             logger.info("Attempting AI-powered resume generation for vertical: %s", vertical)
             return await generate_with_autofix(profile, vertical, skill_names)
@@ -468,7 +468,7 @@ async def generate_with_autofix(
         "embedding": embedding,
         "generation_metadata": {
             "method": "ai",
-            "model": settings.gemini_model,
+            "model": settings.groq_model,
             "iterations": iterations,
             "final_score": best_score,
             "cleaning_warnings": cleaned.warnings,

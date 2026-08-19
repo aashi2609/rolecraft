@@ -19,7 +19,7 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/FormField';
 import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
 import { UpsellPrompt } from '@/components/UpsellPrompt';
-import { CITIES, EMPLOYMENT_TYPES, JOB_TYPES } from '@/lib/constants';
+import { CITIES, COUNTRIES, EMPLOYMENT_TYPES, JOB_LEVELS, JOB_ROLES, JOB_TYPES, STATES_INDIA } from '@/lib/constants';
 import { hasFullFilters } from '@/lib/plans';
 
 const PAGE_SIZE = 5;
@@ -58,12 +58,18 @@ export default function JobSearchPage() {
   const fullFilters = hasFullFilters(plan);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [applyingId, setApplyingId] = useState<string | null>(null);
   const [location, setLocation] = useState('');
   const [experience, setExperience] = useState('');
   const [jobType, setJobType] = useState('');
   const [salaryBand, setSalaryBand] = useState('');
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [employmentType, setEmploymentType] = useState('');
+  const [jobRole, setJobRole] = useState('');
+  const [jobLevel, setJobLevel] = useState('');
+  const [country, setCountry] = useState('');
+  const [state, setStateLoc] = useState('');
+  const [excludeLocation, setExcludeLocation] = useState('');
   const [sort, setSort] = useState('relevant');
   const [page, setPage] = useState(1);
   const [savedSearchToast, setSavedSearchToast] = useState(false);
@@ -105,6 +111,25 @@ export default function JobSearchPage() {
         return max === 0 || max >= minLpa;
       });
     }
+    if (jobRole && fullFilters) {
+      list = list.filter((j) => String(j.jobRole || '').toLowerCase() === jobRole.toLowerCase() || String(j.title).toLowerCase().includes(jobRole.toLowerCase()));
+    }
+    if (jobLevel && fullFilters) {
+      list = list.filter((j) => String(j.jobLevel || '').toLowerCase() === jobLevel.toLowerCase());
+    }
+    if (country) {
+      list = list.filter((j) => String(j.country || j.location || '').toLowerCase().includes(country.toLowerCase()));
+    }
+    if (state) {
+      list = list.filter((j) => String(j.state || j.location || '').toLowerCase().includes(state.toLowerCase()));
+    }
+    if (excludeLocation && fullFilters) {
+      const excludes = excludeLocation.toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+      list = list.filter((j) => {
+        const locStr = String(j.location || '') + ' ' + String(j.city || '') + ' ' + String(j.state || '') + ' ' + String(j.country || '');
+        return !excludes.some(ex => locStr.toLowerCase().includes(ex));
+      });
+    }
 
     if (sort === 'recent') {
       list = [...list].sort((a, b) => String(b.date).localeCompare(String(a.date)));
@@ -118,6 +143,11 @@ export default function JobSearchPage() {
     experience,
     jobType,
     employmentType,
+    jobRole,
+    jobLevel,
+    country,
+    state,
+    excludeLocation,
     salaryBand,
     sort,
     fullFilters,
@@ -128,6 +158,7 @@ export default function JobSearchPage() {
   const pageItems = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   const handleApply = async (job: (typeof jobs)[0]) => {
+    setApplyingId(job.id);
     try {
       await applyToJob({
         jobId: job.id,
@@ -138,6 +169,8 @@ export default function JobSearchPage() {
       });
     } catch {
       alert('You have already applied for this job.');
+    } finally {
+      setApplyingId(null);
     }
   };
 
@@ -249,6 +282,26 @@ export default function JobSearchPage() {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => {
+              setSearchTerm('');
+              setLocation('');
+              setExperience('');
+              setJobType('');
+              setSalaryBand('');
+              setEmploymentType('');
+              setJobRole('');
+              setJobLevel('');
+              setCountry('');
+              setStateLoc('');
+              setExcludeLocation('');
+              setPage(1);
+            }}
+          >
+            Clear Filters
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             className="gap-1.5"
             onClick={() => setShowMoreFilters((s) => !s)}
             disabled={!fullFilters}
@@ -260,13 +313,13 @@ export default function JobSearchPage() {
               Salary & more filters require a paid plan
             </span>
           )}
-          {savedSearchToast && (
-            <span className="text-xs text-primary font-medium">Search saved</span>
-          )}
+          <div className="ml-auto text-sm text-primary font-medium opacity-0 transition-opacity duration-300" style={{ opacity: savedSearchToast ? 1 : 0 }}>
+            Search criteria saved
+          </div>
         </div>
 
         {showMoreFilters && fullFilters && (
-          <div className="pt-2 border-t border-border">
+          <div className="pt-3 pb-1 border-t border-border grid grid-cols-1 md:grid-cols-4 gap-3">
             <select
               className="h-10 px-3 bg-white border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               value={employmentType}
@@ -282,6 +335,78 @@ export default function JobSearchPage() {
                 </option>
               ))}
             </select>
+            <select
+              className="h-10 px-3 bg-white border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              value={jobRole}
+              onChange={(e) => {
+                setJobRole(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">Job Role</option>
+              {JOB_ROLES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <select
+              className="h-10 px-3 bg-white border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              value={jobLevel}
+              onChange={(e) => {
+                setJobLevel(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">Job Level</option>
+              {JOB_LEVELS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <select
+              className="h-10 px-3 bg-white border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              value={country}
+              onChange={(e) => {
+                setCountry(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">Country</option>
+              {COUNTRIES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <select
+              className="h-10 px-3 bg-white border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              value={state}
+              onChange={(e) => {
+                setStateLoc(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">State / Province</option>
+              {STATES_INDIA.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <div className="md:col-span-2 relative">
+              <Input
+                className="h-10 text-sm"
+                placeholder="Exclude Locations (e.g. Remote, Mumbai)"
+                title="-ve Filter: Hide jobs in these locations"
+                value={excludeLocation}
+                onChange={(e) => {
+                  setExcludeLocation(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
           </div>
         )}
       </Card>
@@ -321,6 +446,7 @@ export default function JobSearchPage() {
             const skills: string[] = job.skills || [];
             const shown = skills.slice(0, 3);
             const overflow = skills.length - shown.length;
+            const isApplying = applyingId === job.id;
             return (
               <Card key={job.id} className="p-5">
                 <div className="flex gap-4">
@@ -375,8 +501,19 @@ export default function JobSearchPage() {
                             <Bookmark className="w-4 h-4" />
                           )}
                         </button>
-                        <Button size="sm" onClick={() => handleApply(job)}>
-                          Apply Now
+                        <button
+                          type="button"
+                          className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-red-500 hover:border-red-300"
+                          onClick={() => hideJob(job.id)}
+                          aria-label="Hide job"
+                          title="Hide this job from search"
+                        >
+                          <EyeOff className="w-4 h-4" />
+                        </button>
+                        <Button size="sm" onClick={() => handleApply(job)} disabled={isApplying}>
+                          {isApplying ? (
+                            <><span className="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" /> Tailoring Resume...</>
+                          ) : 'Apply Now'}
                         </Button>
                       </div>
                     </div>

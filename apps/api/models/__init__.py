@@ -277,6 +277,11 @@ class JobPosting(Base):
     max_salary: Mapped[Optional[int]] = mapped_column(Integer)
     salary_unit: Mapped[Optional[str]] = mapped_column(String(32))
     location: Mapped[Optional[str]] = mapped_column(String(255))
+    country: Mapped[Optional[str]] = mapped_column(String(128))
+    state: Mapped[Optional[str]] = mapped_column(String(128))
+    city: Mapped[Optional[str]] = mapped_column(String(128))
+    job_role: Mapped[Optional[str]] = mapped_column(String(128))
+    job_level: Mapped[Optional[str]] = mapped_column(String(64))
     job_type: Mapped[Optional[JobType]] = mapped_column(Enum(JobType, name="job_type"))
     required_skills: Mapped[Optional[list]] = mapped_column(ARRAY(String), default=list)
     num_openings: Mapped[int] = mapped_column(Integer, default=1)
@@ -326,6 +331,18 @@ class SavedJob(Base):
         UUID(as_uuid=True), ForeignKey("job_postings.id", ondelete="CASCADE"), primary_key=True, index=True
     )
     saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class HiddenJob(Base):
+    __tablename__ = "hidden_jobs"
+
+    candidate_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("candidate_profiles.user_id", ondelete="CASCADE"), primary_key=True
+    )
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("job_postings.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    hidden_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
 
 
 class FitmentResult(Base):
