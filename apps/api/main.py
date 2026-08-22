@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from core.config import get_settings
-from routers import auth, candidates, resumes, companies, jobs, applications, messages, analytics
+from routers import auth, candidates, resumes, companies, jobs, applications, messages, analytics, admin
 from routers.notifications import router_notifications, router_subscriptions, router_uploads
 
 settings = get_settings()
@@ -32,6 +32,7 @@ app.include_router(analytics.router)
 app.include_router(router_notifications)
 app.include_router(router_subscriptions)
 app.include_router(router_uploads)
+app.include_router(admin.router)
 
 uploads_dir = Path(__file__).parent / "uploads"
 uploads_dir.mkdir(exist_ok=True)

@@ -208,6 +208,15 @@ export const companyApi = {
   get: (id: string) => api(`/companies/${id}`),
 };
 
+export const adminApi = {
+  me: () => api('/admin/me'), // Not implemented, but can use /admin/users or just a dummy request to check if admin
+  getUsers: (skip=0, limit=100) => api(`/admin/users?skip=${skip}&limit=${limit}`),
+  updateUser: (userId: string, role: string) => api(`/admin/users/${userId}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+  getSubscriptions: (skip=0, limit=100) => api(`/admin/subscriptions?skip=${skip}&limit=${limit}`),
+  updateSubscription: (subId: string, planTier: string) =>
+    api(`/admin/subscriptions/${subId}?plan_tier=${planTier}`, { method: 'PATCH' }),
+};
+
 export const jobsApi = {
   list: (params?: Record<string, string | undefined>) => {
     const q = new URLSearchParams();

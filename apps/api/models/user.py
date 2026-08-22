@@ -12,6 +12,7 @@ from core.database import Base
 class UserRole(str, enum.Enum):
     candidate = "candidate"
     company = "company"
+    admin = "admin"
 
 
 class User(Base):

@@ -23,7 +23,9 @@ export default function SigninPage() {
     try {
       const res = await signInWithApi(email, password);
       // Route to onboarding if profile is incomplete, otherwise to dashboard
-      if (res.role === 'company') {
+      if (res.role === 'admin') {
+        router.push('/admin/dashboard');
+      } else if (res.role === 'company') {
         router.push(res.companyProfileComplete ? '/company/dashboard' : '/onboarding/company-profile');
       } else {
         router.push(res.profileComplete ? '/dashboard' : '/onboarding/profile');

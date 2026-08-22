@@ -12,6 +12,7 @@ import type { PlanId } from '@/lib/plans';
 import { isFreePlan } from '@/lib/plans';
 import { useApplicationSocket } from '@/hooks/useApplicationSocket';
 import {
+  adminApi,
   applicationsApi,
   authApi,
   candidateApi,
@@ -25,7 +26,7 @@ import {
   subscriptionsApi,
 } from '@/lib/api';
 
-type Role = 'candidate' | 'company' | null;
+type Role = 'candidate' | 'company' | 'admin' | null;
 
 interface UserState {
   isAuthenticated: boolean;
@@ -231,25 +232,32 @@ export function UserProvider({ children }: { children: ReactNode }) {
       let companyProfileComplete = false;
 
       try {
-        const me: any = await candidateApi.me();
-        role = 'candidate';
-        userId = me.user_id;
-        candidateProfile = me;
-        profileComplete = Boolean(
-          me.career_level && String(me.career_level).trim().length > 0 &&
-          me.skills && Array.isArray(me.skills) && me.skills.length > 0
-        );
+        await adminApi.me();
+        role = 'admin';
+        profileComplete = true; // admins don't need onboarding
+        companyProfileComplete = true;
       } catch {
         try {
-          const me: any = await companyApi.me();
-          role = 'company';
+          const me: any = await candidateApi.me();
+          role = 'candidate';
           userId = me.user_id;
-          companyProfile = me;
-          companyProfileComplete = Boolean(me.name);
+          candidateProfile = me;
+          profileComplete = Boolean(
+            me.career_level && String(me.career_level).trim().length > 0 &&
+            me.skills && Array.isArray(me.skills) && me.skills.length > 0
+          );
         } catch {
-          setToken(null);
-          setState((prev) => ({ ...prev, ...initialState, loading: false }));
-          return;
+          try {
+            const me: any = await companyApi.me();
+            role = 'company';
+            userId = me.user_id;
+            companyProfile = me;
+            companyProfileComplete = Boolean(me.name);
+          } catch {
+            setToken(null);
+            setState((prev) => ({ ...prev, ...initialState, loading: false }));
+            return;
+          }
         }
       }
 
@@ -339,7 +347,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
     let isProfileComplete = false;
     let isCompanyProfileComplete = false;
     try {
-      if (res.role === 'candidate') {
+      if (res.role === 'admin') {
+        isProfileComplete = true;
+        isCompanyProfileComplete = true;
+      } else if (res.role === 'candidate') {
         const me: any = await candidateApi.me();
         isProfileComplete = Boolean(
           me.career_level && String(me.career_level).trim().length > 0 &&
