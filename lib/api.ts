@@ -209,12 +209,29 @@ export const companyApi = {
 };
 
 export const adminApi = {
-  me: () => api('/admin/me'), // Not implemented, but can use /admin/users or just a dummy request to check if admin
-  getUsers: (skip=0, limit=100) => api(`/admin/users?skip=${skip}&limit=${limit}`),
-  updateUser: (userId: string, role: string) => api(`/admin/users/${userId}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
-  getSubscriptions: (skip=0, limit=100) => api(`/admin/subscriptions?skip=${skip}&limit=${limit}`),
-  updateSubscription: (subId: string, planTier: string) =>
-    api(`/admin/subscriptions/${subId}?plan_tier=${planTier}`, { method: 'PATCH' }),
+  getMe: () => api('/admin/me'),
+  getStats: () => api('/admin/stats'),
+  getUsers: (params?: { search?: string, role?: string, skip?: number, limit?: number }) => {
+    const q = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+    return api(`/admin/users?${q.toString()}`);
+  },
+  updateUser: (id: string, data: { role?: string, is_active?: boolean }) => 
+    api(`/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  getSubscriptions: (params?: { status?: string, plan?: string, skip?: number, limit?: number }) => {
+    const q = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+    return api(`/admin/subscriptions?${q.toString()}`);
+  },
+  updateSubscription: (id: string, data: { plan_tier?: string, status?: string }) => 
+    api(`/admin/subscriptions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  getJobs: (params?: { search?: string, status?: string, skip?: number, limit?: number }) => {
+    const q = new URLSearchParams();
+    if (params) Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
+    return api(`/admin/jobs?${q.toString()}`);
+  },
+  updateJob: (id: string, data: { status?: string }) => 
+    api(`/admin/jobs/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 };
 
 export const jobsApi = {

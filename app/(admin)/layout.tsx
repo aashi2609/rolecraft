@@ -10,6 +10,7 @@ import { Users, LayoutDashboard, CreditCard, LogOut, Briefcase } from 'lucide-re
 const navItems = [
   { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
   { label: 'Users', href: '/admin/users', icon: Users },
+  { label: 'Jobs', href: '/admin/jobs', icon: Briefcase },
   { label: 'Subscriptions', href: '/admin/subscriptions', icon: CreditCard },
 ];
 

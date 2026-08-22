@@ -232,7 +232,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       let companyProfileComplete = false;
 
       try {
-        await adminApi.me();
+        await adminApi.getMe();
         role = 'admin';
         profileComplete = true; // admins don't need onboarding
         companyProfileComplete = true;
