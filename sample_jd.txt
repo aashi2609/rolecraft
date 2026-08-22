@@ -1,0 +1,26 @@
+Job Title: Senior Frontend Developer
+Department: Engineering
+Role: Frontend Developer
+Level: Senior Level
+Employment Type: Full-time
+Location: Bangalore, Karnataka, India
+
+About the Role:
+We are looking for an experienced Senior Frontend Developer to join our core engineering team. You will be responsible for building responsive, high-performance web applications using React and Next.js.
+
+Responsibilities:
+- Architect and develop scalable frontend solutions
+- Collaborate with designers and backend engineers
+- Mentor junior developers and perform code reviews
+- Optimize applications for maximum speed and scalability
+
+Requirements:
+- 5+ years of experience in frontend development
+- Deep knowledge of React, Next.js, and TypeScript
+- Experience with modern CSS frameworks (Tailwind, Vanilla Extract)
+- Strong understanding of web performance and accessibility
+
+Benefits:
+- Competitive salary and equity package
+- Health insurance and wellness benefits
+- Flexible working hours and remote options

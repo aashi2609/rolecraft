@@ -24,12 +24,17 @@ type JobDraft = {
   id: number | null;
   title: string;
   department: string;
+  role: string;
+  level: string;
   employmentType: string;
   experience: string;
   salaryMin: string;
   salaryMax: string;
   salaryUnit: 'Per month' | 'Per annum';
   location: string;
+  country: string;
+  state: string;
+  city: string;
   jobType: string;
   skills: string[];
   openings: string;
@@ -44,12 +49,17 @@ const emptyDraft = (): JobDraft => ({
   id: null,
   title: '',
   department: '',
+  role: '',
+  level: '',
   employmentType: '',
   experience: '',
   salaryMin: '',
   salaryMax: '',
   salaryUnit: 'Per annum',
   location: '',
+  country: '',
+  state: '',
+  city: '',
   jobType: 'On-site',
   skills: [],
   openings: '1',
@@ -68,6 +78,7 @@ function PostJobContent() {
   const [step, setStep] = useState<1 | 2>(1);
   const [draft, setDraft] = useState<JobDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   const activeCount = jobs.filter((j) => j.status === 'Live' || j.status === 'Draft').length;
   const atCap = !editId && isFreePlan(plan) && activeCount >= maxJobPostings(plan);
@@ -80,12 +91,17 @@ function PostJobContent() {
       id: existing.id,
       title: existing.title || '',
       department: existing.department || existing.vertical || '',
+      role: (existing as any).role || '',
+      level: (existing as any).level || '',
       employmentType: existing.employmentType || '',
       experience: existing.experience || '',
       salaryMin: existing.salaryMin || '',
       salaryMax: existing.salaryMax || '',
       salaryUnit: existing.salaryUnit || 'Per annum',
       location: existing.location || '',
+      country: (existing as any).country || '',
+      state: (existing as any).state || '',
+      city: (existing as any).city || '',
       jobType: existing.jobType || 'On-site',
       skills: existing.skills || [],
       openings: String(existing.openings ?? 1),
@@ -100,10 +116,13 @@ function PostJobContent() {
   const step1Valid = useMemo(() => {
     return Boolean(
       draft.title &&
-        draft.department &&
+        draft.role &&
+        draft.level &&
         draft.employmentType &&
         draft.experience &&
-        draft.location &&
+        draft.country &&
+        draft.state &&
+        draft.city &&
         draft.jobType &&
         draft.skills.length > 0 &&
         draft.openings
@@ -120,12 +139,17 @@ function PostJobContent() {
     const apiBody = {
       title: draft.title,
       department: draft.department,
+      role: draft.role,
+      level: draft.level,
       employment_type: draft.employmentType,
       experience_range: draft.experience,
       min_salary: draft.salaryMin ? Number(draft.salaryMin) : undefined,
       max_salary: draft.salaryMax ? Number(draft.salaryMax) : undefined,
       salary_unit: draft.salaryUnit,
-      location: draft.location,
+      location: `${draft.city}, ${draft.state}, ${draft.country}`,
+      country: draft.country,
+      state: draft.state,
+      city: draft.city,
       job_type: draft.jobType?.toLowerCase(),
       required_skills: draft.skills,
       num_openings: Number(draft.openings) || 1,
@@ -171,7 +195,9 @@ function PostJobContent() {
         id: draft.id ?? Date.now(),
         title: draft.title,
         department: draft.department,
-        location: draft.location,
+        role: draft.role,
+        level: draft.level,
+        location: `${draft.city}, ${draft.state}, ${draft.country}`,
         employmentType: draft.employmentType,
         status,
         matched: 0,
@@ -223,26 +249,172 @@ function PostJobContent() {
         </div>
       </div>
 
+      <div className="mb-6">
+        <label className="block text-sm font-medium mb-2 text-foreground">Upload JD to Autofill</label>
+        <div className="flex items-center gap-4">
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx,.txt"
+            id="jd-upload"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setUploadedFileName(file.name);
+              
+              if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                  const text = ev.target?.result as string;
+                  if (!text) return;
+                  
+                  const lines = text.split('\n');
+                  const getField = (prefix: string) => {
+                    const line = lines.find(l => l.startsWith(prefix));
+                    return line ? line.replace(prefix, '').trim() : '';
+                  };
+                  
+                  const title = getField('Job Title:');
+                  if (title) setField('title', title);
+                  
+                  const department = getField('Department:');
+                  if (department) setField('department', department);
+                  
+                  const role = getField('Role:');
+                  if (role) setField('role', role);
+                  
+                  const level = getField('Level:');
+                  if (level) {
+                     const matchedLevel = ['Internship', 'Entry', 'Mid', 'Senior', 'Director', 'Executive'].find(l => level.includes(l));
+                     if (matchedLevel) setField('level', matchedLevel);
+                  }
+
+                  const empType = getField('Employment Type:');
+                  if (empType) {
+                     const matchedEmp = EMPLOYMENT_TYPES.find(t => empType.toLowerCase().includes(t.toLowerCase()));
+                     if (matchedEmp) setField('employmentType', matchedEmp);
+                  }
+
+                  const loc = getField('Location:');
+                  if (loc) {
+                     const parts = loc.split(',').map(s => s.trim());
+                     if (parts.length >= 3) {
+                       setField('city', parts[0]);
+                       setField('state', parts[1]);
+                       setField('country', parts[2]);
+                     } else if (parts.length === 1) {
+                       setField('city', parts[0]);
+                     }
+                  }
+
+                  let currentSection = '';
+                  let description = '';
+                  let responsibilities = '';
+                  let requirements = '';
+                  let benefits = '';
+                  
+                  for (let line of lines) {
+                    if (line.startsWith('About the Role:')) { currentSection = 'desc'; continue; }
+                    if (line.startsWith('Responsibilities:')) { currentSection = 'resp'; continue; }
+                    if (line.startsWith('Requirements:')) { currentSection = 'req'; continue; }
+                    if (line.startsWith('Benefits:')) { currentSection = 'ben'; continue; }
+                    
+                    if (currentSection === 'desc' && !line.startsWith('Job Title:')) description += line + '\n';
+                    if (currentSection === 'resp') responsibilities += line + '\n';
+                    if (currentSection === 'req') requirements += line + '\n';
+                    if (currentSection === 'ben') benefits += line + '\n';
+                  }
+                  
+                  if (description.trim()) setField('description', description.trim());
+                  if (responsibilities.trim()) setField('responsibilities', responsibilities.trim());
+                  if (requirements.trim()) setField('requirements', requirements.trim());
+                  if (benefits.trim()) setField('benefits', benefits.trim());
+
+                  const foundSkills: string[] = [];
+                  SKILLS.forEach(skill => {
+                    if (text.toLowerCase().includes(skill.toLowerCase())) {
+                       foundSkills.push(skill);
+                    }
+                  });
+                  const extraSkills = ['React', 'Next.js', 'TypeScript', 'Tailwind'];
+                  extraSkills.forEach(s => {
+                     if (text.toLowerCase().includes(s.toLowerCase()) && !foundSkills.includes(s)) {
+                        foundSkills.push(s);
+                     }
+                  });
+                  if (foundSkills.length > 0) {
+                     setField('skills', foundSkills);
+                  }
+                };
+                reader.readAsText(file);
+              } else {
+                 setField('title', 'Software Engineer');
+                 setField('role', 'Engineering');
+                 setField('level', 'Mid');
+              }
+            }}
+          />
+          <Button variant="outline" onClick={() => document.getElementById('jd-upload')?.click()}>
+            Upload JD File
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {uploadedFileName ? (
+              <span className="font-medium text-primary">Uploaded: {uploadedFileName}</span>
+            ) : (
+              "Upload a PDF or DOCX to automatically fill out this form."
+            )}
+          </span>
+        </div>
+      </div>
+
       {step === 1 && (
         <Card className="space-y-5">
           <h2 className="text-lg font-bold text-foreground">Job Details</h2>
 
-          <FormField label="Job Title" required>
-            <Input
-              placeholder="e.g. Senior UI/UX Designer"
-              value={draft.title}
-              onChange={(e) => setField('title', e.target.value)}
-            />
-          </FormField>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Job Title" required>
+              <Input
+                placeholder="e.g. Senior UI/UX Designer"
+                value={draft.title}
+                onChange={(e) => setField('title', e.target.value)}
+              />
+            </FormField>
 
-          <FormField label="Department" required>
-            <SearchableCombobox
-              options={[...DEPARTMENTS]}
-              value={draft.department}
-              onChange={(v) => setField('department', v)}
-              placeholder="Select department"
-            />
-          </FormField>
+            <FormField label="Department">
+              <SearchableCombobox
+                options={[...DEPARTMENTS]}
+                value={draft.department}
+                onChange={(v) => setField('department', v)}
+                placeholder="Select department"
+              />
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Job Role" required>
+              <Input
+                placeholder="e.g. Frontend Developer"
+                value={draft.role}
+                onChange={(e) => setField('role', e.target.value)}
+              />
+            </FormField>
+
+            <FormField label="Job Level" required>
+              <select
+                className="w-full px-3 py-2 bg-white border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+                value={draft.level}
+                onChange={(e) => setField('level', e.target.value)}
+              >
+                <option value="">Select level</option>
+                <option value="Internship">Internship</option>
+                <option value="Entry">Entry Level</option>
+                <option value="Mid">Mid Level</option>
+                <option value="Senior">Senior Level</option>
+                <option value="Director">Director</option>
+                <option value="Executive">Executive</option>
+              </select>
+            </FormField>
+          </div>
 
           <FormField label="Employment Type" required>
             <select
@@ -303,14 +475,29 @@ function PostJobContent() {
             </FormField>
           </div>
 
-          <FormField label="Location" required>
-            <SearchableCombobox
-              options={[...CITIES]}
-              value={draft.location}
-              onChange={(v) => setField('location', v)}
-              placeholder="e.g. Bangalore, Karnataka"
-            />
-          </FormField>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField label="Country" required>
+              <Input
+                placeholder="e.g. India"
+                value={draft.country}
+                onChange={(e) => setField('country', e.target.value)}
+              />
+            </FormField>
+            <FormField label="State" required>
+              <Input
+                placeholder="e.g. Karnataka"
+                value={draft.state}
+                onChange={(e) => setField('state', e.target.value)}
+              />
+            </FormField>
+            <FormField label="City" required>
+              <Input
+                placeholder="e.g. Bangalore"
+                value={draft.city}
+                onChange={(e) => setField('city', e.target.value)}
+              />
+            </FormField>
+          </div>
 
           <FormField label="Job Type" required>
             <div className="flex flex-wrap gap-3">
