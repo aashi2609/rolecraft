@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
 
 from core.dependencies import DbSession, get_current_user
+from core.security import hash_password
 from models import (
     Application, Company, CandidateProfile, JobPosting, JobStatus,
     Subscription, SubscriptionStatus, User, UserRole,
@@ -74,17 +75,39 @@ class DashboardStats(BaseModel):
 
 
 class UserStatusUpdate(BaseModel):
+    email: Optional[str] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
 
+class UserCreate(BaseModel):
+    email: str
+    password: str
+    role: str = "candidate"
+    is_active: bool = True
 
 class SubStatusUpdate(BaseModel):
     plan_tier: Optional[str] = None
     status: Optional[str] = None
+    role: Optional[str] = None
 
+class SubCreate(BaseModel):
+    user_id: str
+    role: str
+    plan_tier: str
+    status: str = "active"
 
 class JobAdminUpdate(BaseModel):
+    title: Optional[str] = None
     status: Optional[str] = None
+    location: Optional[str] = None
+    employment_type: Optional[str] = None
+
+class JobCreate(BaseModel):
+    company_id: str
+    title: str
+    status: str = "draft"
+    location: Optional[str] = None
+    employment_type: Optional[str] = None
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -201,9 +224,44 @@ async def update_user(
         raise HTTPException(status_code=404, detail="User not found")
     if update_data.role is not None:
         user.role = update_data.role
+    if update_data.is_active is not None:
+        user.is_active = update_data.is_active
+    if update_data.email is not None:
+        user.email = update_data.email
     await db.commit()
     await db.refresh(user)
     return {"ok": True, "id": str(user.id), "role": str(user.role.value if hasattr(user.role, "value") else user.role)}
+
+@router.post("/users")
+async def create_user(
+    create_data: UserCreate,
+    db: DbSession,
+    current_admin: User = Depends(get_current_admin),
+) -> Any:
+    hashed_pwd = hash_password(create_data.password)
+    user = User(
+        email=create_data.email,
+        password_hash=hashed_pwd,
+        role=create_data.role,
+        is_active=create_data.is_active
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return {"ok": True, "id": str(user.id)}
+
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: str,
+    db: DbSession,
+    current_admin: User = Depends(get_current_admin),
+) -> Any:
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    await db.delete(user)
+    await db.commit()
+    return {"ok": True}
 
 
 @router.get("/subscriptions", response_model=List[AdminSubOut])
@@ -261,8 +319,40 @@ async def update_subscription(
         sub.plan_tier = update_data.plan_tier
     if update_data.status is not None:
         sub.status = update_data.status
+    if update_data.role is not None:
+        sub.role = update_data.role
     await db.commit()
     await db.refresh(sub)
+    return {"ok": True}
+
+@router.post("/subscriptions")
+async def create_subscription(
+    create_data: SubCreate,
+    db: DbSession,
+    current_admin: User = Depends(get_current_admin),
+) -> Any:
+    sub = Subscription(
+        user_id=create_data.user_id,
+        role=create_data.role,
+        plan_tier=create_data.plan_tier,
+        status=create_data.status
+    )
+    db.add(sub)
+    await db.commit()
+    await db.refresh(sub)
+    return {"ok": True, "id": str(sub.id)}
+
+@router.delete("/subscriptions/{sub_id}")
+async def delete_subscription(
+    sub_id: str,
+    db: DbSession,
+    current_admin: User = Depends(get_current_admin),
+) -> Any:
+    sub = await db.get(Subscription, sub_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    await db.delete(sub)
+    await db.commit()
     return {"ok": True}
 
 
@@ -314,8 +404,45 @@ async def update_job_status(
     job = await db.get(JobPosting, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    if update_data.title is not None:
+        job.title = update_data.title
     if update_data.status is not None:
         job.status = update_data.status
+    if update_data.location is not None:
+        job.location = update_data.location
+    if update_data.employment_type is not None:
+        job.employment_type = update_data.employment_type
     await db.commit()
     await db.refresh(job)
+    return {"ok": True}
+
+@router.post("/jobs")
+async def create_job(
+    create_data: JobCreate,
+    db: DbSession,
+    current_admin: User = Depends(get_current_admin),
+) -> Any:
+    job = JobPosting(
+        company_id=create_data.company_id,
+        title=create_data.title,
+        status=create_data.status,
+        location=create_data.location,
+        employment_type=create_data.employment_type
+    )
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
+    return {"ok": True, "id": str(job.id)}
+
+@router.delete("/jobs/{job_id}")
+async def delete_job(
+    job_id: str,
+    db: DbSession,
+    current_admin: User = Depends(get_current_admin),
+) -> Any:
+    job = await db.get(JobPosting, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    await db.delete(job)
+    await db.commit()
     return {"ok": True}

@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'default' | 'primary' | 'secondary' | 'outline' | 'ghost' | 'link';
+  variant?: 'default' | 'primary' | 'secondary' | 'outline' | 'ghost' | 'link' | 'destructive';
   size?: 'default' | 'sm' | 'lg' | 'icon';
 }
 
@@ -18,6 +18,7 @@ const buttonVariants = {
   outline: "border border-border-soft bg-surface-white hover:bg-surface-soft text-ink",
   ghost: "hover:bg-surface-soft text-ink",
   link: "text-brand-blue underline-offset-4 hover:underline",
+  destructive: "bg-red-500 text-white hover:bg-red-600",
 };
 
 const buttonSizes = {

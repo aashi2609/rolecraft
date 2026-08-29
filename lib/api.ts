@@ -216,22 +216,36 @@ export const adminApi = {
     if (params) Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
     return api(`/admin/users?${q.toString()}`);
   },
-  updateUser: (id: string, data: { role?: string, is_active?: boolean }) => 
+  createUser: (data: any) =>
+    api(`/admin/users`, { method: 'POST', body: JSON.stringify(data) }),
+  updateUser: (id: string, data: any) => 
     api(`/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteUser: (id: string) =>
+    api(`/admin/users/${id}`, { method: 'DELETE' }),
+  
   getSubscriptions: (params?: { status?: string, plan?: string, skip?: number, limit?: number }) => {
     const q = new URLSearchParams();
     if (params) Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
     return api(`/admin/subscriptions?${q.toString()}`);
   },
-  updateSubscription: (id: string, data: { plan_tier?: string, status?: string }) => 
+  createSubscription: (data: any) =>
+    api(`/admin/subscriptions`, { method: 'POST', body: JSON.stringify(data) }),
+  updateSubscription: (id: string, data: any) => 
     api(`/admin/subscriptions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteSubscription: (id: string) =>
+    api(`/admin/subscriptions/${id}`, { method: 'DELETE' }),
+    
   getJobs: (params?: { search?: string, status?: string, skip?: number, limit?: number }) => {
     const q = new URLSearchParams();
     if (params) Object.entries(params).forEach(([k, v]) => v !== undefined && q.set(k, String(v)));
     return api(`/admin/jobs?${q.toString()}`);
   },
-  updateJob: (id: string, data: { status?: string }) => 
+  createJob: (data: any) =>
+    api(`/admin/jobs`, { method: 'POST', body: JSON.stringify(data) }),
+  updateJob: (id: string, data: any) => 
     api(`/admin/jobs/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteJob: (id: string) =>
+    api(`/admin/jobs/${id}`, { method: 'DELETE' }),
 };
 
 export const jobsApi = {
