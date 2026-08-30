@@ -6,12 +6,18 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { CheckCircle2, Download, FileText } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
+import { getDisplayName, getProfileLocation } from '@/lib/profile';
+import { resumesApi } from '@/lib/api';
 
 export default function ResumePreviewPage() {
   const router = useRouter();
-  const { resumes } = useUser();
+  const { resumes, candidateProfile } = useUser();
   const [verticals, setVerticals] = useState<string[]>([]);
   const [active, setActive] = useState(0);
+
+  const displayName = getDisplayName(candidateProfile) || 'Your Name';
+  const email = (candidateProfile?.email as string) || '';
+  const location = getProfileLocation(candidateProfile) || 'India';
 
   useEffect(() => {
     const multi = localStorage.getItem('rolecraft_target_verticals');
@@ -34,7 +40,17 @@ export default function ResumePreviewPage() {
 
   const vertical = verticals[active] || 'your targeted role';
   const resumeMeta = resumes.find((r) => r.vertical === vertical);
-  const score = resumeMeta?.score || 87;
+  const score = resumeMeta?.score ?? null;
+  const safeFileName = displayName.replace(/\s+/g, '_');
+
+  const handleDownload = async () => {
+    if (!resumeMeta?.id) return;
+    try {
+      await resumesApi.downloadPdf(String(resumeMeta.id), `${safeFileName}_${vertical.replace(/\s+/g, '_')}_Resume.pdf`);
+    } catch {
+      alert('PDF download failed. Try again from My Resumes.');
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-4">
@@ -53,7 +69,7 @@ export default function ResumePreviewPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2" onClick={handleDownload} disabled={!resumeMeta?.id}>
             <Download className="w-4 h-4" /> Download PDF
           </Button>
           <Button onClick={() => router.push('/dashboard')}>Continue to Dashboard</Button>
@@ -83,18 +99,23 @@ export default function ResumePreviewPage() {
         <div className="bg-secondary/50 border-b border-border p-4 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2 text-foreground font-medium">
             <FileText className="w-5 h-5 text-primary" />
-            Jane_Doe_{vertical.replace(/\s+/g, '_')}_Resume.pdf
+            {safeFileName}_{vertical.replace(/\s+/g, '_')}_Resume.pdf
           </div>
-          <div className="flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm font-medium border border-green-200">
-            <CheckCircle2 className="w-4 h-4" />
-            {score}/100 — ATS Ready
-          </div>
+          {score != null && (
+            <div className="flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm font-medium border border-green-200">
+              <CheckCircle2 className="w-4 h-4" />
+              {score}/100 — ATS Ready
+            </div>
+          )}
         </div>
 
         <div className="p-8 md:p-12 bg-white text-sm text-foreground/80 leading-relaxed mx-auto max-w-3xl">
           <div className="text-center mb-8 border-b border-border pb-6">
-            <h2 className="text-3xl font-bold text-foreground mb-2">Jane Doe</h2>
-            <p className="text-muted-foreground">Bengaluru • jane.doe@example.com</p>
+            <h2 className="text-3xl font-bold text-foreground mb-2">{displayName}</h2>
+            <p className="text-muted-foreground">
+              {location}
+              {email ? ` • ${email}` : ''}
+            </p>
             <p className="text-primary font-medium mt-1">{vertical}</p>
           </div>
 
@@ -119,7 +140,7 @@ export default function ResumePreviewPage() {
               Highlighted Skills
             </h3>
             <div className="flex flex-wrap gap-2">
-              {(resumeMeta?.highlightedSkills || ['Communication', 'Problem Solving', 'Teamwork']).map(
+              {(resumeMeta?.highlightedSkills || (candidateProfile?.skills as string[]) || []).map(
                 (s: string) => (
                   <span key={s} className="px-2 py-1 rounded-md bg-secondary text-xs font-medium">
                     {s}

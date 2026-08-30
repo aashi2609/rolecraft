@@ -29,6 +29,11 @@ class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=6)
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -47,6 +52,7 @@ class UserOut(ORMModel):
 # ── Candidate ─────────────────────────────────────────────────────────────────
 
 class CandidateProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
     photo_url: Optional[str] = None
     career_level: Optional[str] = None
     dob: Optional[date] = None
@@ -59,6 +65,7 @@ class CandidateProfileUpdate(BaseModel):
     strengths: Optional[list[str]] = None
     weaknesses: Optional[list[str]] = None
     weblinks: Optional[dict[str, Any]] = None
+    notification_prefs: Optional[dict[str, bool]] = None
     annual_family_income: Optional[str] = None
 
 
@@ -137,6 +144,7 @@ class SkillsUpdate(BaseModel):
 class CandidateProfileOut(ORMModel):
     user_id: UUID
     email: Optional[str] = None
+    full_name: Optional[str] = None
     photo_url: Optional[str] = None
     career_level: Optional[str] = None
     dob: Optional[date] = None
@@ -149,6 +157,7 @@ class CandidateProfileOut(ORMModel):
     strengths: Optional[list[str]] = None
     weaknesses: Optional[list[str]] = None
     weblinks: Optional[dict[str, Any]] = None
+    notification_prefs: Optional[dict[str, bool]] = None
     annual_family_income: Optional[str] = None
     skills: list[str] = []
     education: list[EducationOut] = []
@@ -324,12 +333,14 @@ class ApplicationOut(ORMModel):
 
 class MessageCreate(BaseModel):
     body: str
+    recipient_id: Optional[UUID] = None
 
 
 class MessageOut(ORMModel):
     id: UUID
     thread_id: UUID
     sender_id: UUID
+    recipient_id: Optional[UUID] = None
     sender_role: str
     body: str
     sent_at: datetime
@@ -340,6 +351,7 @@ class ThreadOut(BaseModel):
     last_body: Optional[str] = None
     last_sent_at: Optional[datetime] = None
     participant_label: Optional[str] = None
+    other_user_id: Optional[UUID] = None
 
 
 class NotificationOut(ORMModel):

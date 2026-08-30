@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Search,
@@ -21,9 +21,35 @@ import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
 import { UpsellPrompt } from '@/components/UpsellPrompt';
 import { CITIES, COUNTRIES, EMPLOYMENT_TYPES, JOB_LEVELS, JOB_ROLES, JOB_TYPES, STATES_INDIA } from '@/lib/constants';
 import { hasFullFilters } from '@/lib/plans';
+import { jobsApi } from '@/lib/api';
 
 const PAGE_SIZE = 5;
 const EXPERIENCE_OPTIONS = ['0-1 Years', '1-3 Years', '3-5 Years', '5+ Years'];
+
+function mapJobFromApi(j: any) {
+  return {
+    id: j.id,
+    companyId: j.company_id,
+    companyName: j.company_name,
+    title: j.title,
+    vertical: j.department,
+    department: j.department,
+    location: j.location,
+    employmentType: j.employment_type,
+    jobType: j.job_type
+      ? String(j.job_type).charAt(0).toUpperCase() + String(j.job_type).slice(1)
+      : undefined,
+    salaryMin: j.min_salary != null ? String(j.min_salary) : '',
+    salaryMax: j.max_salary != null ? String(j.max_salary) : '',
+    salaryUnit: j.salary_unit || 'Per annum',
+    salaryUndisclosed: !j.min_salary && !j.max_salary,
+    experience: j.experience_range,
+    skills: j.required_skills || [],
+    description: j.description,
+    status: j.status ? String(j.status).charAt(0).toUpperCase() + String(j.status).slice(1) : 'Draft',
+    date: j.created_at?.slice?.(0, 10) || j.created_at,
+  };
+}
 
 function daysAgo(dateStr?: string): string {
   if (!dateStr) return 'Recently';
@@ -57,6 +83,7 @@ export default function JobSearchPage() {
   const { jobs, savedJobs, toggleSavedJob, hideJob, hiddenJobIds, plan, applyToJob } = useUser();
   const fullFilters = hasFullFilters(plan);
 
+  const [listedJobs, setListedJobs] = useState<any[]>(jobs);
   const [searchTerm, setSearchTerm] = useState('');
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [location, setLocation] = useState('');
@@ -74,9 +101,25 @@ export default function JobSearchPage() {
   const [page, setPage] = useState(1);
   const [savedSearchToast, setSavedSearchToast] = useState(false);
 
+  useEffect(() => {
+    const params: Record<string, string> = { status: 'live' };
+    if (searchTerm.trim()) params.title = searchTerm.trim();
+    if (location.trim()) params.location = location.trim();
+    if (experience) params.experience_range = experience;
+    if (salaryBand && fullFilters) {
+      const minLpa =
+        salaryBand === '0-8' ? 0 : salaryBand === '8-15' ? 8 : salaryBand === '15-25' ? 15 : 25;
+      if (minLpa > 0) params.salary_min = String(minLpa * 100000);
+    }
+    jobsApi
+      .list(params)
+      .then((raw) => setListedJobs((raw || []).map(mapJobFromApi)))
+      .catch(() => setListedJobs(jobs));
+  }, [searchTerm, location, experience, salaryBand, fullFilters, jobs]);
+
   const filtered = useMemo(() => {
-    let list = jobs.filter(
-      (job) => job.status === 'Live' && !hiddenJobIds.includes(job.id)
+    let list = listedJobs.filter(
+      (job) => job.status === 'Live' && !hiddenJobIds.includes(String(job.id))
     );
 
     const q = searchTerm.trim().toLowerCase();
@@ -136,7 +179,7 @@ export default function JobSearchPage() {
     }
     return list;
   }, [
-    jobs,
+    listedJobs,
     hiddenJobIds,
     searchTerm,
     location,

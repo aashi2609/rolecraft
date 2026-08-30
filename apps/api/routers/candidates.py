@@ -1,8 +1,10 @@
 from uuid import UUID
+import uuid as uuid_mod
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import delete, select, or_, and_
+from sqlalchemy import delete, select, or_, and_, func
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import selectinload
 
 from core.dependencies import CandidateUser, CurrentUser, DbSession
@@ -53,10 +55,21 @@ async def _load_profile(db, user_id: UUID) -> CandidateProfile:
     return profile
 
 
+def _profile_meta(profile: CandidateProfile) -> tuple[Optional[str], dict[str, bool]]:
+    links = profile.weblinks or {}
+    display_name = links.get("display_name")
+    prefs = links.get("notification_prefs") or {}
+    if isinstance(prefs, dict):
+        return display_name, {k: bool(v) for k, v in prefs.items()}
+    return display_name, {}
+
+
 def _to_out(profile: CandidateProfile) -> CandidateProfileOut:
+    full_name, notification_prefs = _profile_meta(profile)
     return CandidateProfileOut(
         user_id=profile.user_id,
         email=profile.user.email if profile.user else None,
+        full_name=full_name,
         photo_url=profile.photo_url,
         career_level=profile.career_level,
         dob=profile.dob,
@@ -69,6 +82,7 @@ def _to_out(profile: CandidateProfile) -> CandidateProfileOut:
         strengths=profile.strengths or [],
         weaknesses=profile.weaknesses or [],
         weblinks=profile.weblinks or {},
+        notification_prefs=notification_prefs,
         annual_family_income=profile.annual_family_income,
         skills=[cs.skill.name for cs in profile.skills if cs.skill],
         education=[EducationOut.model_validate(e) for e in profile.education],
@@ -86,7 +100,14 @@ async def get_me(user: CandidateUser, db: DbSession):
 @router.put("/me", response_model=CandidateProfileOut)
 async def update_me(body: CandidateProfileUpdate, user: CandidateUser, db: DbSession):
     profile = await _load_profile(db, user.id)
-    for k, v in body.model_dump(exclude_unset=True).items():
+    data = body.model_dump(exclude_unset=True)
+    links = dict(profile.weblinks or {})
+    if "full_name" in data:
+        links["display_name"] = data.pop("full_name")
+    if "notification_prefs" in data:
+        links["notification_prefs"] = data.pop("notification_prefs")
+    profile.weblinks = links
+    for k, v in data.items():
         setattr(profile, k, v)
     await db.flush()
     return _to_out(await _load_profile(db, user.id))
@@ -241,16 +262,34 @@ async def get_skills(user: CandidateUser, db: DbSession):
 
 @router.put("/me/skills")
 async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
+    unique_names: list[str] = []
+    seen: set[str] = set()
+    for raw in body.skills:
+        name = raw.strip()
+        key = name.lower()
+        if name and key not in seen:
+            seen.add(key)
+            unique_names.append(name)
+
     await db.execute(delete(CandidateSkill).where(CandidateSkill.candidate_id == user.id))
-    for name in body.skills:
+    await db.flush()
+
+    linked: set[UUID] = set()
+    for name in unique_names:
         skill = await db.scalar(select(Skill).where(Skill.name == name))
         if not skill:
-            skill = Skill(name=name)
-            db.add(skill)
-            await db.flush()
-        db.add(CandidateSkill(candidate_id=user.id, skill_id=skill.id))
+            stmt = (
+                insert(Skill)
+                .values(id=uuid_mod.uuid4(), name=name)
+                .on_conflict_do_nothing(index_elements=["name"])
+            )
+            await db.execute(stmt)
+            skill = await db.scalar(select(Skill).where(Skill.name == name))
+        if skill and skill.id not in linked:
+            db.add(CandidateSkill(candidate_id=user.id, skill_id=skill.id))
+            linked.add(skill.id)
     await db.flush()
-    return {"skills": body.skills}
+    return {"skills": unique_names}
 
 
 # ── Public Candidate Search ─────────────────────────────────────────────────────

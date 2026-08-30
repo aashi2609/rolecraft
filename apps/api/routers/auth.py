@@ -4,10 +4,10 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from core.dependencies import DbSession
+from core.dependencies import CandidateUser, CurrentUser, DbSession
 from core.security import create_access_token, hash_password, verify_password
 from models import CandidateProfile, Company, PlanTier, Subscription, SubscriptionStatus, User, UserRole
-from schemas import ForgotPasswordRequest, SigninRequest, SignupRequest, TokenResponse
+from schemas import ChangePasswordRequest, ForgotPasswordRequest, SigninRequest, SignupRequest, TokenResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -51,7 +51,8 @@ async def signup(body: SignupRequest, db: DbSession):
     db.add(sub)
 
     if role == UserRole.candidate:
-        db.add(CandidateProfile(user_id=user.id))
+        weblinks = {"display_name": body.name} if body.name else {}
+        db.add(CandidateProfile(user_id=user.id, weblinks=weblinks))
     else:
         db.add(Company(user_id=user.id, name=body.name or "", industry=body.industry))
 
@@ -83,3 +84,13 @@ async def signin(body: SigninRequest, db: DbSession):
 async def forgot_password(body: ForgotPasswordRequest):
     # Always succeed — do not leak account existence
     return {"message": "If an account exists for that email, password reset instructions have been sent."}
+
+
+@router.post("/change-password")
+async def change_password(body: ChangePasswordRequest, user: CurrentUser, db: DbSession):
+    row = await db.get(User, user.id)
+    if not row or not verify_password(body.current_password, row.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+    row.password_hash = hash_password(body.new_password)
+    await db.flush()
+    return {"message": "Password updated successfully"}

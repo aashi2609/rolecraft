@@ -20,6 +20,7 @@ import {
   getToken,
   hiddenJobsApi,
   jobsApi,
+  messagesApi,
   resumesApi,
   savedJobsApi,
   setToken,
@@ -62,6 +63,7 @@ interface UserContextType extends UserState {
   refreshJobs: () => Promise<void>;
   refreshResumes: () => Promise<void>;
   refreshApplications: () => Promise<void>;
+  refreshMessages: () => Promise<void>;
   addJob: (job: any) => void;
   updateJob: (job: any) => void;
   toggleSavedJob: (jobId: string | number) => Promise<void>;
@@ -208,6 +210,26 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshMessages = useCallback(async () => {
+    if (!getToken()) return;
+    try {
+      const raw = await messagesApi.threads();
+      setState((prev) => ({
+        ...prev,
+        messages: (raw || []).map((t: any) => ({
+          id: t.thread_id,
+          threadId: t.thread_id,
+          companyName: t.participant_label,
+          lastMessage: t.last_body,
+          timestamp: t.last_sent_at,
+          otherUserId: t.other_user_id,
+        })),
+      }));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const refreshSession = useCallback(async () => {
     const token = getToken();
     if (!token) {
@@ -272,15 +294,34 @@ export function UserProvider({ children }: { children: ReactNode }) {
       let resumes: any[] = [];
       let applications: any[] = [];
       let savedJobs: string[] = [];
+      let messages: any[] = [];
 
       if (role === 'company') {
         jobs = ((await jobsApi.mine().catch(() => [])) as any[]).map(mapJob);
+        const msgRaw = await messagesApi.threads().catch(() => []);
+        messages = (msgRaw || []).map((t: any) => ({
+          id: t.thread_id,
+          threadId: t.thread_id,
+          companyName: t.participant_label,
+          lastMessage: t.last_body,
+          timestamp: t.last_sent_at,
+          otherUserId: t.other_user_id,
+        }));
       } else {
         jobs = ((await jobsApi.list({ status: 'live' }).catch(() => [])) as any[]).map(mapJob);
         resumes = ((await resumesApi.list().catch(() => [])) as any[]).map(mapResume);
         applications = ((await applicationsApi.mine().catch(() => [])) as any[]).map(mapApplication);
         const saved = await savedJobsApi.list().catch(() => ({ job_ids: [] as string[] }));
         savedJobs = saved.job_ids || [];
+        const msgRaw = await messagesApi.threads().catch(() => []);
+        messages = (msgRaw || []).map((t: any) => ({
+          id: t.thread_id,
+          threadId: t.thread_id,
+          companyName: t.participant_label,
+          lastMessage: t.last_body,
+          timestamp: t.last_sent_at,
+          otherUserId: t.other_user_id,
+        }));
       }
 
       setState((prev) => ({
@@ -298,6 +339,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         resumes,
         applications,
         savedJobs,
+        messages,
         loading: false,
       }));
     } catch {
@@ -527,6 +569,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         refreshJobs,
         refreshResumes,
         refreshApplications,
+        refreshMessages,
         addJob,
         updateJob,
         toggleSavedJob,

@@ -8,10 +8,13 @@ import Link from 'next/link';
 import { useUser } from '@/context/UserContext';
 import { isFreePlan } from '@/lib/plans';
 import { UpsellPrompt } from '@/components/UpsellPrompt';
+import { computeProfileCompleteness, getDisplayName } from '@/lib/profile';
 
 export default function CandidateDashboardPage() {
   const [verticals, setVerticals] = useState<string[]>([]);
-  const { applications, savedJobs, messages, jobs, resumes, plan } = useUser();
+  const { applications, savedJobs, messages, jobs, resumes, plan, candidateProfile } = useUser();
+  const displayName = getDisplayName(candidateProfile);
+  const completeness = computeProfileCompleteness(candidateProfile);
 
   useEffect(() => {
     const multi = localStorage.getItem('rolecraft_target_verticals');
@@ -32,7 +35,9 @@ export default function CandidateDashboardPage() {
     <div className="py-8 px-4 md:px-8 max-w-6xl mx-auto space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Welcome back</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+            {displayName ? `Welcome back, ${displayName.split(' ')[0]}` : 'Welcome back'}
+          </h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Here&apos;s what&apos;s happening with your job search today.
           </p>
@@ -62,7 +67,7 @@ export default function CandidateDashboardPage() {
             </p>
 
             <div className="flex flex-wrap gap-4">
-              {(resumes.length ? resumes : verticals.map((v) => ({ vertical: v, score: 87, id: v }))).map(
+              {(resumes.length ? resumes : verticals.map((v) => ({ vertical: v, score: null, id: v }))).map(
                 (r: any) => (
                   <div
                     key={r.id || r.vertical}
@@ -75,10 +80,12 @@ export default function CandidateDashboardPage() {
                       <div className="font-semibold text-foreground text-sm">
                         {r.vertical} Resume
                       </div>
-                      <div className="flex items-center gap-1.5 text-sm text-green-700 font-medium mt-1">
-                        <CheckCircle2 className="w-4 h-4" />
-                        {r.score || 87}/100 — ATS Ready
-                      </div>
+                      {r.score != null && (
+                        <div className="flex items-center gap-1.5 text-sm text-green-700 font-medium mt-1">
+                          <CheckCircle2 className="w-4 h-4" />
+                          {r.score}/100 — ATS Ready
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
@@ -98,7 +105,7 @@ export default function CandidateDashboardPage() {
           <div className="flex flex-col md:flex-row">
             <div className="p-8 md:p-12 flex-1 flex flex-col justify-center">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary text-sm font-bold rounded-full w-fit mb-4">
-                <Sparkles className="w-4 h-4" /> Profile Completeness: 85%
+                <Sparkles className="w-4 h-4" /> Profile Completeness: {completeness}%
               </div>
               <h2 className="text-2xl font-bold text-foreground mb-4">
                 Stand out to top employers
@@ -164,7 +171,7 @@ export default function CandidateDashboardPage() {
           ) : (
             <div className="space-y-4">
               {savedJobs.slice(0, 3).map((jobId) => {
-                const job = jobs.find((j) => j.id === jobId);
+                const job = jobs.find((j) => String(j.id) === String(jobId));
                 if (!job) return null;
                 return (
                   <div key={job.id} className="border-b border-border pb-3 last:border-0">
@@ -196,10 +203,10 @@ export default function CandidateDashboardPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {messages.slice(0, 3).map((msg) => (
+              {messages.slice(0, 3).map((msg: any) => (
                 <div key={msg.id} className="border-b border-border pb-3 last:border-0">
-                  <h4 className="font-bold text-foreground text-sm">{msg.sender}</h4>
-                  <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{msg.text}</p>
+                  <h4 className="font-bold text-foreground text-sm">{msg.companyName}</h4>
+                  <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{msg.lastMessage}</p>
                 </div>
               ))}
             </div>

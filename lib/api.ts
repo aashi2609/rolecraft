@@ -172,6 +172,8 @@ export const authApi = {
       body: JSON.stringify({ email }),
       auth: false,
     }),
+  changePassword: (body: { current_password: string; new_password: string }) =>
+    api('/auth/change-password', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export const candidateApi = {
@@ -383,12 +385,18 @@ export const hiddenJobsApi = {
 };
 
 export const messagesApi = {
-  threads: () => api('/messages/threads'),
-  getThread: (id: string) => api(`/messages/threads/${id}`),
-  send: (threadId: string, body: string) =>
-    api(`/messages/threads/${threadId}`, { method: 'POST', body: JSON.stringify({ body }) }),
-  start: (body: string) =>
-    api('/messages/threads', { method: 'POST', body: JSON.stringify({ body }) }),
+  threads: () => api<any[]>('/messages/threads'),
+  getThread: (id: string) => api<any[]>(`/messages/threads/${id}`),
+  send: (threadId: string, body: string, recipientId?: string) =>
+    api(`/messages/threads/${threadId}`, {
+      method: 'POST',
+      body: JSON.stringify({ body, recipient_id: recipientId }),
+    }),
+  start: (body: string, recipientId: string) =>
+    api('/messages/threads', {
+      method: 'POST',
+      body: JSON.stringify({ body, recipient_id: recipientId }),
+    }),
 };
 
 export const notificationsApi = {

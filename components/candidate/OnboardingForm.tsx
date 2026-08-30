@@ -95,9 +95,20 @@ export default function OnboardingForm() {
 
   const handleSave = async () => {
     if (currentStep < STEPS.length - 1) {
+      try {
+        if (currentStep === 0 && formData.careerLevel) {
+          await candidateApi.updateMe({ career_level: formData.careerLevel });
+        }
+        if (currentStep === 4 && formData.skills?.length) {
+          await candidateApi.putSkills(formData.skills);
+        }
+      } catch (err) {
+        console.error('Step save failed', err);
+      }
       nextStep();
       return;
     }
+
     try {
       await candidateApi.updateMe({ career_level: formData.careerLevel });
       if (formData.skills?.length) {
@@ -139,8 +150,9 @@ export default function OnboardingForm() {
           responsibilities: p.desc,
         });
       }
-    } catch {
-      /* keep local profile if API offline */
+    } catch (err: any) {
+      alert(err?.detail || err?.message || 'Failed to save profile. Please try again.');
+      return;
     }
     setCandidateProfile({
       skills: formData.skills,
