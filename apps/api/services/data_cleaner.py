@@ -337,9 +337,10 @@ def clean_profile(profile: CandidateProfile, user_email: str = "") -> CleanedPro
         _normalise_text(s) for s in (profile.strengths or [])
     ])
 
-    # Weblinks
+    # Name + weblinks
     raw_links = profile.weblinks or {}
     weblinks = {k: _normalise_text(v) for k, v in raw_links.items() if _normalise_text(v)}
+    name = _normalise_text(raw_links.get("display_name", ""))
 
     # Locations / sectors
     preferred_locations = _dedupe_strings([
@@ -350,7 +351,7 @@ def clean_profile(profile: CandidateProfile, user_email: str = "") -> CleanedPro
     ])
 
     return CleanedProfile(
-        name="",  # filled from user table by the caller
+        name=name,
         email=user_email,
         career_level=career_level,
         education=education,

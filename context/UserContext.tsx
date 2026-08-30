@@ -51,7 +51,6 @@ interface UserState {
 }
 
 interface UserContextType extends UserState {
-  login: (role: Role, plan?: PlanId) => void;
   logout: () => void;
   setProfileComplete: (status: boolean) => void;
   setCompanyProfileComplete: (status: boolean) => void;
@@ -431,16 +430,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return { role: res.role, plan: res.plan };
   };
 
-  /** Legacy stub login kept for any remaining callers — prefers clearing to API auth */
-  const login = (role: Role, plan: PlanId = 'basic') =>
-    setState((prev) => ({
-      ...prev,
-      isAuthenticated: true,
-      role,
-      plan: isFreePlan(plan) ? plan : 'basic',
-      pendingPlan: isFreePlan(plan) ? null : plan,
-      planValidTill: defaultValidTill(),
-    }));
+  /** Legacy stub login removed — use signInWithApi / signUpWithApi */
 
   const logout = () => {
     setToken(null);
@@ -557,7 +547,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
     <UserContext.Provider
       value={{
         ...state,
-        login,
         logout,
         setProfileComplete,
         setCompanyProfileComplete,

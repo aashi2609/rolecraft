@@ -43,7 +43,7 @@ async def generate(body: ResumeGenerateRequest, user: CandidateUser, db: DbSessi
     created: list[Resume] = []
 
     for i, vertical in enumerate(body.target_verticals):
-        payload = await generate_resume_for_vertical(profile, vertical, skill_names)
+        payload = await generate_resume_for_vertical(profile, vertical, skill_names, user_email=user.email)
         resume = Resume(
             candidate_id=user.id,
             target_vertical=vertical,
@@ -88,7 +88,9 @@ async def regenerate(resume_id: UUID, user: CandidateUser, db: DbSession):
         raise HTTPException(status_code=404, detail="Not found")
     profile = await _profile_with_skills(db, user.id)
     skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
-    payload = await generate_resume_for_vertical(profile, row.target_vertical, skill_names)
+    payload = await generate_resume_for_vertical(
+        profile, row.target_vertical, skill_names, user_email=user.email
+    )
     row.content = payload["content"]
     row.ats_score = payload["ats_score"]
     row.ats_breakdown = payload.get("ats_breakdown")
@@ -109,7 +111,9 @@ async def improve(resume_id: UUID, user: CandidateUser, db: DbSession):
         raise HTTPException(status_code=404, detail="Not found")
     profile = await _profile_with_skills(db, user.id)
     skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
-    payload = await generate_resume_for_vertical(profile, row.target_vertical, skill_names)
+    payload = await generate_resume_for_vertical(
+        profile, row.target_vertical, skill_names, user_email=user.email
+    )
     row.content = payload["content"]
     row.ats_score = payload["ats_score"]
     row.ats_breakdown = payload.get("ats_breakdown")
@@ -180,7 +184,9 @@ async def download_tailored_resume(body: TailoredResumeRequest, user: CandidateU
     skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
     
     # Generate content using AI
-    payload = await generate_resume_for_vertical(profile, body.target_role, skill_names)
+    payload = await generate_resume_for_vertical(
+        profile, body.target_role, skill_names, user_email=user.email
+    )
     content = payload["content"]
 
     from services.pdf_service import generate_pdf
@@ -216,7 +222,16 @@ async def download_tailored_resume(body: TailoredResumeRequest, user: CandidateU
 @router.post("/parse")
 async def parse_resume(file: UploadFile = File(...), user: CandidateUser = None):
     import pypdf
-    from services.ai_client import generate_content
+
+    from core.config import get_settings
+    from services.ai_client import AIServiceError, generate_content
+
+    settings = get_settings()
+    if not settings.groq_api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Resume parsing requires GROQ_API_KEY. Add it to apps/api/.env and restart the API.",
+        )
 
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
@@ -292,6 +307,8 @@ async def parse_resume(file: UploadFile = File(...), user: CandidateUser = None)
             response_mime_type="application/json"
         )
         return parsed_data
+    except AIServiceError as exc:
+        raise HTTPException(status_code=502, detail=f"Groq AI unavailable: {exc}") from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to parse resume with AI: {exc}")
+        raise HTTPException(status_code=500, detail=f"Failed to parse resume with AI: {exc}") from exc
 

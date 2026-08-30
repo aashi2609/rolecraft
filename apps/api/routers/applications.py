@@ -77,7 +77,9 @@ async def apply(body: ApplicationCreate, user: CandidateUser, db: DbSession):
         target_vertical = job.title or "Job Application"
         
         try:
-            payload = await generate_resume_for_vertical(profile, target_vertical, skill_names)
+            payload = await generate_resume_for_vertical(
+                profile, target_vertical, skill_names, user_email=user.email
+            )
             resume = Resume(
                 candidate_id=user.id,
                 target_vertical=target_vertical,

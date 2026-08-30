@@ -201,8 +201,12 @@ def _build_profile_prompt(cleaned: CleanedProfile, vertical: str) -> str:
         f"- Key skills for this vertical: {', '.join(vp.key_skills[:10])}",
         "",
         "## Candidate Profile:",
-        f"- Career Level: {cleaned.career_level}",
     ]
+    if cleaned.name:
+        sections.append(f"- Name: {cleaned.name}")
+    if cleaned.email:
+        sections.append(f"- Email: {cleaned.email}")
+    sections.append(f"- Career Level: {cleaned.career_level}")
 
     if cleaned.skills:
         sections.append(f"- Skills: {', '.join(cleaned.skills)}")
@@ -370,13 +374,15 @@ async def generate_resume_for_vertical(
     profile: CandidateProfile,
     vertical: str,
     skill_names: list[str],
+    *,
+    user_email: str = "",
 ) -> dict[str, Any]:
     """Generate a single vertical resume — AI with auto-fix, or deterministic fallback."""
     # Try AI path
     if settings.groq_api_key:
         try:
             logger.info("Attempting AI-powered resume generation for vertical: %s", vertical)
-            return await generate_with_autofix(profile, vertical, skill_names)
+            return await generate_with_autofix(profile, vertical, skill_names, user_email=user_email)
         except AIServiceError as exc:
             logger.warning("AI service error, falling back to deterministic: %s", exc)
         except Exception as exc:
@@ -391,14 +397,15 @@ async def generate_with_autofix(
     profile: CandidateProfile,
     vertical: str,
     skill_names: list[str],
+    *,
+    user_email: str = "",
 ) -> dict[str, Any]:
     """Full AI pipeline: clean → generate → score → fix loop → embed."""
     max_iterations = settings.resume_max_fix_iterations
     started_at = datetime.now(timezone.utc).isoformat()
 
     # Step 1: Clean profile data
-    cleaned = clean_profile(profile)
-    cleaned.name = ""  # Caller fills from User table if needed
+    cleaned = clean_profile(profile, user_email=user_email)
 
     # Step 2: Generate initial resume
     content = await _generate_ai(cleaned, vertical)

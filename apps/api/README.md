@@ -6,7 +6,8 @@ FastAPI + Neon Postgres (async SQLAlchemy 2.0) + Alembic + pgvector.
 
 - **Python 3.11 or 3.12** (recommended — 3.14 may fail installing `pydantic-core` wheels)
 - A [Neon](https://neon.tech) project (serverless Postgres). pgvector is available on all Neon plans; enable it per database with `CREATE EXTENSION` (also done in the first migration).
-- (Optional) GCS bucket + `GEMINI_API_KEY` for real embeddings/uploads
+- (Optional) GCS bucket for uploads
+- (Optional) `GROQ_API_KEY` for AI resume generation, ATS scoring, and PDF parsing
 
 ## Setup
 
@@ -64,6 +65,20 @@ Or: `bash run.sh` (Unix).
 - Health: http://127.0.0.1:8000/health  
 
 Local file uploads are stored under `apps/api/uploads/` and served at `/static/...` when `STORAGE_BACKEND=local`.
+
+### Groq (AI resume generation)
+
+1. Create an API key at [console.groq.com](https://console.groq.com).
+2. Add to `apps/api/.env`:
+
+```
+GROQ_API_KEY=gsk_...
+# Optional model overrides (default: openai/gpt-oss-20b)
+# GROQ_MODEL=openai/gpt-oss-20b
+# GROQ_ATS_MODEL=openai/gpt-oss-20b
+```
+
+3. Restart uvicorn. Resume generation, ATS scoring, and `POST /resumes/parse` use Groq. Without a key, resume generation falls back to deterministic templates and ATS uses a hash-based score.
 
 ## Cloud Run deploy
 
