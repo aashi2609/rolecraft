@@ -7,7 +7,7 @@ from sqlalchemy import delete, select, or_, and_, func
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import selectinload
 
-from core.dependencies import CandidateUser, CurrentUser, DbSession
+from core.dependencies import CandidateUser, CompanyUser, CurrentUser, DbSession
 from models import (
     CandidateProfile,
     CandidateSkill,
@@ -21,6 +21,7 @@ from models import (
 from schemas import (
     CandidateProfileOut,
     CandidateProfileUpdate,
+    CandidatePublicProfileOut,
     CandidateSearchOut,
     CertificationIn,
     CertificationOut,
@@ -85,6 +86,35 @@ def _to_out(profile: CandidateProfile) -> CandidateProfileOut:
         notification_prefs=notification_prefs,
         annual_family_income=profile.annual_family_income,
         skills=[cs.skill.name for cs in profile.skills if cs.skill],
+        education=[EducationOut.model_validate(e) for e in profile.education],
+        certifications=[CertificationOut.model_validate(c) for c in profile.certifications],
+        experience=[ExperienceOut.model_validate(e) for e in profile.experience],
+        projects=[ProjectOut.model_validate(p) for p in profile.projects],
+    )
+
+
+def _public_weblinks(links: dict) -> dict:
+    """Return only professional links suitable for employer-facing views."""
+    allowed = {"linkedin", "github", "portfolio", "website", "behance", "dribbble"}
+    out: dict = {}
+    for key, value in (links or {}).items():
+        if key in ("display_name", "notification_prefs"):
+            continue
+        if key.lower() in allowed and value:
+            out[key] = value
+    return out
+
+
+def _to_public_out(profile: CandidateProfile) -> CandidatePublicProfileOut:
+    full_name, _ = _profile_meta(profile)
+    return CandidatePublicProfileOut(
+        user_id=profile.user_id,
+        full_name=full_name,
+        photo_url=profile.photo_url,
+        career_level=profile.career_level,
+        skills=[cs.skill.name for cs in profile.skills if cs.skill],
+        strengths=profile.strengths or [],
+        weblinks=_public_weblinks(profile.weblinks or {}),
         education=[EducationOut.model_validate(e) for e in profile.education],
         certifications=[CertificationOut.model_validate(c) for c in profile.certifications],
         experience=[ExperienceOut.model_validate(e) for e in profile.experience],
@@ -523,6 +553,15 @@ async def search_candidates(
     return candidates
 
 
+@router.get("/{candidate_id}/public-profile", response_model=CandidatePublicProfileOut)
+async def get_candidate_public_profile(candidate_id: UUID, user: CompanyUser, db: DbSession):
+    """Employer-facing profile — no PII (address, income, DOB, family, etc.)."""
+    return _to_public_out(await _load_profile(db, candidate_id))
+
+
 @router.get("/{candidate_id}", response_model=CandidateProfileOut)
-async def get_candidate_public(candidate_id: UUID, user: CurrentUser, db: DbSession):
+async def get_candidate_self(candidate_id: UUID, user: CandidateUser, db: DbSession):
+    """Full profile — self-only. Other users must use /public-profile."""
+    if user.id != candidate_id:
+        raise HTTPException(status_code=404, detail="Not found")
     return _to_out(await _load_profile(db, candidate_id))

@@ -191,6 +191,7 @@ export const candidateApi = {
   addCertification: (body: Record<string, unknown>) =>
     api('/candidates/me/certifications', { method: 'POST', body: JSON.stringify(body) }),
   get: (id: string) => api(`/candidates/${id}`),
+  getPublicProfile: (id: string) => api(`/candidates/${id}/public-profile`),
   search: (params?: Record<string, string | number | undefined>) => {
     const q = new URLSearchParams();
     if (params) {

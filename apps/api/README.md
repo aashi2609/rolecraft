@@ -115,3 +115,95 @@ GCS bucket setup and file storage remain unchanged — only the database host mo
 ## Auth
 
 `Authorization: Bearer <jwt>` on protected routes. Signup/signin return `{ access_token, user_id, role, plan }`.
+
+
+
+Local Testing Guide (Full Feature Walkthrough)
+1. Prerequisites
+# Terminal 1 — API
+cd apps/api
+python -m venv .venv313
+.venv313\Scripts\activate          # Windows
+pip install -r requirements.txt
+cp .env.example .env               # fill DATABASE_URL, JWT_SECRET, GROQ_API_KEY
+alembic upgrade head
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# Terminal 2 — Frontend
+cd c:\rolecraft
+cp .env.local.example .env.local     # or create:
+# NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+npm install
+npm run dev
+2. Create admin user
+cd apps/api
+python make_admin.py your@email.com
+3. Test matrix
+Flow	Steps	Expected
+Auth
+Signup candidate + company at /signup
+JWT stored, redirect to onboarding
+Candidate onboarding
+Complete profile steps, save skills/education
+Data in Neon via /candidates/me
+Resume AI
+Onboarding → generate resume
+Groq-powered content with your name (check API logs for "AI-powered")
+Jobs
+Company posts job → candidate browses /jobs → apply
+Application created
+Messages
+Company/candidate send via /messages
+Thread appears both sides
+Settings
+Change password, notification prefs
+API updates
+Admin
+Sign in as admin → /admin/dashboard
+Stats load from /admin/stats
+ATS/PDF
+Regenerate resume, download PDF
+Score + PDF download
+Parse
+Upload PDF in onboarding
+Returns structured JSON (needs Groq key)
+4. Verify Groq is active
+cd apps/api
+$env:PYTHONPATH="."; python scripts/groq_audit.py
+Look for status: OK on resume, ATS, and parse tests.
+
+5. API docs
+Open http://127.0.0.1:8000/docs for interactive testing.
+
+Hosting Frontend & Backend Separately
+Backend (FastAPI) — e.g. Google Cloud Run
+cd apps/api
+# Set secrets in Cloud Run / Neon console:
+# DATABASE_URL=postgresql+asyncpg://...@ep-xxx-pooler.neon.tech/neondb?sslmode=require
+# JWT_SECRET=<64-char random>
+# GROQ_API_KEY=gsk_...
+# CORS_ORIGINS=https://your-frontend.vercel.app
+# STORAGE_BACKEND=gcs
+# GCS_BUCKET_NAME=rolecraft-uploads
+gcloud run deploy rolecraft-api \
+  --source . \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --set-secrets "DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,GROQ_API_KEY=GROQ_API_KEY:latest" \
+  --set-env-vars "CORS_ORIGINS=https://your-frontend.vercel.app,ENVIRONMENT=production,STORAGE_BACKEND=gcs"
+Run migrations against Neon before deploy:
+
+alembic upgrade head
+Before production: Remove allow_origin_regex=".*" from main.py.
+
+Frontend (Next.js) — e.g. Vercel
+Push repo to GitHub
+Import project in Vercel (root directory = repo root)
+Set environment variable:
+NEXT_PUBLIC_API_URL=https://rolecraft-api-xxxxx.run.app
+Deploy — Vercel builds next build automatically
+Alternative stacks
+Backend	Frontend
+Railway / Render / Fly.io
+Vercel / Netlify / Cloudflare Pages
+AWS ECS + ALB
+S3 + CloudFront (static export)

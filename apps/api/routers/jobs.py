@@ -1,11 +1,11 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
-from core.dependencies import CompanyUser, DbSession, check_plan_limit
-from models import Application, ApplicationStatus, Company, JobPosting, JobStatus, JobType, UserRole
+from core.dependencies import CompanyUser, DbSession, check_plan_limit, get_optional_current_user
+from models import Application, ApplicationStatus, Company, JobPosting, JobStatus, JobType, User, UserRole
 from schemas import FitmentCandidateOut, JobCreate, JobOut, JobStatusUpdate, JobUpdate
 from services.fitment_service import compute_fitment
 
@@ -177,10 +177,18 @@ async def my_jobs(user: CompanyUser, db: DbSession):
 
 
 @router.get("/{job_id}", response_model=JobOut)
-async def get_job(job_id: UUID, db: DbSession):
+async def get_job(job_id: UUID, db: DbSession, user: User | None = Depends(get_optional_current_user)):
     job = await db.get(JobPosting, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    if job.status != JobStatus.live:
+        is_owner = (
+            user is not None
+            and user.role == UserRole.company
+            and job.company_id == user.id
+        )
+        if not is_owner:
+            raise HTTPException(status_code=404, detail="Job not found")
     return await _enrich(db, job)
 
 

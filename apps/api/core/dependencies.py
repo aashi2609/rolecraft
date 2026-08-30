@@ -1,4 +1,4 @@
-from typing import Annotated, Callable
+from typing import Annotated, Callable, Optional
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
@@ -36,6 +36,24 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
+
+
+async def get_optional_current_user(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Optional[User]:
+    if credentials is None or not credentials.credentials:
+        return None
+    try:
+        payload = decode_access_token(credentials.credentials)
+        user_id = UUID(payload["sub"])
+    except (ValueError, KeyError):
+        return None
+
+    result = await db.execute(
+        select(User).options(selectinload(User.subscription)).where(User.id == user_id)
+    )
+    return result.scalar_one_or_none()
 
 
 def require_role(*roles: UserRole) -> Callable:
@@ -78,8 +96,8 @@ async def check_plan_limit(user: User, db: AsyncSession, resource: str, extra: i
         )
         if plan in FREE_CANDIDATE_PLANS and (count or 0) >= 1:
             raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail="Free plan resume cap reached. Upgrade for unlimited generations.",
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You've reached your plan's resume generation limit — upgrade to generate more.",
             )
 
     if resource == "job_postings":

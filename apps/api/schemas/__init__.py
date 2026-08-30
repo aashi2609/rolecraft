@@ -166,6 +166,22 @@ class CandidateProfileOut(ORMModel):
     projects: list[ProjectOut] = []
 
 
+class CandidatePublicProfileOut(ORMModel):
+    """Hiring-safe candidate view — excludes PII."""
+
+    user_id: UUID
+    full_name: Optional[str] = None
+    photo_url: Optional[str] = None
+    career_level: Optional[str] = None
+    skills: list[str] = []
+    strengths: list[str] = []
+    weblinks: dict[str, Any] = {}
+    education: list[EducationOut] = []
+    certifications: list[CertificationOut] = []
+    experience: list[ExperienceOut] = []
+    projects: list[ProjectOut] = []
+
+
 # ── Resumes ───────────────────────────────────────────────────────────────────
 
 class ResumeGenerateRequest(BaseModel):

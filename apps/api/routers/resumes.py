@@ -86,6 +86,7 @@ async def regenerate(resume_id: UUID, user: CandidateUser, db: DbSession):
     row = await db.get(Resume, resume_id)
     if not row or row.candidate_id != user.id:
         raise HTTPException(status_code=404, detail="Not found")
+    await check_plan_limit(user, db, "resume_verticals", extra=1)
     profile = await _profile_with_skills(db, user.id)
     skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
     payload = await generate_resume_for_vertical(
@@ -109,6 +110,7 @@ async def improve(resume_id: UUID, user: CandidateUser, db: DbSession):
     row = await db.get(Resume, resume_id)
     if not row or row.candidate_id != user.id:
         raise HTTPException(status_code=404, detail="Not found")
+    await check_plan_limit(user, db, "resume_verticals", extra=1)
     profile = await _profile_with_skills(db, user.id)
     skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
     payload = await generate_resume_for_vertical(
@@ -180,6 +182,7 @@ class TailoredResumeRequest(BaseModel):
 @router.post("/download-tailored")
 async def download_tailored_resume(body: TailoredResumeRequest, user: CandidateUser, db: DbSession):
     """Generate and return a PDF of a resume tailored to a specific role without saving it."""
+    await check_plan_limit(user, db, "resume_verticals", extra=1)
     profile = await _profile_with_skills(db, user.id)
     skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
     
@@ -220,7 +223,9 @@ async def download_tailored_resume(body: TailoredResumeRequest, user: CandidateU
 
 
 @router.post("/parse")
-async def parse_resume(file: UploadFile = File(...), user: CandidateUser = None):
+async def parse_resume(user: CandidateUser, db: DbSession, file: UploadFile = File(...)):
+    await check_plan_limit(user, db, "resume_verticals", extra=1)
+
     import pypdf
 
     from core.config import get_settings

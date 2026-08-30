@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy import select, exc
 from sqlalchemy.orm import selectinload
 
-from core.dependencies import CandidateUser, CompanyUser, CurrentUser, DbSession
+from core.dependencies import CandidateUser, CompanyUser, CurrentUser, DbSession, check_plan_limit
 from core.security import decode_access_token
 from core.ws_manager import ws_manager
 from models import Application, ApplicationStatus, Company, JobPosting, Resume, SavedJob, User
@@ -72,7 +72,9 @@ async def apply(body: ApplicationCreate, user: CandidateUser, db: DbSession):
         )
         if not profile:
             raise HTTPException(status_code=400, detail="Complete your profile first to generate a resume")
-            
+
+        await check_plan_limit(user, db, "resume_verticals", extra=1)
+
         skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
         target_vertical = job.title or "Job Application"
         
