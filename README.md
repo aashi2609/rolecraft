@@ -95,7 +95,7 @@ See [`ARCHITECTURE_PLAN.md`](ARCHITECTURE_PLAN.md) for detailed implementation r
 
 ### Prerequisites
 - Node.js 18+ and npm
-- Python 3.11 or 3.12
+- Python 3.13 (required - pydantic-core and other native dependencies require prebuilt wheels)
 - PostgreSQL database (Neon recommended)
 - Gemini API key (optional, for AI features)
 
@@ -221,6 +221,29 @@ See [`ARCHITECTURE_PLAN.md`](ARCHITECTURE_PLAN.md) for detailed timeline and imp
 - Maximum component length: 300 lines
 - Functional components with hooks
 - Test coverage minimum: 70%
+
+---
+
+## 🛡️ Security & Known Vulnerabilities
+
+All frontend dependencies have been audited and high-severity CVEs have been resolved.
+
+**Upload Validation Security Fix (Aug 2026):**
+- Implemented comprehensive file upload validation in `upload_limits.py` with:
+  - Content-type verification against allowed MIME types
+  - Magic-byte verification for PNG/JPEG/WEBP/PDF files
+  - Content-Length fast-path rejection for oversized files
+  - Bounded 64KB chunked reads with abort-on-oversize
+  - Filename/path sanitization against path traversal attacks
+  - Fixed NameError crash in upload validation path
+
+For backend dependencies, we actively monitor and patch vulnerabilities. The following vulnerabilities currently remain unpatched either because no fix is available upstream or because upgrading would introduce breaking changes:
+
+- **`python-jose` (3.4.0)**: PYSEC-2025-185 - No upstream fix available yet.
+- **`ecdsa` (0.19.2)**: PYSEC-2026-1325 - Transitive dependency of `python-jose`, no fix available.
+- **`pyasn1` (0.4.8)**: 5 CVEs - Transitive dependency of `python-jose`, which strictly pins `pyasn1<0.5.0`. Cannot bump to fix version 0.6.4 without breaking `python-jose`.
+- **`weasyprint` (68.0)**: PYSEC-2026-3412 - No fix available upstream yet.
+- **`starlette` (0.46.2)**: 9 CVEs - Pinned by `fastapi` 0.115.14. Upgrading `fastapi` to a version that supports a patched `starlette` (1.0+) introduces significant breaking changes and is deferred to a future maintenance window.
 
 ---
 

@@ -226,9 +226,12 @@ async def download_tailored_resume(body: TailoredResumeRequest, user: CandidateU
 async def parse_resume(user: CandidateUser, db: DbSession, file: UploadFile = File(...)):
     await check_plan_limit(user, db, "resume_verticals", extra=1)
 
+    import io
+
     import pypdf
 
     from core.config import get_settings
+    from core.upload_limits import validate_upload
     from services.ai_client import AIServiceError, generate_content
 
     settings = get_settings()
@@ -238,16 +241,17 @@ async def parse_resume(user: CandidateUser, db: DbSession, file: UploadFile = Fi
             detail="Resume parsing requires GROQ_API_KEY. Add it to apps/api/.env and restart the API.",
         )
 
-    if not file.filename.lower().endswith(".pdf"):
+    data, _, _ = await validate_upload(file, "document")
+    if not data.startswith(b"%PDF"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
-    
+
     try:
-        reader = pypdf.PdfReader(file.file)
+        reader = pypdf.PdfReader(io.BytesIO(data))
         text = ""
         for page in reader.pages:
             text += page.extract_text() + "\n"
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to read PDF: {exc}")
+        raise HTTPException(status_code=400, detail=f"Failed to read PDF: {exc}") from exc
 
     prompt = f"""
     You are an expert resume parser. Extract the following information from the provided resume text and return it as a structured JSON object.

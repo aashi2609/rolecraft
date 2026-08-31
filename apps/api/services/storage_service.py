@@ -8,33 +8,50 @@ from pathlib import Path
 from fastapi import HTTPException, UploadFile
 
 from core.config import get_settings
+from core.upload_limits import UploadCategory, validate_upload
 
 settings = get_settings()
 LOCAL_ROOT = Path(__file__).resolve().parent.parent / "uploads"
 
 
-async def upload_file(file: UploadFile, *, prefix: str, owner_id: str) -> tuple[str, str]:
+async def upload_file(
+    file: UploadFile,
+    *,
+    prefix: str,
+    owner_id: str,
+    category: UploadCategory,
+    content_length: int | None = None,
+) -> tuple[str, str]:
     """
     Returns (public_url, storage_path).
     prefix examples: photos/{user_id}, documents/{candidate_id}, logos/{company_id}
     """
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="Missing filename")
+    data, ext, detected_mime = await validate_upload(
+        file, category, content_length=content_length
+    )
 
-    ext = Path(file.filename).suffix or ".bin"
+    # Never use client filename in storage path — uuid + validated extension only.
     object_name = f"{prefix}/{owner_id}/{uuid.uuid4().hex}{ext}"
-    data = await file.read()
+    _assert_safe_object_path(object_name)
 
     if settings.storage_backend == "gcs":
-        return _upload_gcs(object_name, data, file.content_type)
+        return _upload_gcs(object_name, data, detected_mime)
     return _upload_local(object_name, data)
+
+
+def _assert_safe_object_path(object_name: str) -> None:
+    """Ensure the resolved path stays under LOCAL_ROOT."""
+    dest = (LOCAL_ROOT / object_name).resolve()
+    root = LOCAL_ROOT.resolve()
+    if not str(dest).startswith(str(root)):
+        raise HTTPException(status_code=400, detail="Invalid upload path")
 
 
 def _upload_local(object_name: str, data: bytes) -> tuple[str, str]:
     dest = LOCAL_ROOT / object_name
+    _assert_safe_object_path(object_name)
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(data)
-    # Served via /static mounts in main.py
     url = f"/static/{object_name}"
     return url, object_name
 

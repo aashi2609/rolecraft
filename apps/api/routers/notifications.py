@@ -1,15 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from sqlalchemy import select
 
-from core.dependencies import CurrentUser, DbSession, get_user_plan
-from models import Notification, PlanTier, Subscription, SubscriptionStatus
-from models import UserRole
-from schemas import NotificationOut, SubscriptionCreate, SubscriptionOut, UploadOut
+from core.dependencies import CurrentUser, DbSession
+from models import Notification, Subscription, UserRole, PlanTier, SubscriptionStatus
+from schemas import NotificationOut, SubscriptionOut, SubscriptionCreate, UploadOut
 from services.storage_service import upload_file
-from fastapi import File, UploadFile
 
 router_notifications = APIRouter(prefix="/notifications", tags=["notifications"])
 router_subscriptions = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
@@ -89,19 +87,44 @@ async def upsert_subscription(body: SubscriptionCreate, user: CurrentUser, db: D
     return SubscriptionOut.model_validate(sub)
 
 
+def _content_length(request: Request) -> int | None:
+    raw = request.headers.get("content-length")
+    if raw and raw.isdigit():
+        return int(raw)
+    return None
+
+
 @router_uploads.post("/photo", response_model=UploadOut)
-async def upload_photo(user: CurrentUser, file: UploadFile = File(...)):
-    url, path = await upload_file(file, prefix=f"photos/{user.id}", owner_id=str(user.id))
+async def upload_photo(request: Request, user: CurrentUser, file: UploadFile = File(...)):
+    url, path = await upload_file(
+        file,
+        prefix=f"photos/{user.id}",
+        owner_id=str(user.id),
+        category="photo",
+        content_length=_content_length(request),
+    )
     return UploadOut(url=url, path=path)
 
 
 @router_uploads.post("/document", response_model=UploadOut)
-async def upload_document(user: CurrentUser, file: UploadFile = File(...)):
-    url, path = await upload_file(file, prefix=f"documents/{user.id}", owner_id=str(user.id))
+async def upload_document(request: Request, user: CurrentUser, file: UploadFile = File(...)):
+    url, path = await upload_file(
+        file,
+        prefix=f"documents/{user.id}",
+        owner_id=str(user.id),
+        category="document",
+        content_length=_content_length(request),
+    )
     return UploadOut(url=url, path=path)
 
 
 @router_uploads.post("/logo", response_model=UploadOut)
-async def upload_logo(user: CurrentUser, file: UploadFile = File(...)):
-    url, path = await upload_file(file, prefix=f"logos/{user.id}", owner_id=str(user.id))
+async def upload_logo(request: Request, user: CurrentUser, file: UploadFile = File(...)):
+    url, path = await upload_file(
+        file,
+        prefix=f"photos/{user.id}",
+        owner_id=str(user.id),
+        category="photo",
+        content_length=_content_length(request),
+    )
     return UploadOut(url=url, path=path)
