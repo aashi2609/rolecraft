@@ -1,267 +1,218 @@
 # RoleCraft
 
-RoleCraft is an AI-powered platform for resume writing and job matching, designed to connect candidates with the right opportunities using advanced vector search and automated resume optimization.
+AI-powered resume writing and job matching: Next.js frontend + FastAPI backend on Neon Postgres, with Groq-assisted resume/ATS/parse and vector-assisted fitment.
 
-## 🏗️ Architecture
-
-The project is built as a full-stack web application with the following stack:
-
-### Frontend
-- **Framework:** Next.js 16 (React 19)
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS v4
-- **State Management:** React Context (`UserContext` connected to backend APIs)
-- **Payment:** Mock implementation (ready for Stripe/Razorpay integration)
-
-### Backend (`apps/api`)
-- **Framework:** FastAPI (Python 3.11/3.12)
-- **Database:** PostgreSQL on [Neon](https://neon.tech) (Serverless Postgres)
-- **ORM:** async SQLAlchemy 2.0
-- **Vector Database:** `pgvector` extension for embeddings
-- **Migrations:** Alembic
-- **Authentication:** JWT (python-jose, bcrypt)
-- **Storage:** Local / Google Cloud Storage
-- **AI Services:** Gemini API with deterministic fallback
+**Docs:** this file (setup & ops) · [`ARCHITECTURE_PLAN.md`](ARCHITECTURE_PLAN.md) (status & roadmap) · [`AGENTS.md`](AGENTS.md) (agent notes)
 
 ---
 
-## 📊 Current Status
+## Architecture
 
-**Overall Completion:**
-- **Backend:** 92% complete
-- **Frontend:** 88% complete
-- **AI Features:** 45% complete
-- **Production Readiness:** 25% complete
+| Layer | Details |
+|--------|---------|
+| **Frontend** | Next.js 16, React 19, TypeScript, Tailwind CSS v4, `UserContext` |
+| **Backend** | FastAPI under `apps/api` — **Python 3.13** required |
+| **Database** | Neon Postgres + pgvector (async SQLAlchemy 2.0, Alembic) |
+| **Auth** | JWT; roles: candidate / company / admin |
+| **AI** | Groq for resume generate / ATS / parse (deterministic fallback without key). Fitment rationale is still **template-based** — see Architecture Plan. |
+| **Storage** | Local `apps/api/uploads/` or GCS |
+| **Payments** | Mock (Stripe/Razorpay later) |
 
-### ✅ Completed Features
-
-#### Backend (FastAPI)
-- ✅ Authentication system (signup, signin, forgot-password)
-- ✅ User management with role-based access (candidate/company)
-- ✅ Subscription & plan management with role-based validation
-- ✅ Payment processing framework (mock implementation)
-- ✅ Candidate profile CRUD (education, experience, projects, certifications, skills)
-- ✅ Company profile management
-- ✅ Job posting CRUD with status management
-- ✅ Application workflow with status tracking
-- ✅ Messages/threads system
-- ✅ Notifications system
-- ✅ File uploads (photos, documents, logos)
-- ✅ Database migrations (Alembic)
-- ✅ Resume generation with AI service (Gemini)
-- ✅ Enhanced AI error handling with deterministic fallback
-- ✅ Resume PDF generation
-- ✅ Fitment service (basic job-candidate matching with embeddings; rationale is **template-based**, not LLM — see `apps/api/README.md`)
-
-#### Frontend (Next.js)
-- ✅ Complete candidate UI flow (dashboard, onboarding, profile, jobs, applications, messages, settings)
-- ✅ Complete company UI flow (dashboard, jobs, candidates, applications, messages, settings)
-- ✅ Public pages (landing, pricing, checkout, company profiles)
-- ✅ Authentication pages (signin, signup, forgot-password)
-- ✅ UserContext with API integration
-- ✅ Reusable UI components
-- ✅ Plan-based feature gating
-- ✅ Job search with filters
-- ✅ Resume generation flow
-- ✅ Pricing pages with backend integration
-- ✅ Checkout flow with payment processing framework
-- ✅ Settings pages with subscription management
-
-### ⏳ In Progress / TODO
-
-See [`ARCHITECTURE_PLAN.md`](ARCHITECTURE_PLAN.md) for detailed implementation roadmap.
-
-**High Priority:**
-- Replace mock data with real API calls in candidate search
-- Implement real-time application status updates
-- Enhanced error handling for API failures
-- Deploy staging environment
-
-**Medium Priority:**
-- Advanced candidate search API
-- Analytics endpoints for dashboards
-- AI double-check for shortlists
-- Enhanced embedding strategy
-
-**Lower Priority:**
-- Production deployment
-- Monitoring and analytics
-- Security hardening
-- Performance optimization
+```
+Browser → NEXT_PUBLIC_API_URL → apps/api routers → services → Neon
+```
 
 ---
 
-## 🚀 Setup Instructions
+## Current status (Sep 2026)
 
-### Prerequisites
-- Node.js 18+ and npm
-- Python 3.13 (required - pydantic-core and other native dependencies require prebuilt wheels)
-- PostgreSQL database (Neon recommended)
-- Gemini API key (optional, for AI features)
+| Area | Approx. |
+|------|---------|
+| Backend | ~95% |
+| Frontend | ~90% |
+| AI features | ~50% |
+| Production readiness | ~40% |
 
-### Frontend Setup
+**Done recently:** service-layer extraction, `ProfileItemService` CRUD, schema hardening, upload limits, CORS/IDOR/plan-limit fixes, API-backed candidate search, fitment rationale wiring, draft-job create fix, security pytest suite.
+
+**Still open:** LLM fitment text, better embeddings, staging/CI/monitoring, real payments, analytics UI polish. Full checklist → [`ARCHITECTURE_PLAN.md`](ARCHITECTURE_PLAN.md).
+
+---
+
+## Prerequisites
+
+- Node.js 18+ and npm  
+- **Python 3.13** (use `apps/api/.venv313`)  
+- Neon Postgres project  
+- Optional: `GROQ_API_KEY`, GCS bucket  
+
+---
+
+## Frontend setup
 
 ```bash
-# From the project root
+# Repo root
 cp .env.local.example .env.local
+# NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 npm install
 npm run dev
 ```
 
-> Set `NEXT_PUBLIC_API_URL` to your API (default `http://127.0.0.1:8000`).
+---
 
-### Backend Setup
-
-See [`apps/api/README.md`](apps/api/README.md) for full details on Neon Postgres setup, migrations, and Cloud Run deploy.
+## Backend setup
 
 ```bash
 cd apps/api
-python -m venv .venv
+python -m venv .venv313
 
-# Windows:
-.venv\Scripts\activate
-# macOS/Linux:
-# source .venv/bin/activate
+# Windows
+.\.venv313\Scripts\activate
+# macOS/Linux: source .venv313/bin/activate
 
 pip install -r requirements.txt
 cp .env.example .env
-# Set DATABASE_URL in .env to your Neon pooled connection string
-# Set GEMINI_API_KEY for AI features (optional)
-
+# Fill DATABASE_URL, JWT_SECRET, optional GROQ_API_KEY
 alembic upgrade head
-uvicorn main:app --reload --port 8000
+$env:PYTHONPATH="."   # Windows PowerShell; export PYTHONPATH=. on Unix
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Environment Variables
+- Docs: http://127.0.0.1:8000/docs  
+- Health: http://127.0.0.1:8000/health  
+- Uploads (local): `apps/api/uploads/` → `/static/...`
+
+### Neon `DATABASE_URL`
+
+1. Neon Console → **Connect** → **pooled** host (`-pooler` in hostname).  
+2. Use async scheme:
+
+```
+DATABASE_URL=postgresql+asyncpg://USER:PASS@ep-xxx-pooler.region.aws.neon.tech/DB?sslmode=require
+```
+
+The app requires TLS (`connect_args` / `pool_pre_ping`). pgvector is enabled by the first migration (`CREATE EXTENSION vector`), or run `scripts/enable_pgvector.sql`.
+
+Heavy DDL: prefer Neon’s **direct** (non-pooler) host; app traffic should stay on pooled.
+
+### Groq (optional)
+
+```
+GROQ_API_KEY=gsk_...
+# GROQ_MODEL=openai/gpt-oss-20b
+# GROQ_ATS_MODEL=openai/gpt-oss-20b
+```
+
+Without a key, resume generation uses templates and ATS uses a hash-based score.
+
+### Fitment rationale (interim)
+
+Backend returns template strings such as `Strong skills overlap in {skills}.` — **not** LLM prose. The company candidates UI must show the API `rationale` field as-is.
+
+### Admin user
+
+```bash
+cd apps/api
+$env:PYTHONPATH="."
+python scripts/make_admin.py you@email.com
+```
+
+### Auth
+
+`Authorization: Bearer <jwt>` on protected routes. Signup/signin return `{ access_token, user_id, role, plan }`.
+
+---
+
+## Environment variables
 
 **Frontend (`.env.local`):**
+
 ```bash
 NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 ```
 
-**Backend (`.env`):**
+**Backend (`apps/api/.env`):**
+
 ```bash
-DATABASE_URL=postgresql+asyncpg://user:password@host/database
+DATABASE_URL=postgresql+asyncpg://user:password@host/database?sslmode=require
 JWT_SECRET=your-secret-key
-GEMINI_API_KEY=your-gemini-api-key  # Optional
-GCS_BUCKET_NAME=rolecraft-uploads   # For GCS storage
-STORAGE_BACKEND=local               # or 'gcs'
+GROQ_API_KEY=gsk_...                 # Optional
+CORS_ORIGINS=http://localhost:3000
+STORAGE_BACKEND=local                # or gcs
+GCS_BUCKET_NAME=rolecraft-uploads    # if gcs
 ```
 
 ---
 
-## 📖 Documentation
+## Testing
 
-- [`ARCHITECTURE_PLAN.md`](ARCHITECTURE_PLAN.md) - Comprehensive implementation roadmap
-- [`FIXES_SUMMARY.md`](FIXES_SUMMARY.md) - Recent fixes and integration details
-- [`apps/api/README.md`](apps/api/README.md) - Backend-specific documentation
-- [`AGENTS.md`](AGENTS.md) - Development guidelines for AI agents
-
----
-
-## 🧪 Testing
-
-### Backend Tests
 ```bash
+# Backend (must be Python 3.13)
 cd apps/api
-pytest
+$env:PYTHONPATH="."
+python -m pytest tests/security tests/test_schema_validation.py -v
+
+# Groq smoke (optional)
+python scripts/groq_audit.py
 ```
 
-### Frontend Tests
-```bash
-npm test
-```
-
-### E2E Tests
-```bash
-npm run test:e2e
-```
+Frontend: `npm test` / `npm run test:e2e` when configured.
 
 ---
 
-## 🚢 Deployment
+## Local feature walkthrough
 
-### Backend (Cloud Run)
+| Flow | Steps | Expected |
+|------|--------|----------|
+| Auth | Signup candidate + company | JWT stored, onboarding |
+| Profile | Skills / education / experience | Persisted via `/candidates/me/*` |
+| Resume AI | Generate / parse / PDF | Groq or deterministic fallback |
+| Jobs | Company posts → candidate applies | Application row; draft jobs owner-only |
+| Messages | Send via `/messages` | Thread both sides |
+| Admin | `make_admin` → `/admin/dashboard` | Stats from `/admin/stats` |
+
+---
+
+## Deployment
+
+### Backend (Cloud Run example)
+
 ```bash
+# Prefer Secret Manager for DATABASE_URL / JWT_SECRET / GROQ_API_KEY
 cd apps/api
-gcloud run deploy
+gcloud run deploy rolecraft-api \
+  --source . \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --set-secrets "DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,GROQ_API_KEY=GROQ_API_KEY:latest" \
+  --set-env-vars "CORS_ORIGINS=https://your-frontend.example,ENVIRONMENT=production,STORAGE_BACKEND=gcs,GCS_BUCKET_NAME=..."
 ```
 
-### Frontend (Vercel/Netlify)
-Follow platform-specific deployment instructions.
+Run `alembic upgrade head` against Neon before/at deploy. Alternatives: Railway, Render, Fly.io, ECS.
+
+### Frontend (Vercel)
+
+- Root = repo root; set `NEXT_PUBLIC_API_URL` to the API URL.
 
 ---
 
-## 🗺️ Development Roadmap
+## Security notes
 
-The project follows a phased implementation approach:
+Upload validation lives in `apps/api/core/upload_limits.py` (MIME, magic bytes, size, path sanitization).
 
-**Phase 1:** Complete Stage 1 Integration (2-3 weeks)
-**Phase 2:** Payment & Subscription Enhancement (2 weeks)
-**Phase 3:** Advanced AI Features (3-4 weeks)
-**Phase 4:** Production Readiness (4-5 weeks)
-**Phase 5:** Advanced Features (3-4 weeks)
+Deferred dependency CVEs (no clean upgrade path yet):
 
-See [`ARCHITECTURE_PLAN.md`](ARCHITECTURE_PLAN.md) for detailed timeline and implementation steps.
+- `python-jose` / `ecdsa` / pinned `pyasn1`
+- `weasyprint`, `starlette` (pinned by current FastAPI)
 
----
-
-## 🛡️ Code Quality Standards
-
-### Backend (Python/FastAPI)
-- PEP 8 compliance
-- Type hints for all functions
-- Maximum function length: 50 lines
-- Maximum file length: 500 lines
-- Test coverage minimum: 80%
-
-### Frontend (Next.js/React)
-- TypeScript strict mode
-- ESLint rules compliance
-- Maximum component length: 300 lines
-- Functional components with hooks
-- Test coverage minimum: 70%
+Monitor and upgrade when upstream allows.
 
 ---
 
-## 🛡️ Security & Known Vulnerabilities
+## License / team
 
-All frontend dependencies have been audited and high-severity CVEs have been resolved.
+[Add license and team information here.]
 
-**Upload Validation Security Fix (Aug 2026):**
-- Implemented comprehensive file upload validation in `upload_limits.py` with:
-  - Content-type verification against allowed MIME types
-  - Magic-byte verification for PNG/JPEG/WEBP/PDF files
-  - Content-Length fast-path rejection for oversized files
-  - Bounded 64KB chunked reads with abort-on-oversize
-  - Filename/path sanitization against path traversal attacks
-  - Fixed NameError crash in upload validation path
+## Acknowledgments
 
-For backend dependencies, we actively monitor and patch vulnerabilities. The following vulnerabilities currently remain unpatched either because no fix is available upstream or because upgrading would introduce breaking changes:
-
-- **`python-jose` (3.4.0)**: PYSEC-2025-185 - No upstream fix available yet.
-- **`ecdsa` (0.19.2)**: PYSEC-2026-1325 - Transitive dependency of `python-jose`, no fix available.
-- **`pyasn1` (0.4.8)**: 5 CVEs - Transitive dependency of `python-jose`, which strictly pins `pyasn1<0.5.0`. Cannot bump to fix version 0.6.4 without breaking `python-jose`.
-- **`weasyprint` (68.0)**: PYSEC-2026-3412 - No fix available upstream yet.
-- **`starlette` (0.46.2)**: 9 CVEs - Pinned by `fastapi` 0.115.14. Upgrading `fastapi` to a version that supports a patched `starlette` (1.0+) introduces significant breaking changes and is deferred to a future maintenance window.
-
----
-
-## 📄 License
-
-[Add your license information here]
-
----
-
-## 👥 Team
-
-[Add team information here]
-
----
-
-## 🙏 Acknowledgments
-
-- Built with [Next.js](https://nextjs.org/)
-- Backend powered by [FastAPI](https://fastapi.tiangolo.com/)
-- Database hosted on [Neon](https://neon.tech/)
-- AI features powered by [Google Gemini](https://ai.google.dev/)
+- [Next.js](https://nextjs.org/) · [FastAPI](https://fastapi.tiangolo.com/) · [Neon](https://neon.tech/) · [Groq](https://groq.com/)
