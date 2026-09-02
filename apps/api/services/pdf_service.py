@@ -161,3 +161,51 @@ def generate_pdf(
         )
         # Return HTML as PDF-like bytes (browser can open it)
         return html.encode("utf-8")
+
+
+def create_pdf_response(
+    pdf_bytes: bytes,
+    filename: str,
+) -> Any:
+    """Create a FastAPI Response object for PDF download."""
+    from fastapi import Response
+
+    is_pdf = pdf_bytes[:4] == b"%PDF"
+    media_type = "application/pdf" if is_pdf else "text/html"
+
+    return Response(
+        content=pdf_bytes,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
+def display_name_from_email(email: str) -> str:
+    return email.split("@")[0].replace(".", " ").title() if email else "Candidate"
+
+
+def build_resume_pdf_response(
+    *,
+    resume_content: dict[str, Any],
+    email: str,
+    weblinks: Optional[dict] = None,
+    filename: str,
+    candidate_name: Optional[str] = None,
+) -> Any:
+    """Generate PDF bytes and wrap as a download Response."""
+    name = candidate_name or display_name_from_email(email)
+    try:
+        pdf_bytes = generate_pdf(
+            resume_content=resume_content,
+            candidate_name=name,
+            email=email,
+            weblinks=weblinks or {},
+        )
+    except Exception as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}") from exc
+
+    return create_pdf_response(pdf_bytes, filename)

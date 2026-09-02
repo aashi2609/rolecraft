@@ -1,13 +1,13 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, or_, select
-from sqlalchemy.orm import selectinload
+from sqlalchemy import select
 
 from core.dependencies import CompanyUser, DbSession, check_plan_limit, get_optional_current_user
 from models import Application, ApplicationStatus, Company, JobPosting, JobStatus, JobType, User, UserRole
 from schemas import FitmentCandidateOut, JobCreate, JobOut, JobStatusUpdate, JobUpdate
-from services.fitment_service import compute_fitment
+from services.fitment_service import ranked_candidates_for_job
+from services.job_search_service import search_jobs, enrich_job
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -20,28 +20,14 @@ def _job_type(raw: str | None) -> JobType | None:
     return mapping.get(key)
 
 
-async def _enrich(db, job: JobPosting) -> JobOut:
-    company = await db.get(Company, job.company_id)
-    matched = await db.scalar(
-        select(func.count()).select_from(Application).where(Application.job_id == job.id)
-    ) or 0
-    shortlisted = await db.scalar(
-        select(func.count())
-        .select_from(Application)
-        .where(Application.job_id == job.id, Application.status == ApplicationStatus.shortlisted)
-    ) or 0
-    data = JobOut.model_validate(job)
-    data.company_name = company.name if company else None
-    data.job_type = job.job_type.value if job.job_type else None
-    data.status = job.status.value
-    data.matched = matched
-    data.shortlisted = shortlisted
-    return data
-
-
 @router.post("", response_model=JobOut)
 async def create_job(body: JobCreate, user: CompanyUser, db: DbSession):
-    status = JobStatus(body.status) if body.status in JobStatus.__members__ else JobStatus.draft
+    # Convert string status to enum
+    if body.status and body.status in JobStatus.__members__:
+        status = JobStatus(body.status)
+    else:
+        status = JobStatus.draft
+
     if status in (JobStatus.live, JobStatus.draft):
         await check_plan_limit(user, db, "job_postings")
 
@@ -72,7 +58,7 @@ async def create_job(body: JobCreate, user: CompanyUser, db: DbSession):
     )
     db.add(job)
     await db.flush()
-    return await _enrich(db, job)
+    return await enrich_job(db, job)
 
 
 @router.get("", response_model=list[JobOut])
@@ -96,72 +82,27 @@ async def list_jobs(
     salary_min: int | None = Query(None),
     salary_max: int | None = Query(None),
 ):
-    # Public browse endpoint (no auth). Company "my jobs" is GET /jobs/mine.
-    q = select(JobPosting).options(selectinload(JobPosting.company))
-    if status:
-        try:
-            q = q.where(JobPosting.status == JobStatus(status))
-        except ValueError:
-            pass
-    elif not mine:
-        q = q.where(JobPosting.status == JobStatus.live)
-
-    if title:
-        q = q.where(
-            or_(
-                JobPosting.title.ilike(f"%{title}%"),
-                JobPosting.description.ilike(f"%{title}%"),
-            )
-        )
-    if location:
-        q = q.where(JobPosting.location.ilike(f"%{location}%"))
-    if country:
-        q = q.where(JobPosting.country.ilike(f"%{country}%"))
-    if state:
-        q = q.where(JobPosting.state.ilike(f"%{state}%"))
-    if city:
-        q = q.where(JobPosting.city.ilike(f"%{city}%"))
-    if employment_type:
-        q = q.where(JobPosting.employment_type == employment_type)
-    if experience_range:
-        q = q.where(JobPosting.experience_range.ilike(f"%{experience_range}%"))
-    if vertical:
-        q = q.where(JobPosting.department.ilike(f"%{vertical}%"))
-    if job_role:
-        q = q.where(JobPosting.job_role.ilike(f"%{job_role}%"))
-    if job_level:
-        q = q.where(JobPosting.job_level.ilike(f"%{job_level}%"))
-    if salary_min is not None:
-        q = q.where(JobPosting.max_salary >= salary_min)
-    if salary_max is not None:
-        q = q.where(JobPosting.min_salary <= salary_max)
-
-    # Negative filters — exclude locations
-    if exclude_country:
-        for val in exclude_country.split(","):
-            val = val.strip()
-            if val:
-                q = q.where(~JobPosting.country.ilike(f"%{val}%"))
-    if exclude_state:
-        for val in exclude_state.split(","):
-            val = val.strip()
-            if val:
-                q = q.where(~JobPosting.state.ilike(f"%{val}%"))
-    if exclude_city:
-        for val in exclude_city.split(","):
-            val = val.strip()
-            if val:
-                q = q.where(~JobPosting.city.ilike(f"%{val}%"))
-
-    q = q.order_by(JobPosting.created_at.desc())
-    jobs = (await db.execute(q)).scalars().all()
-
-    # If mine=true, filter to caller's company jobs when authenticated as company
-    # (optional header — list endpoint also used publicly for browse)
-    out = []
-    for job in jobs:
-        out.append(await _enrich(db, job))
-    return out
+    """Public browse endpoint (no auth). Company 'my jobs' is GET /jobs/mine."""
+    return await search_jobs(
+        db=db,
+        title=title,
+        location=location,
+        country=country,
+        state=state,
+        city=city,
+        exclude_country=exclude_country,
+        exclude_state=exclude_state,
+        exclude_city=exclude_city,
+        employment_type=employment_type,
+        experience_range=experience_range,
+        vertical=vertical,
+        job_role=job_role,
+        job_level=job_level,
+        status=status,
+        mine=mine,
+        salary_min=salary_min,
+        salary_max=salary_max,
+    )
 
 
 @router.get("/mine", response_model=list[JobOut])
@@ -173,7 +114,7 @@ async def my_jobs(user: CompanyUser, db: DbSession):
             .order_by(JobPosting.created_at.desc())
         )
     ).scalars().all()
-    return [await _enrich(db, j) for j in jobs]
+    return [await enrich_job(db, j) for j in jobs]
 
 
 @router.get("/{job_id}", response_model=JobOut)
@@ -189,34 +130,34 @@ async def get_job(job_id: UUID, db: DbSession, user: User | None = Depends(get_o
         )
         if not is_owner:
             raise HTTPException(status_code=404, detail="Job not found")
-    return await _enrich(db, job)
+    return await enrich_job(db, job)
 
 
 @router.put("/{job_id}", response_model=JobOut)
 async def update_job(job_id: UUID, body: JobUpdate, user: CompanyUser, db: DbSession):
     job = await db.get(JobPosting, job_id)
     if not job or job.company_id != user.id:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=404, detail="Not found")
     data = body.model_dump(exclude_unset=True)
     if "job_type" in data:
         data["job_type"] = _job_type(data["job_type"])
     for k, v in data.items():
         setattr(job, k, v)
     await db.flush()
-    return await _enrich(db, job)
+    return await enrich_job(db, job)
 
 
 @router.patch("/{job_id}/status", response_model=JobOut)
 async def patch_status(job_id: UUID, body: JobStatusUpdate, user: CompanyUser, db: DbSession):
     job = await db.get(JobPosting, job_id)
     if not job or job.company_id != user.id:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=404, detail="Not found")
     try:
         job.status = JobStatus(body.status)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Invalid status") from exc
     await db.flush()
-    return await _enrich(db, job)
+    return await enrich_job(db, job)
 
 
 @router.get("/{job_id}/candidates", response_model=list[FitmentCandidateOut])
@@ -224,35 +165,7 @@ async def ranked_candidates(job_id: UUID, user: CompanyUser, db: DbSession):
     job = await db.get(JobPosting, job_id)
     if not job or job.company_id != user.id:
         raise HTTPException(status_code=404, detail="Job not found")
-
-    results = await compute_fitment(db, job)
-    out: list[FitmentCandidateOut] = []
-    for fr in results:
-        from models import CandidateProfile, CandidateSkill
-
-        profile = (
-            await db.execute(
-                select(CandidateProfile)
-                .options(selectinload(CandidateProfile.skills).selectinload(CandidateSkill.skill), selectinload(CandidateProfile.user))
-                .where(CandidateProfile.user_id == fr.candidate_id)
-            )
-        ).scalar_one_or_none()
-        skills = [cs.skill.name for cs in (profile.skills if profile else []) if cs.skill]
-        email = profile.user.email if profile and profile.user else None
-        name = (email.split("@")[0].replace(".", " ").title() if email else "Candidate")
-        out.append(
-            FitmentCandidateOut(
-                candidate_id=fr.candidate_id,
-                name=name,
-                title=(profile.preferred_sectors or [None])[0] if profile else None,
-                score=fr.score,
-                rationale=fr.rationale,
-                skills=skills,
-                location=(profile.preferred_locations or [None])[0] if profile else None,
-            )
-        )
-    out.sort(key=lambda x: x.score, reverse=True)
-    return out
+    return await ranked_candidates_for_job(db, job)
 
 
 from core.dependencies import CandidateUser

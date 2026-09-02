@@ -80,6 +80,15 @@ GROQ_API_KEY=gsk_...
 
 3. Restart uvicorn. Resume generation, ATS scoring, and `POST /resumes/parse` use Groq. Without a key, resume generation falls back to deterministic templates and ATS uses a hash-based score.
 
+### Fitment rationale (interim — template, not LLM)
+
+Job/candidate fitment scores use deterministic mock embeddings plus **template-string rationales**, not Groq/LLM text. Typical shapes:
+
+- With skills: `Strong skills overlap in {skill1}, {skill2}, {skill3}.`
+- Without overlap: `Partial profile match based on vertical alignment.` / `Profile match based on experience and vertical alignment.`
+
+The company candidates UI must display the API `rationale` field as returned. Replacing it with a different frontend string is a trust bug. Real AI rationales are a later stage.
+
 ## Cloud Run deploy
 
 No Cloud SQL instance, Auth Proxy, or Unix socket is required. Point `DATABASE_URL` at your Neon **pooled** connection string.

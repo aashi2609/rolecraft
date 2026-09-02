@@ -1,23 +1,48 @@
 from datetime import date, datetime
-from typing import Any, Optional
+from typing import Any, Optional, Literal
 from uuid import UUID
+import enum
+import re
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class ORMModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+def _coerce_enum_value(v: Any) -> Any:
+    """Accept SQLAlchemy/Python Enum instances when validating Literal fields."""
+    if isinstance(v, enum.Enum):
+        return v.value
+    return v
+
+
+def _validate_password_strength(password: str) -> str:
+    """Shared password rule: min 8 chars, at least one letter and one number."""
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters long")
+    if not re.search(r"[A-Za-z]", password):
+        raise ValueError("Password must contain at least one letter")
+    if not re.search(r"\d", password):
+        raise ValueError("Password must contain at least one number")
+    return password
+
+
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 class SignupRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6)
-    role: str  # candidate | company
+    password: str = Field(min_length=8)
+    role: Literal["candidate", "company"]
     name: Optional[str] = None
     industry: Optional[str] = None
     plan: Optional[str] = "basic"
+
+    @field_validator("password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return _validate_password_strength(v)
 
 
 class SigninRequest(BaseModel):
@@ -31,21 +56,26 @@ class ForgotPasswordRequest(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=6)
+    new_password: str = Field(min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return _validate_password_strength(v)
 
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user_id: UUID
-    role: str
+    role: Literal["candidate", "company", "admin"]
     plan: Optional[str] = None
 
 
 class UserOut(ORMModel):
     id: UUID
     email: EmailStr
-    role: str
+    role: Literal["candidate", "company", "admin"]
     created_at: datetime
 
 
@@ -104,6 +134,7 @@ class ExperienceIn(BaseModel):
     company_name: Optional[str] = None
     role: Optional[str] = None
     designation: Optional[str] = None
+    # Free-form (onboarding accepts values like "Full-time, Contract"); jobs use strict Literals
     employment_type: Optional[str] = None
     current_salary: Optional[str] = None
     expected_salary: Optional[str] = None
@@ -114,6 +145,17 @@ class ExperienceIn(BaseModel):
     gap_from: Optional[date] = None
     gap_to: Optional[date] = None
     gap_reason: Optional[str] = None
+
+    @field_validator("to_date")
+    @classmethod
+    def validate_to_date(cls, v: Optional[date], info) -> Optional[date]:
+        # Current roles may omit to_date; skip ordering check when is_current=True
+        if info.data.get("is_current"):
+            return v
+        if v is not None and info.data.get("from_date") is not None:
+            if v < info.data["from_date"]:
+                raise ValueError("to_date must be >= from_date")
+        return v
 
 
 class ExperienceOut(ExperienceIn, ORMModel):
@@ -130,6 +172,14 @@ class ProjectIn(BaseModel):
     to_date: Optional[date] = None
     responsibilities: Optional[str] = None
     achievements: Optional[str] = None
+
+    @field_validator("to_date")
+    @classmethod
+    def validate_to_date(cls, v: Optional[date], info) -> Optional[date]:
+        if v is not None and info.data.get("from_date") is not None:
+            if v < info.data["from_date"]:
+                raise ValueError("to_date must be >= from_date")
+        return v
 
 
 class ProjectOut(ProjectIn, ORMModel):
@@ -230,10 +280,11 @@ class CompanyOut(ORMModel):
 class JobCreate(BaseModel):
     title: str
     department: Optional[str] = None
-    employment_type: Optional[str] = None
+    # Match frontend EMPLOYMENT_TYPES (lib/constants.ts)
+    employment_type: Optional[Literal["Full-time", "Part-time", "Contract", "Internship"]] = None
     experience_range: Optional[str] = None
-    min_salary: Optional[int] = None
-    max_salary: Optional[int] = None
+    min_salary: Optional[int] = Field(default=None, ge=0)
+    max_salary: Optional[int] = Field(default=None, ge=0)
     salary_unit: Optional[str] = "Per annum"
     location: Optional[str] = None
     country: Optional[str] = None
@@ -241,7 +292,7 @@ class JobCreate(BaseModel):
     city: Optional[str] = None
     job_role: Optional[str] = None
     job_level: Optional[str] = None
-    job_type: Optional[str] = None  # onsite|remote|hybrid
+    job_type: Optional[Literal["onsite", "remote", "hybrid"]] = None
     required_skills: list[str] = []
     num_openings: int = 1
     application_deadline: Optional[date] = None
@@ -249,16 +300,24 @@ class JobCreate(BaseModel):
     responsibilities: Optional[str] = None
     requirements: Optional[str] = None
     benefits: Optional[str] = None
-    status: str = "draft"
+    status: Literal["draft", "live", "closed"] = "draft"
+
+    @field_validator("max_salary")
+    @classmethod
+    def validate_max_salary(cls, v: Optional[int], info) -> Optional[int]:
+        if v is not None and info.data.get("min_salary") is not None:
+            if v < info.data["min_salary"]:
+                raise ValueError("max_salary must be >= min_salary")
+        return v
 
 
 class JobUpdate(BaseModel):
     title: Optional[str] = None
     department: Optional[str] = None
-    employment_type: Optional[str] = None
+    employment_type: Optional[Literal["Full-time", "Part-time", "Contract", "Internship"]] = None
     experience_range: Optional[str] = None
-    min_salary: Optional[int] = None
-    max_salary: Optional[int] = None
+    min_salary: Optional[int] = Field(default=None, ge=0)
+    max_salary: Optional[int] = Field(default=None, ge=0)
     salary_unit: Optional[str] = None
     location: Optional[str] = None
     country: Optional[str] = None
@@ -266,7 +325,7 @@ class JobUpdate(BaseModel):
     city: Optional[str] = None
     job_role: Optional[str] = None
     job_level: Optional[str] = None
-    job_type: Optional[str] = None
+    job_type: Optional[Literal["onsite", "remote", "hybrid"]] = None
     required_skills: Optional[list[str]] = None
     num_openings: Optional[int] = None
     application_deadline: Optional[date] = None
@@ -275,9 +334,17 @@ class JobUpdate(BaseModel):
     requirements: Optional[str] = None
     benefits: Optional[str] = None
 
+    @field_validator("max_salary")
+    @classmethod
+    def validate_max_salary(cls, v: Optional[int], info) -> Optional[int]:
+        if v is not None and info.data.get("min_salary") is not None:
+            if v < info.data["min_salary"]:
+                raise ValueError("max_salary must be >= min_salary")
+        return v
+
 
 class JobStatusUpdate(BaseModel):
-    status: str  # draft|live|closed
+    status: Literal["draft", "live", "closed"]
 
 
 class JobOut(ORMModel):
@@ -286,6 +353,7 @@ class JobOut(ORMModel):
     company_name: Optional[str] = None
     title: str
     department: Optional[str] = None
+    # Optional[str] so legacy admin values (e.g. full_time) still serialize
     employment_type: Optional[str] = None
     experience_range: Optional[str] = None
     min_salary: Optional[int] = None
@@ -297,7 +365,7 @@ class JobOut(ORMModel):
     city: Optional[str] = None
     job_role: Optional[str] = None
     job_level: Optional[str] = None
-    job_type: Optional[str] = None
+    job_type: Optional[Literal["onsite", "remote", "hybrid"]] = None
     required_skills: Optional[list[str]] = None
     num_openings: int = 1
     application_deadline: Optional[date] = None
@@ -305,10 +373,18 @@ class JobOut(ORMModel):
     responsibilities: Optional[str] = None
     requirements: Optional[str] = None
     benefits: Optional[str] = None
-    status: str
+    status: Literal["draft", "live", "closed"]
     created_at: datetime
+    # Computed in enrich_job (job_search_service), not ORM columns:
+    # matched = COUNT(applications) for this job; shortlisted = COUNT where status=shortlisted.
+    # Default 0 only until enrichment runs (e.g. create_job error fallback).
     matched: int = 0
     shortlisted: int = 0
+
+    @field_validator("status", "job_type", mode="before")
+    @classmethod
+    def coerce_job_enums(cls, v: Any) -> Any:
+        return _coerce_enum_value(v)
 
 
 class FitmentCandidateOut(BaseModel):
@@ -330,7 +406,7 @@ class ApplicationCreate(BaseModel):
 
 
 class ApplicationStatusUpdate(BaseModel):
-    status: str
+    status: Literal["applied", "shortlisted", "rejected", "interview"]
 
 
 class ApplicationOut(ORMModel):
@@ -338,11 +414,16 @@ class ApplicationOut(ORMModel):
     candidate_id: UUID
     job_id: UUID
     resume_id: Optional[UUID] = None
-    status: str
+    status: Literal["applied", "shortlisted", "rejected", "interview"]
     applied_at: datetime
     job_title: Optional[str] = None
     company_name: Optional[str] = None
     candidate_name: Optional[str] = None
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def coerce_application_status(cls, v: Any) -> Any:
+        return _coerce_enum_value(v)
 
 
 # ── Messages / Notifications / Subscriptions ──────────────────────────────────
@@ -411,3 +492,4 @@ class CandidateSearchOut(ORMModel):
     expected_salary_lpa: Optional[int] = None
     notice_period_days: Optional[int] = None
     photo_url: Optional[str] = None
+    rationale: Optional[str] = None

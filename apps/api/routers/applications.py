@@ -9,8 +9,10 @@ from sqlalchemy.orm import selectinload
 from core.dependencies import CandidateUser, CompanyUser, CurrentUser, DbSession, check_plan_limit
 from core.security import decode_access_token
 from core.ws_manager import ws_manager
+from core.websocket_auth import authenticate_websocket_connection, handle_websocket_lifecycle
 from models import Application, ApplicationStatus, Company, JobPosting, Resume, SavedJob, User
 from schemas import ApplicationCreate, ApplicationOut, ApplicationStatusUpdate, JobOut
+from services.resume_service import get_or_generate_resume
 
 logger = logging.getLogger(__name__)
 
@@ -56,54 +58,20 @@ async def apply(body: ApplicationCreate, user: CandidateUser, db: DbSession):
             raise HTTPException(status_code=400, detail="Invalid resume")
     else:
         # Dynamically generate a tailored resume for this job
-        from models import CandidateProfile, CandidateSkill
-        from services.resume_service import generate_resume_for_vertical
-        
-        profile = await db.scalar(
-            select(CandidateProfile)
-            .options(
-                selectinload(CandidateProfile.education),
-                selectinload(CandidateProfile.experience),
-                selectinload(CandidateProfile.projects),
-                selectinload(CandidateProfile.certifications),
-                selectinload(CandidateProfile.skills).selectinload(CandidateSkill.skill),
-            )
-            .where(CandidateProfile.user_id == user.id)
-        )
-        if not profile:
-            raise HTTPException(status_code=400, detail="Complete your profile first to generate a resume")
-
         await check_plan_limit(user, db, "resume_verticals", extra=1)
-
-        skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
-        target_vertical = job.title or "Job Application"
         
+        target_vertical = job.title or "Job Application"
         try:
-            payload = await generate_resume_for_vertical(
-                profile, target_vertical, skill_names, user_email=user.email
+            resume_id = await get_or_generate_resume(
+                db, user.id, target_vertical, user.email
             )
-            resume = Resume(
-                candidate_id=user.id,
-                target_vertical=target_vertical,
-                content=payload["content"],
-                ats_score=payload["ats_score"],
-                ats_breakdown=payload.get("ats_breakdown"),
-                generation_metadata=payload.get("generation_metadata"),
-                embedding=payload["embedding"],
-                is_default=False,
-            )
-            db.add(resume)
-            await db.flush()
-            resume_id = resume.id
+            if not resume_id:
+                raise HTTPException(status_code=400, detail="Failed to generate resume and no fallback available")
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
         except Exception as exc:
-            logger.error("Failed to dynamically generate resume: %s", exc)
-            # Fallback to default resume
-            resume = await db.scalar(
-                select(Resume)
-                .where(Resume.candidate_id == user.id)
-                .order_by(Resume.is_default.desc(), Resume.created_at.desc())
-            )
-            resume_id = resume.id if resume else None
+            logger.error("Failed to get or generate resume: %s", exc)
+            raise HTTPException(status_code=500, detail="Resume generation failed")
 
     app = Application(candidate_id=user.id, job_id=body.job_id, resume_id=resume_id)
     db.add(app)
@@ -180,40 +148,11 @@ async def ws_applications(websocket: WebSocket):
     connection, and keeps it alive.  Events are pushed as JSON objects with
     a "type" field (e.g. "application_status_updated").
     """
-    await websocket.accept()
-    # Wait for the client to send their auth token
-    try:
-        auth_msg = await asyncio.wait_for(websocket.receive_json(), timeout=10.0)
-    except Exception:
-        await websocket.close(code=4001, reason="Auth timeout")
+    user_id = await authenticate_websocket_connection(websocket)
+    if user_id is None:
         return
-
-    token = auth_msg.get("token")
-    if not token:
-        await websocket.close(code=4002, reason="Missing token")
-        return
-
-    try:
-        payload = decode_access_token(token)
-        user_id = UUID(payload["sub"])
-    except (ValueError, KeyError):
-        await websocket.close(code=4003, reason="Invalid token")
-        return
-
-    await ws_manager.connect(user_id, websocket)
-    try:
-        # Keep the connection alive — listen for pings or client messages
-        while True:
-            data = await websocket.receive_json()
-            # Handle client-side ping to keep the connection alive
-            if data.get("type") == "ping":
-                await websocket.send_json({"type": "pong"})
-    except WebSocketDisconnect:
-        pass
-    except Exception as exc:
-        logger.warning("WS error for user=%s: %s", user_id, exc)
-    finally:
-        await ws_manager.disconnect(user_id, websocket)
+    
+    await handle_websocket_lifecycle(websocket, user_id)
 
 
 # Saved jobs

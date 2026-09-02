@@ -51,7 +51,7 @@ The project is built as a full-stack web application with the following stack:
 - ✅ Resume generation with AI service (Gemini)
 - ✅ Enhanced AI error handling with deterministic fallback
 - ✅ Resume PDF generation
-- ✅ Fitment service (basic job-candidate matching with embeddings)
+- ✅ Fitment service (basic job-candidate matching with embeddings; rationale is **template-based**, not LLM — see `apps/api/README.md`)
 
 #### Frontend (Next.js)
 - ✅ Complete candidate UI flow (dashboard, onboarding, profile, jobs, applications, messages, settings)

@@ -39,6 +39,10 @@ function mapJobFromApi(j: any) {
     jobType: j.job_type
       ? String(j.job_type).charAt(0).toUpperCase() + String(j.job_type).slice(1)
       : undefined,
+    // Backend uses snake_case (job_role / job_level); this mapper is the camelCase boundary.
+    // Candidate filters read jobRole — keep in sync with UserContext.mapJob.
+    jobRole: j.job_role,
+    jobLevel: j.job_level,
     salaryMin: j.min_salary != null ? String(j.min_salary) : '',
     salaryMax: j.max_salary != null ? String(j.max_salary) : '',
     salaryUnit: j.salary_unit || 'Per annum',
@@ -48,6 +52,10 @@ function mapJobFromApi(j: any) {
     description: j.description,
     status: j.status ? String(j.status).charAt(0).toUpperCase() + String(j.status).slice(1) : 'Draft',
     date: j.created_at?.slice?.(0, 10) || j.created_at,
+    // Additional location fields for advanced filtering
+    country: j.country,
+    state: j.state,
+    city: j.city,
   };
 }
 

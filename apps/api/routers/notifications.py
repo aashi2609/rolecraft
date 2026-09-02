@@ -8,6 +8,7 @@ from core.dependencies import CurrentUser, DbSession
 from models import Notification, Subscription, UserRole, PlanTier, SubscriptionStatus
 from schemas import NotificationOut, SubscriptionOut, SubscriptionCreate, UploadOut
 from services.storage_service import upload_file
+from services.subscription_service import get_active_subscription, upsert_subscription
 
 router_notifications = APIRouter(prefix="/notifications", tags=["notifications"])
 router_subscriptions = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
@@ -39,52 +40,15 @@ async def mark_read(notification_id: UUID, user: CurrentUser, db: DbSession):
 
 @router_subscriptions.get("/me", response_model=SubscriptionOut)
 async def get_subscription(user: CurrentUser, db: DbSession):
-    sub = await db.scalar(
-        select(Subscription)
-        .where(Subscription.user_id == user.id, Subscription.status == SubscriptionStatus.active)
-        .order_by(Subscription.started_at.desc())
-    )
+    sub = await get_active_subscription(db, user.id)
     if not sub:
         raise HTTPException(status_code=404, detail="No active subscription")
     return SubscriptionOut.model_validate(sub)
 
 
 @router_subscriptions.post("", response_model=SubscriptionOut)
-async def upsert_subscription(body: SubscriptionCreate, user: CurrentUser, db: DbSession):
-    try:
-        tier = PlanTier(body.plan_tier.lower())
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Invalid plan_tier") from exc
-
-    # Validate plan tier matches user role
-    if user.role == UserRole.candidate and tier not in [PlanTier.free, PlanTier.basic, PlanTier.premium, PlanTier.elite]:
-        raise HTTPException(status_code=400, detail="Invalid plan tier for candidate role")
-    if user.role == UserRole.company and tier not in [PlanTier.starter, PlanTier.growth, PlanTier.scale]:
-        raise HTTPException(status_code=400, detail="Invalid plan tier for company role")
-
-    # Cancel existing active subscriptions
-    existing = (
-        await db.execute(
-            select(Subscription).where(
-                Subscription.user_id == user.id, Subscription.status == SubscriptionStatus.active
-            )
-        )
-    ).scalars().all()
-    for s in existing:
-        s.status = SubscriptionStatus.cancelled
-
-    # Create new subscription
-    sub = Subscription(
-        user_id=user.id,
-        role=user.role,
-        plan_tier=tier,
-        status=SubscriptionStatus.active,
-        renews_at=datetime.now(timezone.utc) + timedelta(days=30),
-    )
-    db.add(sub)
-    await db.flush()
-    await db.refresh(sub)
-    return SubscriptionOut.model_validate(sub)
+async def upsert_subscription_route(body: SubscriptionCreate, user: CurrentUser, db: DbSession):
+    return await upsert_subscription(db, body, user.id, user.role)
 
 
 def _content_length(request: Request) -> int | None:

@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { jobsApi } from '@/lib/api';
 
 function mapJobFromApi(j: any) {
+  // snake_case API → camelCase UI (same boundary as UserContext.mapJob / jobs/page)
   return {
     id: j.id,
     companyId: j.company_id,
@@ -22,6 +23,8 @@ function mapJobFromApi(j: any) {
     jobType: j.job_type
       ? String(j.job_type).charAt(0).toUpperCase() + String(j.job_type).slice(1)
       : undefined,
+    jobRole: j.job_role,
+    jobLevel: j.job_level,
     salaryMin: j.min_salary != null ? String(j.min_salary) : '',
     salaryMax: j.max_salary != null ? String(j.max_salary) : '',
     salaryUnit: j.salary_unit || 'Per annum',

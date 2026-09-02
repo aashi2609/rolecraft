@@ -91,8 +91,8 @@ function PostJobContent() {
       id: existing.id,
       title: existing.title || '',
       department: existing.department || existing.vertical || '',
-      role: (existing as any).role || '',
-      level: (existing as any).level || '',
+      role: (existing as any).jobRole || (existing as any).role || '',
+      level: (existing as any).jobLevel || (existing as any).level || '',
       employmentType: existing.employmentType || '',
       experience: existing.experience || '',
       salaryMin: existing.salaryMin || '',
@@ -139,8 +139,9 @@ function PostJobContent() {
     const apiBody = {
       title: draft.title,
       department: draft.department,
-      role: draft.role,
-      level: draft.level,
+      // DB/API field is job_role / job_level (snake_case); draft uses role / level locally
+      job_role: draft.role,
+      job_level: draft.level,
       employment_type: draft.employmentType,
       experience_range: draft.experience,
       min_salary: draft.salaryMin ? Number(draft.salaryMin) : undefined,

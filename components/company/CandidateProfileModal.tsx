@@ -47,10 +47,19 @@ export function CandidateProfileModal({ candidate, isOpen, onClose }: CandidateP
               
               <div className="bg-white p-6 rounded-xl border border-border-soft shadow-sm">
                 <div className="flex items-center gap-2 mb-4 text-primary font-bold">
-                  <TrendingUp className="w-5 h-5" /> AI Fitment Rationale
+                  <TrendingUp className="w-5 h-5" /> Fitment Rationale
                 </div>
+                {/*
+                  Interim: backend rationale is template-string based (not LLM-generated),
+                  e.g. "Strong skills overlap in {skills}." Show that value as-is for trust.
+                */}
                 <p className="text-ink leading-relaxed">
-                  {candidate.rationale}
+                  {candidate.rationale?.trim()
+                    ? candidate.rationale
+                    : 'No fitment rationale available for this candidate.'}
+                </p>
+                <p className="mt-2 text-xs text-ink-muted">
+                  Template-based match summary (not AI-generated).
                 </p>
               </div>
 

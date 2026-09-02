@@ -1,57 +1,33 @@
-"""Verify security fixes #1-#4. Run from apps/api: PYTHONPATH=. python scripts/verify_security_fixes.py"""
+"""Verify security fixes #1-#4. Run from apps/api with .venv313:
+
+    PYTHONPATH=. python -m pytest tests/security/test_security_fixes.py -v
+
+Uses in-process TestClient so results track the code under test (not a stale
+uvicorn on :8000).
+"""
 from __future__ import annotations
 
-import io
-import sys
 import uuid
 from unittest.mock import AsyncMock, patch
 
-import httpx
+import pytest
+from fastapi.testclient import TestClient
 
 from core.config import get_settings
+from main import app
+from services import resume_service
 
 settings = get_settings()
 
-# Log database connection (masked)
-db_url = settings.database_url
-if "@" in db_url:
-    masked_db = db_url.split("@")[1]  # Show host+db only
-else:
-    masked_db = db_url
-print(f"DATABASE_URL (masked): postgresql+asyncpg://****@{masked_db}")
 
-# Use httpx to hit running server instead of TestClient to avoid event loop issues
-BASE_URL = "http://127.0.0.1:8000"
-client = httpx.Client(base_url=BASE_URL, timeout=120.0)
-
-PASS = 0
-FAIL = 0
+@pytest.fixture(scope="module")
+def client():
+    # Module-scoped: shared async engine must not outlive the TestClient event loop
+    with TestClient(app) as c:
+        yield c
 
 
-def ok(name: str, cond: bool, detail: str = "") -> None:
-    global PASS, FAIL
-    if cond:
-        PASS += 1
-        print(f"  PASS  {name}")
-    else:
-        FAIL += 1
-        print(f"  FAIL  {name}" + (f" — {detail}" if detail else ""))
-
-
-def test_cors() -> None:
-    print("\n=== 1. CORS wildcard removed ===")
-    allowed = settings.cors_origin_list[0] if settings.cors_origin_list else "http://localhost:3000"
-
-    evil = client.get("/health", headers={"Origin": "https://evil.com"})
-    acao_evil = evil.headers.get("access-control-allow-origin")
-    ok("evil origin not reflected", acao_evil != "https://evil.com", f"got {acao_evil!r}")
-
-    good = client.get("/health", headers={"Origin": allowed})
-    acao_good = good.headers.get("access-control-allow-origin")
-    ok(f"allowed origin {allowed} works", acao_good == allowed, f"got {acao_good!r}")
-
-
-def _signup(email: str, role: str, password: str = "testpass123") -> dict:
+def _signup(client: TestClient, email: str, role: str, password: str = "testpass123A") -> dict:
     r = client.post(
         "/auth/signup",
         json={"email": email, "password": password, "role": role, "name": "Test User"},
@@ -61,12 +37,23 @@ def _signup(email: str, role: str, password: str = "testpass123") -> dict:
     return r.json()
 
 
-def test_idor_candidates_and_jobs() -> None:
-    print("\n=== 2. IDOR fixes ===")
+def test_cors(client: TestClient) -> None:
+    allowed = settings.cors_origin_list[0] if settings.cors_origin_list else "http://localhost:3000"
+
+    evil = client.get("/health", headers={"Origin": "https://evil.com"})
+    acao_evil = evil.headers.get("access-control-allow-origin")
+    assert acao_evil != "https://evil.com", f"got {acao_evil!r}"
+
+    good = client.get("/health", headers={"Origin": allowed})
+    acao_good = good.headers.get("access-control-allow-origin")
+    assert acao_good == allowed, f"got {acao_good!r}"
+
+
+def test_idor_candidates_and_jobs(client: TestClient) -> None:
     uid = uuid.uuid4().hex[:8]
-    cand_a = _signup(f"cand_a_{uid}@test.com", "candidate")
-    cand_b = _signup(f"cand_b_{uid}@test.com", "candidate")
-    company_a = _signup(f"company_a_{uid}@test.com", "company")
+    cand_a = _signup(client, f"cand_a_{uid}@test.com", "candidate")
+    cand_b = _signup(client, f"cand_b_{uid}@test.com", "candidate")
+    company_a = _signup(client, f"company_a_{uid}@test.com", "company")
 
     token_a = cand_a["access_token"]
     token_b = cand_b["access_token"]
@@ -74,7 +61,6 @@ def test_idor_candidates_and_jobs() -> None:
     id_a = cand_a["user_id"]
     id_b = cand_b["user_id"]
 
-    # Seed sensitive data on candidate B
     client.put(
         "/candidates/me",
         headers={"Authorization": f"Bearer {token_b}"},
@@ -86,97 +72,76 @@ def test_idor_candidates_and_jobs() -> None:
         },
     )
 
-    # Candidate A cannot read B's full profile
-    r = client.get(
-        f"/candidates/{id_b}",
-        headers={"Authorization": f"Bearer {token_a}"},
-    )
-    ok("candidate A blocked from B full profile", r.status_code == 404, f"status={r.status_code}")
+    r = client.get(f"/candidates/{id_b}", headers={"Authorization": f"Bearer {token_a}"})
+    assert r.status_code == 404, f"status={r.status_code}"
 
-    # Candidate A can read own profile
-    r = client.get(
-        f"/candidates/{id_a}",
-        headers={"Authorization": f"Bearer {token_a}"},
-    )
-    ok("candidate A can read own profile", r.status_code == 200, f"status={r.status_code}")
+    r = client.get(f"/candidates/{id_a}", headers={"Authorization": f"Bearer {token_a}"})
+    assert r.status_code == 200, f"status={r.status_code}"
 
-    # Company can read public profile without PII
     r = client.get(
         f"/candidates/{id_b}/public-profile",
         headers={"Authorization": f"Bearer {token_co}"},
     )
-    ok("company can read public profile", r.status_code == 200, f"status={r.status_code}")
-    if r.status_code == 200:
-        data = r.json()
-        ok("public profile excludes address", "present_address" not in data)
-        ok("public profile excludes income", "annual_family_income" not in data)
-        ok("public profile excludes dob", "dob" not in data)
-        ok("public profile excludes email", "email" not in data)
+    assert r.status_code == 200, f"status={r.status_code}"
+    data = r.json()
+    assert "present_address" not in data
+    assert "annual_family_income" not in data
+    assert "dob" not in data
+    assert "email" not in data
 
-    # Draft job IDOR
     job = client.post(
         "/jobs",
         headers={"Authorization": f"Bearer {token_co}"},
-        json={"title": "Draft Role", "status": "draft", "description": "secret draft"},
+        json={
+            "title": "Draft Role",
+            "status": "draft",
+            "description": "secret draft",
+            "min_salary": 0,
+            "max_salary": 100,
+        },
     )
-    if job.status_code != 200:
-        print(f"  SKIP  draft job creation ({job.status_code}) — may hit plan limit")
-        return
+    if job.status_code == 402:
+        pytest.skip(f"draft job creation unavailable (plan limit: {job.status_code})")
+    assert job.status_code == 200, f"{job.status_code} {job.text[:500]}"
     job_id = job.json()["id"]
 
     r = client.get(f"/jobs/{job_id}")
-    ok("unauthenticated draft job returns 404", r.status_code == 404, f"status={r.status_code}")
+    assert r.status_code == 404, f"status={r.status_code}"
 
-    r = client.get(
-        f"/jobs/{job_id}",
-        headers={"Authorization": f"Bearer {token_a}"},
-    )
-    ok("other user draft job returns 404", r.status_code == 404, f"status={r.status_code}")
+    r = client.get(f"/jobs/{job_id}", headers={"Authorization": f"Bearer {token_a}"})
+    assert r.status_code == 404, f"status={r.status_code}"
 
-    r = client.get(
-        f"/jobs/{job_id}",
-        headers={"Authorization": f"Bearer {token_co}"},
-    )
-    ok("owner can read draft job", r.status_code == 200, f"status={r.status_code}")
+    r = client.get(f"/jobs/{job_id}", headers={"Authorization": f"Bearer {token_co}"})
+    assert r.status_code == 200, f"status={r.status_code}"
 
 
-def test_parse_auth_required() -> None:
-    print("\n=== 3. POST /resumes/parse requires auth ===")
+def test_parse_auth_required(client: TestClient) -> None:
     with patch("services.ai_client.generate_content", new_callable=AsyncMock) as mock_groq:
         r = client.post(
             "/resumes/parse",
             files={"file": ("resume.pdf", b"%PDF-1.4 minimal", "application/pdf")},
         )
-        ok("no auth returns 401", r.status_code == 401, f"status={r.status_code} body={r.text[:120]}")
-        ok("Groq not called without auth", mock_groq.await_count == 0, f"calls={mock_groq.await_count}")
+        assert r.status_code == 401, f"status={r.status_code} body={r.text[:120]}"
+        assert mock_groq.await_count == 0, f"calls={mock_groq.await_count}"
 
 
-def test_plan_limit_before_groq() -> None:
-    print("\n=== 4. check_plan_limit before Groq ===")
+def test_plan_limit_before_groq(client: TestClient) -> None:
     uid = uuid.uuid4().hex[:8]
-    cand = _signup(f"plan_{uid}@test.com", "candidate")
+    cand = _signup(client, f"plan_{uid}@test.com", "candidate")
     token = cand["access_token"]
 
-    # Create one resume to hit free-tier cap
     gen = client.post(
         "/resumes/generate",
         headers={"Authorization": f"Bearer {token}"},
         json={"target_verticals": ["software"]},
     )
     if gen.status_code not in (200, 402, 403):
-        print(f"  SKIP  initial generate failed ({gen.status_code})")
-        return
-
-    if gen.status_code in (402, 403):
-        print("  NOTE  user already at cap from generate — proceeding with limit tests")
-
-    endpoints = [
-        ("POST", "/resumes/parse", {"files": {"file": ("r.pdf", b"%PDF", "application/pdf")}}),
-    ]
+        pytest.skip(f"initial generate failed ({gen.status_code})")
 
     with patch("services.ai_client.generate_content", new_callable=AsyncMock) as mock_groq:
-        with patch(
-            "services.resume_service.generate_resume_for_vertical",
+        with patch.object(
+            resume_service,
+            "generate_resume_for_vertical",
             new_callable=AsyncMock,
         ) as mock_resume:
             mock_resume.return_value = {
@@ -191,10 +156,9 @@ def test_plan_limit_before_groq() -> None:
                 headers={"Authorization": f"Bearer {token}"},
                 files={"file": ("resume.pdf", b"%PDF-1.4", "application/pdf")},
             )
-            ok("parse blocked at plan cap", r.status_code == 403, f"status={r.status_code}")
-            ok("parse: Groq not called when capped", mock_groq.await_count == 0)
+            assert r.status_code == 403, f"status={r.status_code}"
+            assert mock_groq.await_count == 0
 
-            # Regenerate needs existing resume id
             resumes = client.get("/resumes", headers={"Authorization": f"Bearer {token}"})
             if resumes.status_code == 200 and resumes.json():
                 rid = resumes.json()[0]["id"]
@@ -202,45 +166,18 @@ def test_plan_limit_before_groq() -> None:
                     f"/resumes/{rid}/regenerate",
                     headers={"Authorization": f"Bearer {token}"},
                 )
-                ok("regenerate blocked at plan cap", r.status_code == 403, f"status={r.status_code}")
-                ok(
-                    "regenerate: generate_resume not called when capped",
-                    mock_resume.await_count == 0,
-                    f"calls={mock_resume.await_count}",
-                )
+                assert r.status_code == 403, f"status={r.status_code}"
+                assert mock_resume.await_count == 0, f"calls={mock_resume.await_count}"
 
                 r = client.post(
                     f"/resumes/{rid}/improve",
                     headers={"Authorization": f"Bearer {token}"},
                 )
-                ok("improve blocked at plan cap", r.status_code == 403, f"status={r.status_code}")
+                assert r.status_code == 403, f"status={r.status_code}"
 
             r = client.post(
                 "/resumes/download-tailored",
                 headers={"Authorization": f"Bearer {token}"},
                 json={"target_role": "Engineer"},
             )
-            ok("download-tailored blocked at plan cap", r.status_code == 403, f"status={r.status_code}")
-
-
-def main() -> None:
-    print("Security fix verification")
-    print(f"CORS origins: {settings.cors_origin_list}")
-    try:
-        test_cors()
-        test_idor_candidates_and_jobs()
-        test_parse_auth_required()
-        test_plan_limit_before_groq()
-    except Exception as exc:
-        print(f"\nABORTED: {exc}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
-
-    print(f"\n{'='*40}")
-    print(f"Results: {PASS} passed, {FAIL} failed")
-    sys.exit(1 if FAIL else 0)
-
-
-if __name__ == "__main__":
-    main()
+            assert r.status_code == 403, f"status={r.status_code}"

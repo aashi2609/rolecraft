@@ -11,8 +11,9 @@ import logging
 import random
 from datetime import datetime, timezone
 from typing import Any
+from uuid import UUID
 
-from models import CandidateProfile
+from models import CandidateProfile, CandidateSkill, Resume
 from core.config import get_settings
 from services.ai_client import AIServiceError, generate_content
 from services.ats_scorer import ATSResult, score_resume
@@ -483,3 +484,180 @@ async def generate_with_autofix(
             "completed_at": datetime.now(timezone.utc).isoformat(),
         },
     }
+
+
+async def get_or_generate_resume(
+    db,
+    candidate_id: UUID,
+    target_vertical: str,
+    user_email: str,
+) -> UUID | None:
+    """Get an existing resume for the vertical, or generate a new one.
+
+    Returns the resume_id, or None if generation fails and no fallback exists.
+    Caller must enforce plan limits before invoking this when generating.
+    """
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    existing = await db.scalar(
+        select(Resume).where(
+            Resume.candidate_id == candidate_id,
+            Resume.target_vertical == target_vertical,
+        )
+    )
+    if existing:
+        return existing.id
+
+    profile = await db.scalar(
+        select(CandidateProfile)
+        .options(
+            selectinload(CandidateProfile.education),
+            selectinload(CandidateProfile.experience),
+            selectinload(CandidateProfile.projects),
+            selectinload(CandidateProfile.certifications),
+            selectinload(CandidateProfile.skills).selectinload(CandidateSkill.skill),
+        )
+        .where(CandidateProfile.user_id == candidate_id)
+    )
+    if not profile:
+        raise ValueError("Complete your profile first to generate a resume")
+
+    skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
+
+    try:
+        payload = await generate_resume_for_vertical(
+            profile, target_vertical, skill_names, user_email=user_email
+        )
+        resume = Resume(
+            candidate_id=candidate_id,
+            target_vertical=target_vertical,
+            content=payload["content"],
+            ats_score=payload["ats_score"],
+            ats_breakdown=payload.get("ats_breakdown"),
+            generation_metadata=payload.get("generation_metadata"),
+            embedding=payload["embedding"],
+            is_default=False,
+        )
+        db.add(resume)
+        await db.flush()
+        return resume.id
+    except Exception as exc:
+        logger.error("Failed to dynamically generate resume: %s", exc)
+        resume = await db.scalar(
+            select(Resume)
+            .where(Resume.candidate_id == candidate_id)
+            .order_by(Resume.is_default.desc(), Resume.created_at.desc())
+        )
+        return resume.id if resume else None
+
+
+_PARSE_SYSTEM = "You are a strict JSON returning AI. You must return only the JSON."
+
+_PARSE_PROMPT = """\
+You are an expert resume parser. Extract the following information from the provided resume text and return it as a structured JSON object.
+
+The JSON object MUST have this exact schema:
+{{
+    "career_level": "Entry Level, Mid Level, or Senior Level",
+    "gender": "Male, Female, or Other",
+    "marital_status": "Single, Married, etc",
+    "present_address": "Full address",
+    "strengths": ["list", "of", "strengths"],
+    "weblinks": {{"LinkedIn": "url", "GitHub": "url"}},
+    "education": [
+        {{
+            "qualification_level": "Bachelor, Master, etc",
+            "degree": "Degree name",
+            "institute": "Institution name",
+            "field_of_study": "Major",
+            "passing_year": 2020,
+            "cgpa": "Grade"
+        }}
+    ],
+    "experience": [
+        {{
+            "company_name": "Company",
+            "role": "Role name",
+            "designation": "Designation",
+            "from_date": "YYYY-MM-DD",
+            "to_date": "YYYY-MM-DD",
+            "is_current": true/false,
+            "responsibilities": "Description of work"
+        }}
+    ],
+    "projects": [
+        {{
+            "project_name": "Project name",
+            "tools_used": "Tools used",
+            "from_date": "YYYY-MM-DD",
+            "to_date": "YYYY-MM-DD",
+            "responsibilities": "What they did"
+        }}
+    ],
+    "certifications": [
+        {{
+            "name": "Cert name",
+            "issuing_org": "Org"
+        }}
+    ],
+    "skills": ["Python", "React", "SQL"]
+}}
+
+If a field is not found in the resume, omit it or set it to null. Ensure dates are in YYYY-MM-DD format if possible, or null.
+
+RESUME TEXT:
+{text}
+"""
+
+
+async def parse_resume_pdf(
+    db,
+    candidate_id: UUID,
+    file_data: bytes,
+) -> dict[str, Any]:
+    """Parse already-validated PDF bytes and extract structured data via Groq.
+
+    Caller must validate upload type/size before passing ``file_data``.
+    """
+    import io
+
+    import pypdf
+    from fastapi import HTTPException
+
+    from core.config import get_settings
+
+    settings = get_settings()
+    if not settings.groq_api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Resume parsing requires GROQ_API_KEY. Add it to apps/api/.env and restart the API.",
+        )
+
+    if not file_data.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+
+    try:
+        reader = pypdf.PdfReader(io.BytesIO(file_data))
+        text = ""
+        for page in reader.pages:
+            text += (page.extract_text() or "") + "\n"
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Failed to read PDF: {exc}") from exc
+
+    prompt = _PARSE_PROMPT.format(text=text[:15000])
+
+    try:
+        return await generate_content(
+            prompt=prompt,
+            system_instruction=_PARSE_SYSTEM,
+            response_mime_type="application/json",
+        )
+    except AIServiceError as exc:
+        from fastapi import HTTPException as HTTPExc
+
+        raise HTTPExc(status_code=502, detail=f"Groq AI unavailable: {exc}") from exc
+    except Exception as exc:
+        from fastapi import HTTPException as HTTPExc
+
+        raise HTTPExc(status_code=500, detail=f"Failed to parse resume with AI: {exc}") from exc

@@ -4,19 +4,12 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from core.dependencies import CandidateUser, CurrentUser, DbSession
+from core.dependencies import CurrentUser, DbSession
 from core.security import create_access_token, hash_password, verify_password
 from models import CandidateProfile, Company, PlanTier, Subscription, SubscriptionStatus, User, UserRole
 from schemas import ChangePasswordRequest, ForgotPasswordRequest, SigninRequest, SignupRequest, TokenResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-def _parse_role(role: str) -> UserRole:
-    try:
-        return UserRole(role)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="role must be 'candidate' or 'company'") from exc
 
 
 def _parse_plan(plan: str | None, role: UserRole) -> PlanTier:
@@ -31,7 +24,8 @@ def _parse_plan(plan: str | None, role: UserRole) -> PlanTier:
 
 @router.post("/signup", response_model=TokenResponse)
 async def signup(body: SignupRequest, db: DbSession):
-    role = _parse_role(body.role)
+    # Password complexity + role Literal already enforced by SignupRequest
+    role = UserRole(body.role)
     existing = await db.scalar(select(User).where(User.email == body.email.lower()))
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -88,6 +82,7 @@ async def forgot_password(body: ForgotPasswordRequest):
 
 @router.post("/change-password")
 async def change_password(body: ChangePasswordRequest, user: CurrentUser, db: DbSession):
+    # new_password complexity already enforced by ChangePasswordRequest
     row = await db.get(User, user.id)
     if not row or not verify_password(body.current_password, row.password_hash):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")

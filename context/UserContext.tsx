@@ -109,6 +109,8 @@ function mapResume(r: any) {
 }
 
 function mapJob(j: any) {
+  // API/DB use snake_case; frontend state uses camelCase. Keep this mapper as the
+  // intentional boundary — do not read j.jobRole / j.role from API payloads.
   return {
     id: j.id,
     companyId: j.company_id,
@@ -117,10 +119,15 @@ function mapJob(j: any) {
     vertical: j.department,
     department: j.department,
     location: j.location,
+    country: j.country,
+    state: j.state,
+    city: j.city,
     employmentType: j.employment_type,
     jobType: j.job_type
       ? String(j.job_type).charAt(0).toUpperCase() + String(j.job_type).slice(1)
       : undefined,
+    jobRole: j.job_role ?? null,
+    jobLevel: j.job_level ?? null,
     salaryMin: j.min_salary != null ? String(j.min_salary) : '',
     salaryMax: j.max_salary != null ? String(j.max_salary) : '',
     salaryUnit: j.salary_unit || 'Per annum',
@@ -134,6 +141,7 @@ function mapJob(j: any) {
     openings: j.num_openings,
     deadline: j.application_deadline,
     status: j.status ? String(j.status).charAt(0).toUpperCase() + String(j.status).slice(1) : 'Draft',
+    // Populated by backend enrich_job: matched = application count; shortlisted = status=shortlisted
     matched: j.matched ?? 0,
     shortlisted: j.shortlisted ?? 0,
     date: j.created_at?.slice?.(0, 10) || j.created_at,

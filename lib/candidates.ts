@@ -9,6 +9,16 @@ export interface SearchCandidate {
   education: string;
   expectedSalaryLpa: number;
   noticePeriodDays: number;
+  /** Same shape as API template rationale (not LLM-generated). */
+  rationale?: string | null;
+}
+
+/** Mirrors apps/api candidate_search_service / fitment_service template strings. */
+export function templateFitmentRationale(skills: string[]): string {
+  const top = skills.slice(0, 3);
+  return top.length
+    ? `Strong skills overlap in ${top.join(', ')}.`
+    : 'Profile match based on experience and vertical alignment.';
 }
 
 export const SEED_CANDIDATES: SearchCandidate[] = [
@@ -23,6 +33,7 @@ export const SEED_CANDIDATES: SearchCandidate[] = [
     education: 'Masters',
     expectedSalaryLpa: 18,
     noticePeriodDays: 30,
+    rationale: templateFitmentRationale(['Figma', 'UI Design', 'Prototyping']),
   },
   {
     id: 202,
@@ -35,6 +46,7 @@ export const SEED_CANDIDATES: SearchCandidate[] = [
     education: 'Bachelors',
     expectedSalaryLpa: 22,
     noticePeriodDays: 60,
+    rationale: templateFitmentRationale(['React', 'TypeScript', 'Next.js']),
   },
   {
     id: 203,
@@ -47,6 +59,7 @@ export const SEED_CANDIDATES: SearchCandidate[] = [
     education: 'Bachelors',
     expectedSalaryLpa: 10,
     noticePeriodDays: 15,
+    rationale: templateFitmentRationale(['Content Marketing', 'SEO', 'Google Analytics']),
   },
   {
     id: 204,
@@ -59,6 +72,7 @@ export const SEED_CANDIDATES: SearchCandidate[] = [
     education: 'Bachelors',
     expectedSalaryLpa: 8,
     noticePeriodDays: 45,
+    rationale: templateFitmentRationale(['Circuit Design', 'Embedded C', 'MATLAB']),
   },
   {
     id: 205,
@@ -71,6 +85,7 @@ export const SEED_CANDIDATES: SearchCandidate[] = [
     education: 'Masters',
     expectedSalaryLpa: 24,
     noticePeriodDays: 30,
+    rationale: templateFitmentRationale(['Figma', 'UX Design', 'Wireframing']),
   },
   {
     id: 206,
@@ -83,6 +98,7 @@ export const SEED_CANDIDATES: SearchCandidate[] = [
     education: 'Bachelors',
     expectedSalaryLpa: 14,
     noticePeriodDays: 90,
+    rationale: templateFitmentRationale(['Node.js', 'PostgreSQL', 'AWS']),
   },
   {
     id: 207,
@@ -95,6 +111,7 @@ export const SEED_CANDIDATES: SearchCandidate[] = [
     education: 'Bachelors',
     expectedSalaryLpa: 12,
     noticePeriodDays: 30,
+    rationale: templateFitmentRationale(['Salesforce', 'Lead Generation', 'Negotiation']),
   },
   {
     id: 208,
@@ -107,9 +124,9 @@ export const SEED_CANDIDATES: SearchCandidate[] = [
     education: 'Masters',
     expectedSalaryLpa: 11,
     noticePeriodDays: 0,
+    rationale: templateFitmentRationale(['SQL', 'Python', 'Google Analytics']),
   },
 ];
-
 export function matchLabel(pct: number): { label: string; tone: string } {
   if (pct >= 85) return { label: 'Excellent Match', tone: 'text-green-700 bg-green-50 border-green-200' };
   if (pct >= 70) return { label: 'Good Match', tone: 'text-emerald-700 bg-emerald-50 border-emerald-200' };

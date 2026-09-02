@@ -1,14 +1,15 @@
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from core.dependencies import CandidateUser, DbSession, check_plan_limit
 from models import CandidateProfile, CandidateSkill, Resume
 from schemas import ResumeGenerateRequest, ResumeOut
-from services.resume_service import generate_resume_for_vertical
+from services.resume_service import generate_resume_for_vertical, parse_resume_pdf
+from services.pdf_service import build_resume_pdf_response
+
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
 
@@ -128,97 +129,48 @@ async def improve(resume_id: UUID, user: CandidateUser, db: DbSession):
     return ResumeOut.model_validate(row)
 
 
+@router.get("/{resume_id}/download")
 @router.get("/{resume_id}/pdf")
 async def download_pdf(resume_id: UUID, user: CandidateUser, db: DbSession):
-    """Generate and return a PDF of the resume."""
     row = await db.get(Resume, resume_id)
     if not row or row.candidate_id != user.id:
-        raise HTTPException(status_code=404, detail="Not found")
+        raise HTTPException(status_code=404, detail="Resume not found")
 
-    from services.pdf_service import generate_pdf
-
-    # Get candidate name from profile
-    profile = await db.execute(
-        select(CandidateProfile).where(CandidateProfile.user_id == user.id)
+    profile = (
+        await db.execute(select(CandidateProfile).where(CandidateProfile.user_id == user.id))
+    ).scalar_one_or_none()
+    weblinks = (profile.weblinks or {}) if profile else {}
+    filename = f"resume_{row.target_vertical.replace(' ', '_').lower()}_v{row.version or 1}.pdf"
+    return build_resume_pdf_response(
+        resume_content=row.content or {},
+        email=user.email,
+        weblinks=weblinks,
+        filename=filename,
     )
-    candidate = profile.scalar_one_or_none()
-    candidate_name = "Candidate"
-    weblinks = {}
-    if candidate:
-        # Try to build a name from the profile; fall back to email
-        candidate_name = user.email.split("@")[0].replace(".", " ").title()
-        weblinks = candidate.weblinks or {}
 
-    content = row.content or {}
-    try:
-        pdf_bytes = generate_pdf(
-            resume_content=content,
-            candidate_name=candidate_name,
-            email=user.email,
-            weblinks=weblinks,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}")
-
-    # Determine content type
-    is_pdf = pdf_bytes[:4] == b"%PDF"
-    media_type = "application/pdf" if is_pdf else "text/html"
-    ext = "pdf" if is_pdf else "html"
-    filename = f"resume_{row.target_vertical.replace(' ', '_').lower()}_v{row.version or 1}.{ext}"
-
-    return Response(
-        content=pdf_bytes,
-        media_type=media_type,
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-        },
-    )
 
 from pydantic import BaseModel
+
 
 class TailoredResumeRequest(BaseModel):
     target_role: str
 
+
 @router.post("/download-tailored")
 async def download_tailored_resume(body: TailoredResumeRequest, user: CandidateUser, db: DbSession):
-    """Generate and return a PDF of a resume tailored to a specific role without saving it."""
+    """Generate and return a PDF tailored to a role without saving it."""
     await check_plan_limit(user, db, "resume_verticals", extra=1)
     profile = await _profile_with_skills(db, user.id)
     skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
-    
-    # Generate content using AI
     payload = await generate_resume_for_vertical(
         profile, body.target_role, skill_names, user_email=user.email
     )
-    content = payload["content"]
-
-    from services.pdf_service import generate_pdf
-    
-    # Get candidate name from profile
-    candidate_name = user.email.split("@")[0].replace(".", " ").title()
-    weblinks = profile.weblinks or {}
-
-    try:
-        pdf_bytes = generate_pdf(
-            resume_content=content,
-            candidate_name=candidate_name,
-            email=user.email,
-            weblinks=weblinks,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}")
-
-    is_pdf = pdf_bytes[:4] == b"%PDF"
-    media_type = "application/pdf" if is_pdf else "text/html"
-    ext = "pdf" if is_pdf else "html"
-    filename = f"resume_{body.target_role.replace(' ', '_').lower()}.{ext}"
-
-    return Response(
-        content=pdf_bytes,
-        media_type=media_type,
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-        },
+    filename = f"resume_{body.target_role.replace(' ', '_').lower()}.pdf"
+    return build_resume_pdf_response(
+        resume_content=payload["content"],
+        email=user.email,
+        weblinks=profile.weblinks or {},
+        filename=filename,
     )
 
 
@@ -226,98 +178,11 @@ async def download_tailored_resume(body: TailoredResumeRequest, user: CandidateU
 async def parse_resume(user: CandidateUser, db: DbSession, file: UploadFile = File(...)):
     await check_plan_limit(user, db, "resume_verticals", extra=1)
 
-    import io
-
-    import pypdf
-
-    from core.config import get_settings
     from core.upload_limits import validate_upload
-    from services.ai_client import AIServiceError, generate_content
-
-    settings = get_settings()
-    if not settings.groq_api_key:
-        raise HTTPException(
-            status_code=503,
-            detail="Resume parsing requires GROQ_API_KEY. Add it to apps/api/.env and restart the API.",
-        )
 
     data, _, _ = await validate_upload(file, "document")
     if not data.startswith(b"%PDF"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
 
-    try:
-        reader = pypdf.PdfReader(io.BytesIO(data))
-        text = ""
-        for page in reader.pages:
-            text += page.extract_text() + "\n"
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to read PDF: {exc}") from exc
-
-    prompt = f"""
-    You are an expert resume parser. Extract the following information from the provided resume text and return it as a structured JSON object.
-    
-    The JSON object MUST have this exact schema:
-    {{
-        "career_level": "Entry Level, Mid Level, or Senior Level",
-        "gender": "Male, Female, or Other",
-        "marital_status": "Single, Married, etc",
-        "present_address": "Full address",
-        "strengths": ["list", "of", "strengths"],
-        "weblinks": {{"LinkedIn": "url", "GitHub": "url"}},
-        "education": [
-            {{
-                "qualification_level": "Bachelor, Master, etc",
-                "degree": "Degree name",
-                "institute": "Institution name",
-                "field_of_study": "Major",
-                "passing_year": 2020,
-                "cgpa": "Grade"
-            }}
-        ],
-        "experience": [
-            {{
-                "company_name": "Company",
-                "role": "Role name",
-                "designation": "Designation",
-                "from_date": "YYYY-MM-DD",
-                "to_date": "YYYY-MM-DD",
-                "is_current": true/false,
-                "responsibilities": "Description of work"
-            }}
-        ],
-        "projects": [
-            {{
-                "project_name": "Project name",
-                "tools_used": "Tools used",
-                "from_date": "YYYY-MM-DD",
-                "to_date": "YYYY-MM-DD",
-                "responsibilities": "What they did"
-            }}
-        ],
-        "certifications": [
-            {{
-                "name": "Cert name",
-                "issuing_org": "Org"
-            }}
-        ],
-        "skills": ["Python", "React", "SQL"]
-    }}
-
-    If a field is not found in the resume, omit it or set it to null. Ensure dates are in YYYY-MM-DD format if possible, or null.
-    
-    RESUME TEXT:
-    {text[:15000]}
-    """
-    
-    try:
-        parsed_data = await generate_content(
-            prompt=prompt,
-            system_instruction="You are a strict JSON returning AI. You must return only the JSON.",
-            response_mime_type="application/json"
-        )
-        return parsed_data
-    except AIServiceError as exc:
-        raise HTTPException(status_code=502, detail=f"Groq AI unavailable: {exc}") from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to parse resume with AI: {exc}") from exc
+    return await parse_resume_pdf(db, user.id, data)
 

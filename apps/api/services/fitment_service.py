@@ -87,6 +87,7 @@ async def compute_fitment(db: AsyncSession, job: JobPosting, limit: int = 20) ->
             distance = float(row["distance"] or 0)
             # Convert L2 distance to 0-100-ish score
             score = max(40.0, min(98.0, 100.0 - distance * 25))
+            # Template rationale (interim — not LLM). Keep in sync with candidate_search_service.
             skills = ", ".join((job.required_skills or [])[:3]) or "core requirements"
             rationale = f"Strong skills overlap in {skills}."
             existing = await db.scalar(
@@ -148,3 +149,44 @@ async def compute_fitment(db: AsyncSession, job: JobPosting, limit: int = 20) ->
             results.append(fr)
     await db.flush()
     return results
+
+
+async def ranked_candidates_for_job(db: AsyncSession, job: JobPosting) -> list:
+    """Compute fitment and return FitmentCandidateOut-ready dicts sorted by score."""
+    from sqlalchemy.orm import selectinload
+
+    from models import CandidateProfile, CandidateSkill
+    from schemas import FitmentCandidateOut
+
+    results = await compute_fitment(db, job)
+    out: list[FitmentCandidateOut] = []
+    for fr in results:
+        profile = (
+            await db.execute(
+                select(CandidateProfile)
+                .options(
+                    selectinload(CandidateProfile.skills).selectinload(CandidateSkill.skill),
+                    selectinload(CandidateProfile.user),
+                )
+                .where(CandidateProfile.user_id == fr.candidate_id)
+            )
+        ).scalar_one_or_none()
+        skills = [cs.skill.name for cs in (profile.skills if profile else []) if cs.skill]
+        email = profile.user.email if profile and profile.user else None
+        name = email.split("@")[0].replace(".", " ").title() if email else "Candidate"
+        display_name = None
+        if profile and profile.weblinks:
+            display_name = profile.weblinks.get("display_name")
+        out.append(
+            FitmentCandidateOut(
+                candidate_id=fr.candidate_id,
+                name=display_name or name,
+                title=(profile.preferred_sectors or [None])[0] if profile else None,
+                score=fr.score,
+                rationale=fr.rationale,
+                skills=skills,
+                location=(profile.preferred_locations or [None])[0] if profile else None,
+            )
+        )
+    out.sort(key=lambda x: x.score, reverse=True)
+    return out

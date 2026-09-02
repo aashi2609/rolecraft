@@ -122,6 +122,9 @@ export default function SearchCandidatesPage() {
         education: c.education || 'Bachelor\'s',
         expectedSalaryLpa: c.expected_salary_lpa || 10,
         noticePeriodDays: c.notice_period_days || 30,
+        // Backend fitment rationale is currently template-based (not LLM) —
+        // e.g. "Strong skills overlap in React, TypeScript, Node.js."
+        rationale: c.rationale ?? null,
       }));
       
       setCandidates(transformed);
@@ -662,7 +665,8 @@ export default function SearchCandidatesPage() {
                 id: selectedCandidate.id,
                 name: selectedCandidate.name,
                 fitment: `${selectedCandidate.matchPercent}%`,
-                rationale: `Strong overlap on ${selectedCandidate.skills.slice(0, 2).join(', ')} for ${selectedCandidate.title} roles.`,
+                // Display API/template rationale only — do not invent a different frontend string
+                rationale: selectedCandidate.rationale ?? undefined,
                 vertical: selectedCandidate.title,
                 badgeColor: 'bg-green-100 text-green-700',
                 isShortlisted: shortlisted.includes(selectedCandidate.id),
