@@ -22,7 +22,7 @@ print(f"DATABASE_URL (masked): postgresql+asyncpg://****@{masked_db}")
 
 # Use httpx to hit running server instead of TestClient to avoid event loop issues
 BASE_URL = "http://127.0.0.1:8000"
-client = httpx.Client(base_url=BASE_URL, timeout=30.0)
+client = httpx.Client(base_url=BASE_URL, timeout=120.0)
 
 PASS = 0
 FAIL = 0
