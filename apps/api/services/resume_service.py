@@ -18,7 +18,7 @@ from core.config import get_settings
 from services.ai_client import AIServiceError, generate_content
 from services.ats_scorer import ATSResult, score_resume
 from services.data_cleaner import CleanedProfile, clean_profile
-from services.fitment_service import embed_text
+from services.embedding_service import embed_text
 from services.vertical_prompts import classify_vertical, get_vertical_prompt
 
 logger = logging.getLogger(__name__)

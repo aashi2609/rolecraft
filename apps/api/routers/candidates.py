@@ -34,9 +34,15 @@ from schemas import (
     SkillsUpdate,
 )
 from services.candidate_search_service import search_candidates
+from services.embedding_service import refresh_resume_embeddings_for_candidate
 from services.profile_item_service import ProfileItemService
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
+
+
+async def _sync_candidate_embeddings(db: DbSession, candidate_id: UUID) -> None:
+    """Refresh resume vectors after profile/skills change (fitment uses resume embeddings)."""
+    await refresh_resume_embeddings_for_candidate(db, candidate_id)
 
 # Initialize profile item services
 _education_service = ProfileItemService(Education, EducationIn, EducationIn, EducationOut)
@@ -148,6 +154,7 @@ async def update_me(body: CandidateProfileUpdate, user: CandidateUser, db: DbSes
     for k, v in data.items():
         setattr(profile, k, v)
     await db.flush()
+    await _sync_candidate_embeddings(db, user.id)
     return _to_out(await _load_profile(db, user.id))
 
 
@@ -159,17 +166,23 @@ async def list_education(user: CandidateUser, db: DbSession):
 
 @router.post("/me/education", response_model=EducationOut)
 async def add_education(body: EducationIn, user: CandidateUser, db: DbSession):
-    return await _education_service.create_item(db, user.id, body)
+    out = await _education_service.create_item(db, user.id, body)
+    await _sync_candidate_embeddings(db, user.id)
+    return out
 
 
 @router.put("/me/education/{item_id}", response_model=EducationOut)
 async def update_education(item_id: UUID, body: EducationIn, user: CandidateUser, db: DbSession):
-    return await _education_service.update_item(db, item_id, user.id, body)
+    out = await _education_service.update_item(db, item_id, user.id, body)
+    await _sync_candidate_embeddings(db, user.id)
+    return out
 
 
 @router.delete("/me/education/{item_id}")
 async def delete_education(item_id: UUID, user: CandidateUser, db: DbSession):
-    return await _education_service.delete_item(db, item_id, user.id)
+    result = await _education_service.delete_item(db, item_id, user.id)
+    await _sync_candidate_embeddings(db, user.id)
+    return result
 
 
 # Certifications
@@ -180,17 +193,23 @@ async def list_certs(user: CandidateUser, db: DbSession):
 
 @router.post("/me/certifications", response_model=CertificationOut)
 async def add_cert(body: CertificationIn, user: CandidateUser, db: DbSession):
-    return await _certification_service.create_item(db, user.id, body)
+    out = await _certification_service.create_item(db, user.id, body)
+    await _sync_candidate_embeddings(db, user.id)
+    return out
 
 
 @router.put("/me/certifications/{item_id}", response_model=CertificationOut)
 async def update_cert(item_id: UUID, body: CertificationIn, user: CandidateUser, db: DbSession):
-    return await _certification_service.update_item(db, item_id, user.id, body)
+    out = await _certification_service.update_item(db, item_id, user.id, body)
+    await _sync_candidate_embeddings(db, user.id)
+    return out
 
 
 @router.delete("/me/certifications/{item_id}")
 async def delete_cert(item_id: UUID, user: CandidateUser, db: DbSession):
-    return await _certification_service.delete_item(db, item_id, user.id)
+    result = await _certification_service.delete_item(db, item_id, user.id)
+    await _sync_candidate_embeddings(db, user.id)
+    return result
 
 
 # Experience
@@ -201,17 +220,23 @@ async def list_exp(user: CandidateUser, db: DbSession):
 
 @router.post("/me/experience", response_model=ExperienceOut)
 async def add_exp(body: ExperienceIn, user: CandidateUser, db: DbSession):
-    return await _experience_service.create_item(db, user.id, body)
+    out = await _experience_service.create_item(db, user.id, body)
+    await _sync_candidate_embeddings(db, user.id)
+    return out
 
 
 @router.put("/me/experience/{item_id}", response_model=ExperienceOut)
 async def update_exp(item_id: UUID, body: ExperienceIn, user: CandidateUser, db: DbSession):
-    return await _experience_service.update_item(db, item_id, user.id, body)
+    out = await _experience_service.update_item(db, item_id, user.id, body)
+    await _sync_candidate_embeddings(db, user.id)
+    return out
 
 
 @router.delete("/me/experience/{item_id}")
 async def delete_exp(item_id: UUID, user: CandidateUser, db: DbSession):
-    return await _experience_service.delete_item(db, item_id, user.id)
+    result = await _experience_service.delete_item(db, item_id, user.id)
+    await _sync_candidate_embeddings(db, user.id)
+    return result
 
 
 # Projects
@@ -222,17 +247,23 @@ async def list_projects(user: CandidateUser, db: DbSession):
 
 @router.post("/me/projects", response_model=ProjectOut)
 async def add_project(body: ProjectIn, user: CandidateUser, db: DbSession):
-    return await _project_service.create_item(db, user.id, body)
+    out = await _project_service.create_item(db, user.id, body)
+    await _sync_candidate_embeddings(db, user.id)
+    return out
 
 
 @router.put("/me/projects/{item_id}", response_model=ProjectOut)
 async def update_project(item_id: UUID, body: ProjectIn, user: CandidateUser, db: DbSession):
-    return await _project_service.update_item(db, item_id, user.id, body)
+    out = await _project_service.update_item(db, item_id, user.id, body)
+    await _sync_candidate_embeddings(db, user.id)
+    return out
 
 
 @router.delete("/me/projects/{item_id}")
 async def delete_project(item_id: UUID, user: CandidateUser, db: DbSession):
-    return await _project_service.delete_item(db, item_id, user.id)
+    result = await _project_service.delete_item(db, item_id, user.id)
+    await _sync_candidate_embeddings(db, user.id)
+    return result
 
 
 # Skills
@@ -271,6 +302,7 @@ async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
             db.add(CandidateSkill(candidate_id=user.id, skill_id=skill.id))
             linked.add(skill.id)
     await db.flush()
+    await _sync_candidate_embeddings(db, user.id)
     return {"skills": unique_names}
 
 

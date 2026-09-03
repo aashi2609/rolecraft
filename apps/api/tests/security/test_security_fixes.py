@@ -20,13 +20,6 @@ from services import resume_service
 settings = get_settings()
 
 
-@pytest.fixture(scope="module")
-def client():
-    # Module-scoped: shared async engine must not outlive the TestClient event loop
-    with TestClient(app) as c:
-        yield c
-
-
 def _signup(client: TestClient, email: str, role: str, password: str = "testpass123A") -> dict:
     r = client.post(
         "/auth/signup",

@@ -8,6 +8,7 @@ from models import Application, ApplicationStatus, Company, JobPosting, JobStatu
 from schemas import FitmentCandidateOut, JobCreate, JobOut, JobStatusUpdate, JobUpdate
 from services.fitment_service import ranked_candidates_for_job
 from services.job_search_service import search_jobs, enrich_job
+from services.embedding_service import refresh_job_embedding
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -58,6 +59,7 @@ async def create_job(body: JobCreate, user: CompanyUser, db: DbSession):
     )
     db.add(job)
     await db.flush()
+    await refresh_job_embedding(db, job)
     return await enrich_job(db, job)
 
 
@@ -73,6 +75,7 @@ async def list_jobs(
     exclude_state: str | None = Query(None, description="Comma-separated states to exclude"),
     exclude_city: str | None = Query(None, description="Comma-separated cities to exclude"),
     employment_type: str | None = None,
+    job_type: str | None = None,
     experience_range: str | None = None,
     vertical: str | None = None,
     job_role: str | None = None,
@@ -94,6 +97,7 @@ async def list_jobs(
         exclude_state=exclude_state,
         exclude_city=exclude_city,
         employment_type=employment_type,
+        job_type=job_type,
         experience_range=experience_range,
         vertical=vertical,
         job_role=job_role,
@@ -144,6 +148,7 @@ async def update_job(job_id: UUID, body: JobUpdate, user: CompanyUser, db: DbSes
     for k, v in data.items():
         setattr(job, k, v)
     await db.flush()
+    await refresh_job_embedding(db, job)
     return await enrich_job(db, job)
 
 

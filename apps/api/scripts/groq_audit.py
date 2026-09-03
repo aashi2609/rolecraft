@@ -127,7 +127,7 @@ async def main() -> None:
     print()
 
     print("=== TEST 3: Fitment rationale ===")
-    print("  NOT APPLICABLE — fitment_service uses deterministic mock embeddings + template rationale; no Groq call.")
+    print("  NOT APPLICABLE — embeddings use EMBEDDING_API_KEY (OpenAI-compatible) or mock fallback; no Groq call.")
     print()
 
     print("=== TEST 4: PDF parse prompt (minimal generate_content) ===")

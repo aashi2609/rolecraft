@@ -6,7 +6,7 @@ from typing import Optional
 from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
-from models import Application, ApplicationStatus, Company, JobPosting, JobStatus
+from models import Application, ApplicationStatus, Company, JobPosting, JobStatus, JobType
 from schemas import JobOut
 
 
@@ -74,6 +74,16 @@ def apply_experience_range_filter(query, experience_range: Optional[str]):
     if not experience_range:
         return query
     return query.where(JobPosting.experience_range.ilike(f"%{experience_range}%"))
+
+
+def apply_job_type_filter(query, job_type: Optional[str]):
+    """Apply remote/hybrid/onsite filter."""
+    if not job_type:
+        return query
+    try:
+        return query.where(JobPosting.job_type == JobType(job_type.lower()))
+    except ValueError:
+        return query
 
 
 def apply_vertical_filter(query, vertical: Optional[str]):
@@ -193,6 +203,7 @@ async def search_jobs(
     exclude_state: Optional[str] = None,
     exclude_city: Optional[str] = None,
     employment_type: Optional[str] = None,
+    job_type: Optional[str] = None,
     experience_range: Optional[str] = None,
     vertical: Optional[str] = None,
     job_role: Optional[str] = None,
@@ -217,6 +228,7 @@ async def search_jobs(
     query = apply_state_filter(query, state)
     query = apply_city_filter(query, city)
     query = apply_employment_type_filter(query, employment_type)
+    query = apply_job_type_filter(query, job_type)
     query = apply_experience_range_filter(query, experience_range)
     query = apply_vertical_filter(query, vertical)
     query = apply_job_role_filter(query, job_role)

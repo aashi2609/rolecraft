@@ -412,8 +412,10 @@ export const subscriptionsApi = {
 };
 
 export const analyticsApi = {
-  candidate: (days: number = 30) => api(`/analytics/candidate?days=${days}`),
-  company: (days: number = 30) => api(`/analytics/company?days=${days}`),
+  candidate: (days: number = 30) =>
+    api<import('@/lib/analytics').CandidateAnalytics>(`/analytics/candidate?days=${days}`),
+  company: (days: number = 30) =>
+    api<import('@/lib/analytics').CompanyAnalytics>(`/analytics/company?days=${days}`),
 };
 
 export const uploadsApi = {

@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from models import CandidateProfile, CandidateSkill, Education, Experience, Skill, User
 from schemas import CandidateSearchOut
+from services.fitment_rationale_service import template_rationale
 
 
 def apply_keyword_filter(query, q: Optional[str]):
@@ -38,11 +39,22 @@ def apply_keyword_filter(query, q: Optional[str]):
 
 
 def apply_location_filter(query, location: Optional[str]):
-    """Apply location filter (matches present_address)."""
+    """Match present_address or preferred_locations (comma-separated OR)."""
     if not location:
         return query
-    location_lower = f"%{location.lower()}%"
-    return query.where(CandidateProfile.present_address.ilike(location_lower))
+    parts = [p.strip() for p in location.split(",") if p.strip()]
+    if not parts:
+        return query
+    loc_conditions = []
+    for part in parts:
+        pattern = f"%{part.lower()}%"
+        loc_conditions.append(CandidateProfile.present_address.ilike(pattern))
+        loc_conditions.append(CandidateProfile.permanent_address.ilike(pattern))
+        # preferred_locations is ARRAY(String) — cast to text for ilike
+        loc_conditions.append(
+            func.array_to_string(CandidateProfile.preferred_locations, ",").ilike(pattern)
+        )
+    return query.where(or_(*loc_conditions))
 
 
 def apply_skills_filter(query, skills: Optional[str]):
@@ -215,14 +227,8 @@ def transform_profile_to_search_out(profile: CandidateProfile, salary_min: Optio
             return None
     
     match_score = calculate_match_score(skill_names, exp_years)
-    
-    # Template rationale (interim — not LLM). Same shape as fitment_service.
-    top_skills = skill_names[:3] if skill_names else []
-    if top_skills:
-        rationale = f"Strong skills overlap in {', '.join(top_skills)}."
-    else:
-        rationale = "Profile match based on experience and vertical alignment."
-    
+    rationale = template_rationale(skill_names, skill_names)
+
     return CandidateSearchOut(
         id=profile.user_id,
         name=profile.user.email.split("@")[0].replace(".", " ").title() if profile.user else None,
@@ -236,6 +242,7 @@ def transform_profile_to_search_out(profile: CandidateProfile, salary_min: Optio
         notice_period_days=30,  # Default notice period (can be calculated from gaps)
         photo_url=profile.photo_url,
         rationale=rationale,
+        rationale_source="template",
     )
 
 

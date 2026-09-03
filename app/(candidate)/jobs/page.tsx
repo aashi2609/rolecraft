@@ -114,6 +114,13 @@ export default function JobSearchPage() {
     if (searchTerm.trim()) params.title = searchTerm.trim();
     if (location.trim()) params.location = location.trim();
     if (experience) params.experience_range = experience;
+    if (jobType && fullFilters) params.job_type = jobType.toLowerCase();
+    if (employmentType && fullFilters) params.employment_type = employmentType;
+    if (jobRole && fullFilters) params.job_role = jobRole;
+    if (jobLevel && fullFilters) params.job_level = jobLevel;
+    if (country) params.country = country;
+    if (state) params.state = state;
+    if (excludeLocation && fullFilters) params.exclude_city = excludeLocation;
     if (salaryBand && fullFilters) {
       const minLpa =
         salaryBand === '0-8' ? 0 : salaryBand === '8-15' ? 8 : salaryBand === '15-25' ? 15 : 25;
@@ -123,72 +130,7 @@ export default function JobSearchPage() {
       .list(params)
       .then((raw) => setListedJobs((raw || []).map(mapJobFromApi)))
       .catch(() => setListedJobs(jobs));
-  }, [searchTerm, location, experience, salaryBand, fullFilters, jobs]);
-
-  const filtered = useMemo(() => {
-    let list = listedJobs.filter(
-      (job) => job.status === 'Live' && !hiddenJobIds.includes(String(job.id))
-    );
-
-    const q = searchTerm.trim().toLowerCase();
-    if (q) {
-      list = list.filter(
-        (j) =>
-          j.title.toLowerCase().includes(q) ||
-          j.companyName.toLowerCase().includes(q) ||
-          (j.skills || []).some((s: string) => s.toLowerCase().includes(q))
-      );
-    }
-    if (location) {
-      list = list.filter((j) =>
-        String(j.location).toLowerCase().includes(location.toLowerCase().split(',')[0])
-      );
-    }
-    if (experience) {
-      list = list.filter((j) => String(j.experience || '').includes(experience.split(' ')[0]));
-    }
-    if (jobType && fullFilters) {
-      list = list.filter((j) => j.jobType === jobType || j.employmentType === jobType);
-    }
-    if (employmentType && fullFilters) {
-      list = list.filter((j) => j.employmentType === employmentType);
-    }
-    if (salaryBand && fullFilters) {
-      // Soft filter by min salary bands in LPA (approx)
-      const minLpa =
-        salaryBand === '0-8' ? 0 : salaryBand === '8-15' ? 8 : salaryBand === '15-25' ? 15 : 25;
-      list = list.filter((j) => {
-        const max = Number(j.salaryMax || j.salaryMin || 0) / 100000;
-        return max === 0 || max >= minLpa;
-      });
-    }
-    if (jobRole && fullFilters) {
-      list = list.filter((j) => String(j.jobRole || '').toLowerCase() === jobRole.toLowerCase() || String(j.title).toLowerCase().includes(jobRole.toLowerCase()));
-    }
-    if (jobLevel && fullFilters) {
-      list = list.filter((j) => String(j.jobLevel || '').toLowerCase() === jobLevel.toLowerCase());
-    }
-    if (country) {
-      list = list.filter((j) => String(j.country || j.location || '').toLowerCase().includes(country.toLowerCase()));
-    }
-    if (state) {
-      list = list.filter((j) => String(j.state || j.location || '').toLowerCase().includes(state.toLowerCase()));
-    }
-    if (excludeLocation && fullFilters) {
-      const excludes = excludeLocation.toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
-      list = list.filter((j) => {
-        const locStr = String(j.location || '') + ' ' + String(j.city || '') + ' ' + String(j.state || '') + ' ' + String(j.country || '');
-        return !excludes.some(ex => locStr.toLowerCase().includes(ex));
-      });
-    }
-
-    if (sort === 'recent') {
-      list = [...list].sort((a, b) => String(b.date).localeCompare(String(a.date)));
-    }
-    return list;
   }, [
-    listedJobs,
-    hiddenJobIds,
     searchTerm,
     location,
     experience,
@@ -200,9 +142,19 @@ export default function JobSearchPage() {
     state,
     excludeLocation,
     salaryBand,
-    sort,
     fullFilters,
+    jobs,
   ]);
+
+  const filtered = useMemo(() => {
+    let list = listedJobs.filter(
+      (job) => job.status === 'Live' && !hiddenJobIds.includes(String(job.id))
+    );
+    if (sort === 'recent') {
+      list = [...list].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    }
+    return list;
+  }, [listedJobs, hiddenJobIds, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);

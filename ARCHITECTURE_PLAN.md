@@ -27,7 +27,7 @@ rolecraft/                          # Next.js 16 frontend (App Router)
 | DB | Neon Postgres + pgvector |
 | Auth | JWT (python-jose, bcrypt); roles: candidate / company / admin |
 | AI | **Groq** for resume generate / ATS / PDF parse; deterministic fallbacks without key |
-| Fitment | Mock/heuristic embeddings + **template** rationales (not LLM text yet) |
+| Fitment | OpenAI-compatible embeddings (`EMBEDDING_API_KEY`) + Groq LLM rationales (template fallback) |
 | Storage | Local `uploads/` or GCS |
 | Payments | Mock (Stripe/Razorpay later) |
 
@@ -42,9 +42,9 @@ rolecraft/                          # Next.js 16 frontend (App Router)
 | Area | Status | Notes |
 |------|--------|--------|
 | Backend product APIs | **~95%** | CRUD, search, applications, messages, admin, analytics router |
-| Frontend product UI | **~90%** | Full role flows; search/jobs API-backed |
-| AI features | **~50%** | Groq live for resume/ATS/parse; fitment still template/heuristic |
-| Production readiness | **~40%** | Security fixes + tests in place; staging/CI/monitoring open |
+| Frontend product UI | **~92%** | Full role flows; analytics dashboard wired with export |
+| AI features | **~75%** | Groq for resume/ATS/parse + rationales; OpenAI-compatible embeddings when keyed |
+| Production readiness | **~45%** | Security tests + staging CI workflow; deploy/monitoring open |
 
 ---
 
@@ -59,15 +59,21 @@ rolecraft/                          # Next.js 16 frontend (App Router)
 - [x] **Services extracted from fat routers:** `candidate_search_service`, `job_search_service`, `resume_service`, `pdf_service`, `subscription_service`, `admin_service`, `fitment_service`, `profile_item_service`
 - [x] Schema tightening: salaries `ge=0` + max≥min; experience dates; job/application status Literals; JobOut enum coerce (fixed POST `/jobs` 500)
 - [x] `job_role` / `job_level` persisted correctly (company form no longer sends bare `role` / `level`)
-- [x] Fitment rationale documented as template-based; company UI shows API `rationale`
-- [x] Tests: `tests/security/*`, `tests/test_schema_validation.py` (require `.venv313` / Python 3.13)
+- [x] Fitment rationale via `fitment_rationale_service` (Groq + template fallback); `rationale_source` on API + company UI
+- [x] `embedding_service` — refresh job/resume vectors on profile and job updates
+- [x] Server-side job filters wired in candidate jobs page; company candidate `locations` → API `location`
+- [x] Tests: `tests/test_fitment_rationale_service.py`; CI workflow `.github/workflows/ci.yml`
+- [x] OpenAI-compatible embeddings via `embedding_client` (`EMBEDDING_API_KEY`; mock fallback)
+- [x] Analytics — `analytics_service` with 60s cache, typed schemas, CSV export + refresh in UI
+- [x] `job_type` filter on `GET /jobs` (remote/hybrid/onsite)
 
 ### Frontend
 - [x] Candidate / company / admin App Router flows
 - [x] Company candidate search → `GET /candidates/search` (SEED only as offline fallback)
 - [x] Job list/detail mappers include `jobRole` / `jobLevel`
 - [x] Plan gating, pricing/checkout (mock pay), settings subscriptions
-- [x] Fitment modal: API rationale + “template-based, not AI” note
+- [x] Fitment modal: API rationale + LLM vs template note via `rationaleSource`
+- [x] Candidate / company analytics dashboards wired to `/analytics` with export
 
 ### Ops / tooling
 - [x] Neon + Alembic migrations; `scripts/enable_pgvector.sql`
@@ -79,11 +85,7 @@ rolecraft/                          # Next.js 16 frontend (App Router)
 ## 4. Left to do
 
 ### High priority
-- [ ] **LLM fitment rationales** — replace template strings; keep UI binding to `rationale`
-- [ ] **Real embeddings** — reduce mock/deterministic vectors; refresh on profile change
 - [ ] **Staging deploy** — Cloud Run + Vercel (or equivalent) with secrets, CORS locked down
-- [ ] **Analytics UI** — wire candidate/company analytics pages fully to `/analytics` (router exists; export/caching polish TBD)
-- [ ] Prefer **server-side** filters wherever the API already supports them (reduce remaining client-only filter paths)
 
 ### Medium priority
 - [ ] AI double-check shortlist (LLM validation of top fitment hits)
@@ -104,22 +106,23 @@ rolecraft/                          # Next.js 16 frontend (App Router)
 | Router | Primary services / notes |
 |--------|---------------------------|
 | `auth` | Core security; Pydantic signup/password rules |
-| `candidates` | `ProfileItemService`, `candidate_search_service` |
-| `jobs` | `job_search_service.enrich_job` / `search_jobs`, `fitment_service` |
+| `candidates` | `ProfileItemService`, `candidate_search_service`, `embedding_service` (profile sync) |
+| `jobs` | `job_search_service`, `fitment_service`, `embedding_service` (job sync) |
 | `resumes` | `resume_service`, `pdf_service`, Groq via `ai_client` |
 | `applications` | Auto-resume via `get_or_generate_resume` |
 | `notifications` (+ uploads/subscriptions) | `storage_service`, `subscription_service`, `upload_limits` |
 | `admin` | `admin_service` |
-| `messages` / `analytics` / `companies` | Domain routers |
+| `messages` / `analytics` / `companies` | `analytics_service` (cached aggregates), domain routers |
 
 ---
 
 ## 6. Phased roadmap (remaining work only)
 
 ### Phase A — AI fitment honesty → quality
-1. Keep template rationale until LLM path ships; never invent frontend strings.
-2. Add Groq (or equivalent) rationale generation behind a flag; store on `FitmentResult`.
-3. Improve embedding pipeline + invalidate on profile/resume change.
+1. ~~Keep template rationale until LLM path ships~~ — LLM path live behind `FITMENT_LLM_RATIONALES`.
+2. ~~Add Groq rationale generation~~ — `fitment_rationale_service`; candidate search stays template-only.
+3. ~~Invalidate embeddings on profile/resume change~~ — `embedding_service` hooks on profile CRUD + job create/update.
+4. Swap mock embeddings for a real provider when chosen. → **Done:** `EMBEDDING_API_KEY` + OpenAI-compatible API; mock fallback retained.
 
 ### Phase B — Payments & subscriptions
 1. Provider SDK + webhooks.
@@ -127,7 +130,7 @@ rolecraft/                          # Next.js 16 frontend (App Router)
 3. Invoices (optional PDF).
 
 ### Phase C — Production
-1. Staging envs; CI running `pytest` on 3.13 + frontend lint/build.
+1. ~~Staging CI~~ — GitHub Actions runs pytest (3.13) + frontend lint/build; staging env deploy TBD.
 2. Monitoring, rate limits, secret rotation.
 3. Load-test search/fitment under concurrency.
 
@@ -157,7 +160,7 @@ Known deferred dependency CVEs: see root README security section (`python-jose` 
 cd apps/api
 .\.venv313\Scripts\activate   # Windows
 $env:PYTHONPATH="."
-python -m pytest tests/security tests/test_schema_validation.py -v
+python -m pytest tests/security tests/test_schema_validation.py tests/test_fitment_rationale_service.py tests/test_embedding_service.py tests/test_analytics_service.py -v
 
 # Optional Groq smoke
 python scripts/groq_audit.py

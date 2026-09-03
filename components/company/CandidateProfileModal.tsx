@@ -59,7 +59,9 @@ export function CandidateProfileModal({ candidate, isOpen, onClose }: CandidateP
                     : 'No fitment rationale available for this candidate.'}
                 </p>
                 <p className="mt-2 text-xs text-ink-muted">
-                  Template-based match summary (not AI-generated).
+                  {candidate.rationaleSource === 'llm'
+                    ? 'AI-generated match summary (Groq).'
+                    : 'Template-based match summary (deterministic fallback).'}
                 </p>
               </div>
 

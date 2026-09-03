@@ -1,34 +1,55 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/Card';
 import { AnalyticsChart } from '@/components/ui/AnalyticsChart';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { BarChart3, TrendingUp, Users, ClipboardList, Briefcase } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { BarChart3, TrendingUp, ClipboardList, Briefcase, Download, RefreshCw } from 'lucide-react';
 import { analyticsApi } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
+import {
+  APPLICATION_STATUS_LABELS,
+  CompanyAnalytics,
+  companyAnalyticsToCsv,
+  downloadAnalyticsCsv,
+} from '@/lib/analytics';
 
 export default function CompanyAnalyticsPage() {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [analytics, setAnalytics] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<CompanyAnalytics | null>(null);
   const [days, setDays] = useState(30);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     setLoading(true);
     try {
       const data = await analyticsApi.company(days);
       setAnalytics(data);
-    } catch (error) {
+    } catch {
       showToast('error', 'Failed to load analytics data');
+      setAnalytics(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, [days, showToast]);
 
   useEffect(() => {
     fetchAnalytics();
-  }, [days]);
+  }, [fetchAnalytics]);
+
+  const handleExport = () => {
+    if (!analytics) return;
+    const { summary, statuses, trend } = companyAnalyticsToCsv(analytics);
+    downloadAnalyticsCsv(`company-analytics-summary-${days}d.csv`, summary);
+    if (statuses.length) {
+      downloadAnalyticsCsv(`company-analytics-status-${days}d.csv`, statuses);
+    }
+    if (trend.length) {
+      downloadAnalyticsCsv(`company-analytics-trend-${days}d.csv`, trend);
+    }
+    showToast('success', 'Analytics exported');
+  };
 
   if (loading) {
     return (
@@ -41,39 +62,43 @@ export default function CompanyAnalyticsPage() {
   if (!analytics) {
     return (
       <div className="py-8 px-4 md:px-8 max-w-6xl mx-auto">
-        <Card className="text-center py-16">
+        <Card className="text-center py-16 space-y-4">
           <p className="text-muted-foreground">Failed to load analytics data</p>
+          <Button variant="outline" onClick={fetchAnalytics}>
+            <RefreshCw className="w-4 h-4 mr-2" /> Retry
+          </Button>
         </Card>
       </div>
     );
   }
 
-  const statusLabels = {
-    applied: 'Applied',
-    shortlisted: 'Shortlisted',
-    rejected: 'Rejected',
-    interview: 'Interview',
-  };
-
   return (
     <div className="py-8 px-4 md:px-8 max-w-6xl mx-auto space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Hiring Analytics</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Monitor job posting engagement, applicant fitment scores, and response times.
+            Monitor job engagement, applicant fitment scores, and response rates.
           </p>
         </div>
-        <select
-          value={days}
-          onChange={(e) => setDays(Number(e.target.value))}
-          className="px-3 py-2 border rounded-lg bg-background"
-        >
-          <option value={7}>Last 7 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={90}>Last 90 days</option>
-          <option value={365}>Last year</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value))}
+            className="px-3 py-2 border rounded-lg bg-background"
+          >
+            <option value={7}>Last 7 days</option>
+            <option value={30}>Last 30 days</option>
+            <option value={90}>Last 90 days</option>
+            <option value={365}>Last year</option>
+          </select>
+          <Button variant="outline" onClick={fetchAnalytics} aria-label="Refresh analytics">
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="w-4 h-4 mr-2" /> Export CSV
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -119,8 +144,10 @@ export default function CompanyAnalyticsPage() {
         <div className="space-y-3">
           {Object.entries(analytics.status_distribution).map(([status, count]) => (
             <div key={status} className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">{statusLabels[status as keyof typeof statusLabels] || status}</span>
-              <span className="font-semibold text-foreground">{count as number}</span>
+              <span className="text-sm text-muted-foreground">
+                {APPLICATION_STATUS_LABELS[status] || status}
+              </span>
+              <span className="font-semibold text-foreground">{count}</span>
             </div>
           ))}
           {Object.keys(analytics.status_distribution).length === 0 && (

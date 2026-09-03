@@ -100,7 +100,11 @@ export default function SearchCandidatesPage() {
       };
       
       if (search.trim()) params.q = search.trim();
-      if (locationQuery) params.location = locationQuery;
+      const locParts = [
+        ...(locationQuery.trim() ? [locationQuery.trim()] : []),
+        ...locations,
+      ];
+      if (locParts.length) params.location = locParts.join(',');
       if (skills.length) params.skills = skills.join(',');
       if (jobTitle) params.title = jobTitle;
       if (expRange[0] > 0) params.experience_min = expRange[0];
@@ -125,6 +129,7 @@ export default function SearchCandidatesPage() {
         // Backend fitment rationale is currently template-based (not LLM) —
         // e.g. "Strong skills overlap in React, TypeScript, Node.js."
         rationale: c.rationale ?? null,
+        rationaleSource: c.rationale_source ?? 'template',
       }));
       
       setCandidates(transformed);
@@ -667,6 +672,7 @@ export default function SearchCandidatesPage() {
                 fitment: `${selectedCandidate.matchPercent}%`,
                 // Display API/template rationale only — do not invent a different frontend string
                 rationale: selectedCandidate.rationale ?? undefined,
+                rationaleSource: selectedCandidate.rationaleSource,
                 vertical: selectedCandidate.title,
                 badgeColor: 'bg-green-100 text-green-700',
                 isShortlisted: shortlisted.includes(selectedCandidate.id),

@@ -393,6 +393,7 @@ class FitmentCandidateOut(BaseModel):
     title: Optional[str] = None
     score: float
     rationale: Optional[str] = None
+    rationale_source: Optional[Literal["llm", "template"]] = None
     skills: list[str] = []
     location: Optional[str] = None
     experience_years: Optional[int] = None
@@ -493,3 +494,30 @@ class CandidateSearchOut(ORMModel):
     notice_period_days: Optional[int] = None
     photo_url: Optional[str] = None
     rationale: Optional[str] = None
+    rationale_source: Optional[Literal["llm", "template"]] = None
+
+
+# ── Analytics ────────────────────────────────────────────────────────────────────
+
+class TrendPointOut(BaseModel):
+    date: str
+    count: int
+
+
+class CandidateAnalyticsOut(BaseModel):
+    period_days: int
+    total_applications: int
+    saved_jobs: int
+    average_fitment_score: float
+    status_distribution: dict[str, int]
+    application_trend: list[TrendPointOut]
+
+
+class CompanyAnalyticsOut(BaseModel):
+    period_days: int
+    total_jobs: int
+    total_applications: int
+    average_fitment_score: float
+    status_distribution: dict[str, int]
+    response_rate: float
+    application_trend: list[TrendPointOut]

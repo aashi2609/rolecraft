@@ -35,7 +35,7 @@ Browser → NEXT_PUBLIC_API_URL → apps/api routers → services → Neon
 
 **Done recently:** service-layer extraction, `ProfileItemService` CRUD, schema hardening, upload limits, CORS/IDOR/plan-limit fixes, API-backed candidate search, fitment rationale wiring, draft-job create fix, security pytest suite.
 
-**Still open:** LLM fitment text, better embeddings, staging/CI/monitoring, real payments, analytics UI polish. Full checklist → [`ARCHITECTURE_PLAN.md`](ARCHITECTURE_PLAN.md).
+**Still open:** staging deploy, real payments, broader E2E coverage. Full checklist → [`ARCHITECTURE_PLAN.md`](ARCHITECTURE_PLAN.md).
 
 ---
 

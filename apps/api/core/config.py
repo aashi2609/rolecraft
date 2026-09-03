@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     groq_model: str = "openai/gpt-oss-20b"
     groq_ats_model: str = "openai/gpt-oss-20b"
+    fitment_llm_rationales: bool = True
+    embedding_api_key: str = ""
+    embedding_model: str = "text-embedding-3-small"
+    embedding_api_base: str = "https://api.openai.com/v1"
     resume_max_fix_iterations: int = 3
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     environment: str = "development"

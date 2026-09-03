@@ -1,67 +1,28 @@
-"""Stage-1 fitment — embedding stub + pgvector similarity when available."""
+"""Stage-1 fitment — embedding similarity + skill heuristic; LLM rationales on ranked output."""
 
 from __future__ import annotations
 
-import hashlib
-import math
-import random
-from typing import Optional
 from uuid import UUID
-
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.config import get_settings
 from models import FitmentResult, JobPosting, Resume
-
-settings = get_settings()
-EMBED_DIM = 1536
-
-
-def _mock_embedding(text: str) -> list[float]:
-    """Deterministic pseudo-embedding so similarity is stable without Gemini."""
-    seed = int(hashlib.sha256(text.encode()).hexdigest()[:16], 16)
-    rng = random.Random(seed)
-    vec = [rng.uniform(-1, 1) for _ in range(EMBED_DIM)]
-    norm = math.sqrt(sum(x * x for x in vec)) or 1.0
-    return [x / norm for x in vec]
-
-
-async def embed_text(text: str) -> list[float]:
-    # Groq does not currently support embeddings via the OpenAI API format
-    # Using deterministic mock embeddings for now
-    return _mock_embedding(text)
+from services.embedding_service import refresh_job_embedding
+from services.fitment_rationale_service import generate_fitment_rationale, template_rationale
 
 
 async def ensure_job_embedding(db: AsyncSession, job: JobPosting) -> list[float]:
     if job.embedding is not None:
         return list(job.embedding)
-    blob = " ".join(
-        filter(
-            None,
-            [
-                job.title,
-                job.department,
-                job.description,
-                " ".join(job.required_skills or []),
-            ],
-        )
-    )
-    vec = await embed_text(blob or job.title)
-    job.embedding = vec
-    await db.flush()
-    return vec
+    await refresh_job_embedding(db, job)
+    return list(job.embedding)
 
 
 async def compute_fitment(db: AsyncSession, job: JobPosting, limit: int = 20) -> list[FitmentResult]:
-    """
-    Rank candidates by resume↔job embedding distance.
-    Falls back to skill-overlap heuristic if no embeddings exist.
-    """
+    """Rank candidates by resume↔job embedding distance; skill-overlap heuristic fallback."""
     await ensure_job_embedding(db, job)
 
-    # Try pgvector nearest-neighbor on resumes for this job's embedding
     try:
         rows = (
             await db.execute(
@@ -83,13 +44,11 @@ async def compute_fitment(db: AsyncSession, job: JobPosting, limit: int = 20) ->
 
     results: list[FitmentResult] = []
     if rows:
+        job_skills = list(job.required_skills or [])
         for row in rows:
             distance = float(row["distance"] or 0)
-            # Convert L2 distance to 0-100-ish score
             score = max(40.0, min(98.0, 100.0 - distance * 25))
-            # Template rationale (interim — not LLM). Keep in sync with candidate_search_service.
-            skills = ", ".join((job.required_skills or [])[:3]) or "core requirements"
-            rationale = f"Strong skills overlap in {skills}."
+            rationale = template_rationale(job_skills)
             existing = await db.scalar(
                 select(FitmentResult).where(
                     FitmentResult.job_id == job.id,
@@ -112,7 +71,6 @@ async def compute_fitment(db: AsyncSession, job: JobPosting, limit: int = 20) ->
         await db.flush()
         return results
 
-    # Heuristic fallback: skill overlap against all resumes
     resumes = (await db.execute(select(Resume))).scalars().all()
     job_skills = {s.lower() for s in (job.required_skills or [])}
     scored: list[tuple[UUID, float, str]] = []
@@ -125,7 +83,7 @@ async def compute_fitment(db: AsyncSession, job: JobPosting, limit: int = 20) ->
             base += 8
         score = min(96.0, float(base))
         rationale = (
-            f"Strong skills overlap in {', '.join(sorted(overlap)[:3])}."
+            template_rationale(list(job.required_skills or []), list(overlap))
             if overlap
             else "Partial profile match based on vertical alignment."
         )
@@ -152,7 +110,7 @@ async def compute_fitment(db: AsyncSession, job: JobPosting, limit: int = 20) ->
 
 
 async def ranked_candidates_for_job(db: AsyncSession, job: JobPosting) -> list:
-    """Compute fitment and return FitmentCandidateOut-ready dicts sorted by score."""
+    """Compute fitment; upgrade rationales via Groq when configured."""
     from sqlalchemy.orm import selectinload
 
     from models import CandidateProfile, CandidateSkill
@@ -177,16 +135,29 @@ async def ranked_candidates_for_job(db: AsyncSession, job: JobPosting) -> list:
         display_name = None
         if profile and profile.weblinks:
             display_name = profile.weblinks.get("display_name")
+
+        rationale, source = await generate_fitment_rationale(
+            job_title=job.title,
+            job_department=job.department,
+            job_skills=list(job.required_skills or []),
+            candidate_name=display_name or name,
+            candidate_title=(profile.preferred_sectors or [None])[0] if profile else None,
+            candidate_skills=skills,
+            score=fr.score,
+        )
+        fr.rationale = rationale
         out.append(
             FitmentCandidateOut(
                 candidate_id=fr.candidate_id,
                 name=display_name or name,
                 title=(profile.preferred_sectors or [None])[0] if profile else None,
                 score=fr.score,
-                rationale=fr.rationale,
+                rationale=rationale,
+                rationale_source=source,
                 skills=skills,
                 location=(profile.preferred_locations or [None])[0] if profile else None,
             )
         )
+    await db.flush()
     out.sort(key=lambda x: x.score, reverse=True)
     return out
