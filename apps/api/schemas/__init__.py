@@ -277,6 +277,33 @@ class CompanyOut(ORMModel):
 
 # ── Jobs ──────────────────────────────────────────────────────────────────────
 
+class JobParsedJDOut(BaseModel):
+    """Fields extracted from an uploaded job description."""
+    title: Optional[str] = None
+    job_role: Optional[str] = None
+    job_level: Optional[str] = None
+    experience_min: Optional[int] = None
+    experience_max: Optional[int] = None
+    experience_range: Optional[str] = None
+    min_salary: Optional[int] = None
+    max_salary: Optional[int] = None
+    salary_unit: Optional[str] = None
+    country: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    location: Optional[str] = None
+    employment_type: Optional[str] = None
+    job_type: Optional[str] = None
+    department: Optional[str] = None
+    description: Optional[str] = None
+    responsibilities: Optional[str] = None
+    requirements: Optional[str] = None
+    benefits: Optional[str] = None
+    required_skills: list[str] = []
+    parse_source: Optional[str] = None
+    parse_warning: Optional[str] = None
+
+
 class JobCreate(BaseModel):
     title: str
     department: Optional[str] = None

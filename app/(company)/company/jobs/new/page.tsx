@@ -79,6 +79,8 @@ function PostJobContent() {
   const [draft, setDraft] = useState<JobDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [parsingJd, setParsingJd] = useState(false);
+  const [jdParseNote, setJdParseNote] = useState<string | null>(null);
 
   const activeCount = jobs.filter((j) => j.status === 'Live' || j.status === 'Draft').length;
   const atCap = !editId && isFreePlan(plan) && activeCount >= maxJobPostings(plan);
@@ -131,6 +133,100 @@ function PostJobContent() {
 
   const setField = <K extends keyof JobDraft>(key: K, value: JobDraft[K]) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const applyParsedJd = (parsed: Awaited<ReturnType<typeof jobsApi.parseJd>>) => {
+    setDraft((prev) => {
+      const next = { ...prev };
+      if (parsed.title) next.title = parsed.title;
+      if (parsed.department) next.department = parsed.department;
+      if (parsed.job_role) next.role = parsed.job_role;
+      if (parsed.job_level) {
+        const matched = ['Internship', 'Entry', 'Mid', 'Senior', 'Director', 'Executive'].find(
+          (l) => parsed.job_level!.toLowerCase().includes(l.toLowerCase())
+        );
+        next.level = matched || parsed.job_level;
+      }
+      if (parsed.employment_type) {
+        const matched = EMPLOYMENT_TYPES.find((t) =>
+          parsed.employment_type!.toLowerCase().includes(t.toLowerCase())
+        );
+        if (matched) next.employmentType = matched;
+      }
+      if (parsed.experience_range) next.experience = parsed.experience_range;
+      else if (parsed.experience_min != null && parsed.experience_max != null) {
+        next.experience = `${parsed.experience_min}-${parsed.experience_max} years`;
+      }
+      if (parsed.min_salary != null) next.salaryMin = String(parsed.min_salary);
+      if (parsed.max_salary != null) next.salaryMax = String(parsed.max_salary);
+      if (parsed.salary_unit) {
+        next.salaryUnit = parsed.salary_unit.toLowerCase().includes('month')
+          ? 'Per month'
+          : 'Per annum';
+      }
+      if (parsed.country) next.country = parsed.country;
+      if (parsed.state) next.state = parsed.state;
+      if (parsed.city) next.city = parsed.city;
+      if (parsed.location && !parsed.city) next.location = parsed.location;
+      if (parsed.job_type) {
+        const jt = parsed.job_type.toLowerCase();
+        if (jt.includes('remote')) next.jobType = 'Remote';
+        else if (jt.includes('hybrid')) next.jobType = 'Hybrid';
+        else next.jobType = 'On-site';
+      }
+      if (parsed.description) next.description = parsed.description;
+      if (parsed.responsibilities) next.responsibilities = parsed.responsibilities;
+      if (parsed.requirements) next.requirements = parsed.requirements;
+      if (parsed.benefits) next.benefits = parsed.benefits;
+      if (parsed.required_skills?.length) next.skills = parsed.required_skills;
+      return next;
+    });
+  };
+
+  // Autofill from company-onboarding JD upload
+  useEffect(() => {
+    if (editId) return;
+    const fromJd = searchParams.get('fromJd');
+    try {
+      const raw = localStorage.getItem('rolecraft_parsed_jd');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      applyParsedJd(parsed);
+      setJdParseNote(
+        fromJd
+          ? 'Fields autofilled from the JD you uploaded during company onboarding. Review before posting.'
+          : 'Fields autofilled from a previously parsed JD. Review before posting.'
+      );
+      localStorage.removeItem('rolecraft_parsed_jd');
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId, searchParams]);
+
+  const handleJdUpload = async (file: File) => {
+    setUploadedFileName(file.name);
+    setParsingJd(true);
+    setJdParseNote(null);
+    try {
+      const parsed = await jobsApi.parseJd(file);
+      applyParsedJd(parsed);
+      const src = parsed.parse_source || 'llm';
+      setJdParseNote(
+        src.includes('heuristic')
+          ? 'JD parsed with local fallback (add GROQ_API_KEY for better AI extraction). Review fields before posting.'
+          : 'JD parsed successfully — review autofilled fields before posting.'
+      );
+      if (parsed.description || parsed.responsibilities) {
+        setStep(1);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to parse JD';
+      setJdParseNote(msg);
+      alert(msg);
+    } finally {
+      setParsingJd(false);
+    }
   };
 
   const persist = async (status: 'Live' | 'Draft') => {
@@ -252,120 +348,39 @@ function PostJobContent() {
 
       <div className="mb-6">
         <label className="block text-sm font-medium mb-2 text-foreground">Upload JD to Autofill</label>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <input
             type="file"
-            accept=".pdf,.doc,.docx,.txt"
+            accept=".pdf,.txt,application/pdf,text/plain"
             id="jd-upload"
             className="hidden"
             onChange={async (e) => {
               const file = e.target.files?.[0];
+              e.target.value = '';
               if (!file) return;
-              setUploadedFileName(file.name);
-              
-              if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                  const text = ev.target?.result as string;
-                  if (!text) return;
-                  
-                  const lines = text.split('\n');
-                  const getField = (prefix: string) => {
-                    const line = lines.find(l => l.startsWith(prefix));
-                    return line ? line.replace(prefix, '').trim() : '';
-                  };
-                  
-                  const title = getField('Job Title:');
-                  if (title) setField('title', title);
-                  
-                  const department = getField('Department:');
-                  if (department) setField('department', department);
-                  
-                  const role = getField('Role:');
-                  if (role) setField('role', role);
-                  
-                  const level = getField('Level:');
-                  if (level) {
-                     const matchedLevel = ['Internship', 'Entry', 'Mid', 'Senior', 'Director', 'Executive'].find(l => level.includes(l));
-                     if (matchedLevel) setField('level', matchedLevel);
-                  }
-
-                  const empType = getField('Employment Type:');
-                  if (empType) {
-                     const matchedEmp = EMPLOYMENT_TYPES.find(t => empType.toLowerCase().includes(t.toLowerCase()));
-                     if (matchedEmp) setField('employmentType', matchedEmp);
-                  }
-
-                  const loc = getField('Location:');
-                  if (loc) {
-                     const parts = loc.split(',').map(s => s.trim());
-                     if (parts.length >= 3) {
-                       setField('city', parts[0]);
-                       setField('state', parts[1]);
-                       setField('country', parts[2]);
-                     } else if (parts.length === 1) {
-                       setField('city', parts[0]);
-                     }
-                  }
-
-                  let currentSection = '';
-                  let description = '';
-                  let responsibilities = '';
-                  let requirements = '';
-                  let benefits = '';
-                  
-                  for (let line of lines) {
-                    if (line.startsWith('About the Role:')) { currentSection = 'desc'; continue; }
-                    if (line.startsWith('Responsibilities:')) { currentSection = 'resp'; continue; }
-                    if (line.startsWith('Requirements:')) { currentSection = 'req'; continue; }
-                    if (line.startsWith('Benefits:')) { currentSection = 'ben'; continue; }
-                    
-                    if (currentSection === 'desc' && !line.startsWith('Job Title:')) description += line + '\n';
-                    if (currentSection === 'resp') responsibilities += line + '\n';
-                    if (currentSection === 'req') requirements += line + '\n';
-                    if (currentSection === 'ben') benefits += line + '\n';
-                  }
-                  
-                  if (description.trim()) setField('description', description.trim());
-                  if (responsibilities.trim()) setField('responsibilities', responsibilities.trim());
-                  if (requirements.trim()) setField('requirements', requirements.trim());
-                  if (benefits.trim()) setField('benefits', benefits.trim());
-
-                  const foundSkills: string[] = [];
-                  SKILLS.forEach(skill => {
-                    if (text.toLowerCase().includes(skill.toLowerCase())) {
-                       foundSkills.push(skill);
-                    }
-                  });
-                  const extraSkills = ['React', 'Next.js', 'TypeScript', 'Tailwind'];
-                  extraSkills.forEach(s => {
-                     if (text.toLowerCase().includes(s.toLowerCase()) && !foundSkills.includes(s)) {
-                        foundSkills.push(s);
-                     }
-                  });
-                  if (foundSkills.length > 0) {
-                     setField('skills', foundSkills);
-                  }
-                };
-                reader.readAsText(file);
-              } else {
-                 setField('title', 'Software Engineer');
-                 setField('role', 'Engineering');
-                 setField('level', 'Mid');
-              }
+              await handleJdUpload(file);
             }}
           />
-          <Button variant="outline" onClick={() => document.getElementById('jd-upload')?.click()}>
-            Upload JD File
+          <Button
+            variant="outline"
+            onClick={() => document.getElementById('jd-upload')?.click()}
+            disabled={parsingJd}
+          >
+            {parsingJd ? 'Parsing JD…' : 'Upload JD File'}
           </Button>
           <span className="text-sm text-muted-foreground">
             {uploadedFileName ? (
               <span className="font-medium text-primary">Uploaded: {uploadedFileName}</span>
             ) : (
-              "Upload a PDF or DOCX to automatically fill out this form."
+              'Upload a PDF or TXT job description to autofill title, role, level, experience, salary, location, and description.'
             )}
           </span>
         </div>
+        {jdParseNote && (
+          <p className="mt-2 text-sm text-primary/90 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
+            {jdParseNote}
+          </p>
+        )}
       </div>
 
       {step === 1 && (

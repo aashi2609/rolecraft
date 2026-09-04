@@ -50,3 +50,5 @@ __pycache__/
 *.tsbuildinfo
 next-env.d.ts
 
+sample_job_description.txt
+sample_job_description.pdf

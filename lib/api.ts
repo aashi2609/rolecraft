@@ -271,6 +271,51 @@ export const jobsApi = {
   setStatus: (id: string, status: string) =>
     api(`/jobs/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   candidates: (id: string) => api(`/jobs/${id}/candidates`),
+  parseJd: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const headers = new Headers();
+    const token = getToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    const res = await fetch(`${API_URL}/jobs/parse-jd`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (body.detail) detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
+      } catch { /* ignore */ }
+      throw new Error(detail);
+    }
+    return res.json() as Promise<{
+      title?: string | null;
+      job_role?: string | null;
+      job_level?: string | null;
+      experience_min?: number | null;
+      experience_max?: number | null;
+      experience_range?: string | null;
+      min_salary?: number | null;
+      max_salary?: number | null;
+      salary_unit?: string | null;
+      country?: string | null;
+      state?: string | null;
+      city?: string | null;
+      location?: string | null;
+      employment_type?: string | null;
+      job_type?: string | null;
+      department?: string | null;
+      description?: string | null;
+      responsibilities?: string | null;
+      requirements?: string | null;
+      benefits?: string | null;
+      required_skills?: string[];
+      parse_source?: string | null;
+      parse_warning?: string | null;
+    }>;
+  },
 };
 
 export const resumesApi = {

@@ -1,14 +1,15 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import select
 
 from core.dependencies import CompanyUser, DbSession, check_plan_limit, get_optional_current_user
 from models import Application, ApplicationStatus, Company, JobPosting, JobStatus, JobType, User, UserRole
-from schemas import FitmentCandidateOut, JobCreate, JobOut, JobStatusUpdate, JobUpdate
+from schemas import FitmentCandidateOut, JobCreate, JobOut, JobParsedJDOut, JobStatusUpdate, JobUpdate
 from services.fitment_service import ranked_candidates_for_job
 from services.job_search_service import search_jobs, enrich_job
 from services.embedding_service import refresh_job_embedding
+from services.jd_parse_service import parse_job_description
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -19,6 +20,26 @@ def _job_type(raw: str | None) -> JobType | None:
     key = raw.lower().replace("-", "").replace(" ", "")
     mapping = {"onsite": JobType.onsite, "remote": JobType.remote, "hybrid": JobType.hybrid}
     return mapping.get(key)
+
+
+@router.post("/parse-jd", response_model=JobParsedJDOut)
+async def parse_jd(user: CompanyUser, file: UploadFile = File(...)):
+    """Upload a JD (PDF or TXT) and extract fields for the post-job form."""
+    from core.upload_limits import validate_upload
+
+    filename = file.filename or "jd.pdf"
+    lower = filename.lower()
+    if lower.endswith(".txt"):
+        data = await file.read()
+        if len(data) > 2 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large (max 2MB)")
+    else:
+        data, _, _ = await validate_upload(file, "document")
+        if not (data.startswith(b"%PDF") or lower.endswith(".pdf")):
+            raise HTTPException(status_code=400, detail="Upload a PDF or TXT job description")
+
+    parsed = await parse_job_description(data, filename=filename)
+    return JobParsedJDOut.model_validate(parsed)
 
 
 @router.post("", response_model=JobOut)
