@@ -5,8 +5,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from core.config import get_settings
-from routers import auth, candidates, resumes, companies, jobs, applications, messages, analytics, admin
-from routers.notifications import router_notifications, router_subscriptions, router_uploads
+from routers import (
+    admin,
+    analytics,
+    applications,
+    auth,
+    candidates,
+    companies,
+    jobs,
+    messages,
+    resumes,
+)
+from routers.notifications import (
+    router_notifications,
+    router_subscriptions,
+    router_uploads,
+)
 
 settings = get_settings()
 

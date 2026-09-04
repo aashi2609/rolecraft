@@ -1,4 +1,5 @@
 """Admin dashboard service."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -18,30 +19,53 @@ from models import (
 
 async def get_dashboard_stats(db) -> dict[str, Any]:
     """Get dashboard statistics for admin view.
-    
+
     Returns counts for users, jobs, applications, subscriptions, and plan breakdown.
     """
     total_users = await db.scalar(select(func.count()).select_from(User)) or 0
-    total_candidates = await db.scalar(
-        select(func.count()).select_from(User).where(User.role == UserRole.candidate)
-    ) or 0
-    total_companies = await db.scalar(
-        select(func.count()).select_from(User).where(User.role == UserRole.company)
-    ) or 0
-    total_admins = await db.scalar(
-        select(func.count()).select_from(User).where(User.role == UserRole.admin)
-    ) or 0
-    total_jobs = await db.scalar(select(func.count()).select_from(JobPosting)) or 0
-    active_jobs = await db.scalar(
-        select(func.count()).select_from(JobPosting).where(JobPosting.status == JobStatus.live)
-    ) or 0
-    total_applications = await db.scalar(select(func.count()).select_from(Application)) or 0
-    total_subscriptions = await db.scalar(select(func.count()).select_from(Subscription)) or 0
-    active_subscriptions = await db.scalar(
-        select(func.count()).select_from(Subscription).where(
-            Subscription.status == SubscriptionStatus.active
+    total_candidates = (
+        await db.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(User.role == UserRole.candidate)
         )
-    ) or 0
+        or 0
+    )
+    total_companies = (
+        await db.scalar(
+            select(func.count()).select_from(User).where(User.role == UserRole.company)
+        )
+        or 0
+    )
+    total_admins = (
+        await db.scalar(
+            select(func.count()).select_from(User).where(User.role == UserRole.admin)
+        )
+        or 0
+    )
+    total_jobs = await db.scalar(select(func.count()).select_from(JobPosting)) or 0
+    active_jobs = (
+        await db.scalar(
+            select(func.count())
+            .select_from(JobPosting)
+            .where(JobPosting.status == JobStatus.live)
+        )
+        or 0
+    )
+    total_applications = (
+        await db.scalar(select(func.count()).select_from(Application)) or 0
+    )
+    total_subscriptions = (
+        await db.scalar(select(func.count()).select_from(Subscription)) or 0
+    )
+    active_subscriptions = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Subscription)
+            .where(Subscription.status == SubscriptionStatus.active)
+        )
+        or 0
+    )
 
     # Plan breakdown
     plan_rows = await db.execute(
@@ -49,7 +73,10 @@ async def get_dashboard_stats(db) -> dict[str, Any]:
         .where(Subscription.status == SubscriptionStatus.active)
         .group_by(Subscription.plan_tier)
     )
-    plan_breakdown = {str(row[0].value if hasattr(row[0], "value") else row[0]): row[1] for row in plan_rows.all()}
+    plan_breakdown = {
+        str(row[0].value if hasattr(row[0], "value") else row[0]): row[1]
+        for row in plan_rows.all()
+    }
 
     return {
         "total_users": total_users,

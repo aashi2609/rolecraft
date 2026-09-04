@@ -73,7 +73,9 @@ Return ONLY valid JSON matching this schema:
 
 def _fallback_score(vertical: str, skills: list[str]) -> ATSResult:
     """Deterministic fallback score when Groq is unavailable."""
-    seed = int(hashlib.md5(f"{vertical}:{','.join(skills)}".encode()).hexdigest()[:8], 16)
+    seed = int(
+        hashlib.md5(f"{vertical}:{','.join(skills)}".encode()).hexdigest()[:8], 16
+    )
     rng = random.Random(seed)
     base = 78 + rng.randint(0, 18) + min(6, len(skills))
     overall = min(98, base)
@@ -145,12 +147,14 @@ async def score_resume(
         }
         issues = []
         for issue_data in data.get("issues", []):
-            issues.append(ATSIssue(
-                category=issue_data.get("category", "general"),
-                description=issue_data.get("description", ""),
-                severity=issue_data.get("severity", "medium"),
-                fix_suggestion=issue_data.get("fix_suggestion", ""),
-            ))
+            issues.append(
+                ATSIssue(
+                    category=issue_data.get("category", "general"),
+                    description=issue_data.get("description", ""),
+                    severity=issue_data.get("severity", "medium"),
+                    fix_suggestion=issue_data.get("fix_suggestion", ""),
+                )
+            )
 
         return ATSResult(
             overall_score=overall,

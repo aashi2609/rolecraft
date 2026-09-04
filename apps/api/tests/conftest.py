@@ -17,6 +17,7 @@ if sys.version_info[:2] != (3, 13):
 
 @pytest.fixture(scope="session", autouse=True)
 def _assert_python_313() -> None:
-    assert sys.version_info[:2] == (3, 13), (
-        f"Tests require Python 3.13.x, got {sys.version} from {sys.executable}"
-    )
+    assert sys.version_info[:2] == (
+        3,
+        13,
+    ), f"Tests require Python 3.13.x, got {sys.version} from {sys.executable}"

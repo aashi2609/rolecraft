@@ -1,4 +1,5 @@
 """Fitment rationale — Groq when configured, template fallback otherwise."""
+
 from __future__ import annotations
 
 import logging

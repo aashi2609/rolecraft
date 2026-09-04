@@ -1,8 +1,8 @@
-from datetime import date, datetime
-from typing import Any, Optional, Literal
-from uuid import UUID
 import enum
 import re
+from datetime import date, datetime
+from typing import Any, Literal, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -30,6 +30,7 @@ def _validate_password_strength(password: str) -> str:
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
+
 
 class SignupRequest(BaseModel):
     email: EmailStr
@@ -80,6 +81,7 @@ class UserOut(ORMModel):
 
 
 # ── Candidate ─────────────────────────────────────────────────────────────────
+
 
 class CandidateProfileUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -234,6 +236,7 @@ class CandidatePublicProfileOut(ORMModel):
 
 # ── Resumes ───────────────────────────────────────────────────────────────────
 
+
 class ResumeGenerateRequest(BaseModel):
     target_verticals: list[str]
 
@@ -253,6 +256,7 @@ class ResumeOut(ORMModel):
 
 
 # ── Company ───────────────────────────────────────────────────────────────────
+
 
 class CompanyUpdate(BaseModel):
     name: Optional[str] = None
@@ -278,8 +282,10 @@ class CompanyOut(ORMModel):
 
 # ── Jobs ──────────────────────────────────────────────────────────────────────
 
+
 class JobParsedJDOut(BaseModel):
     """Fields extracted from an uploaded job description."""
+
     title: Optional[str] = None
     job_role: Optional[str] = None
     job_level: Optional[str] = None
@@ -309,7 +315,9 @@ class JobCreate(BaseModel):
     title: str
     department: Optional[str] = None
     # Match frontend EMPLOYMENT_TYPES (lib/constants.ts)
-    employment_type: Optional[Literal["Full-time", "Part-time", "Contract", "Internship"]] = None
+    employment_type: Optional[
+        Literal["Full-time", "Part-time", "Contract", "Internship"]
+    ] = None
     experience_range: Optional[str] = None
     min_salary: Optional[int] = Field(default=None, ge=0)
     max_salary: Optional[int] = Field(default=None, ge=0)
@@ -342,7 +350,9 @@ class JobCreate(BaseModel):
 class JobUpdate(BaseModel):
     title: Optional[str] = None
     department: Optional[str] = None
-    employment_type: Optional[Literal["Full-time", "Part-time", "Contract", "Internship"]] = None
+    employment_type: Optional[
+        Literal["Full-time", "Part-time", "Contract", "Internship"]
+    ] = None
     experience_range: Optional[str] = None
     min_salary: Optional[int] = Field(default=None, ge=0)
     max_salary: Optional[int] = Field(default=None, ge=0)
@@ -429,6 +439,7 @@ class FitmentCandidateOut(BaseModel):
 
 # ── Applications ──────────────────────────────────────────────────────────────
 
+
 class ApplicationCreate(BaseModel):
     job_id: UUID
     resume_id: Optional[UUID] = None
@@ -456,6 +467,7 @@ class ApplicationOut(ORMModel):
 
 
 # ── Messages / Notifications / Subscriptions ──────────────────────────────────
+
 
 class MessageCreate(BaseModel):
     body: str
@@ -509,6 +521,7 @@ class UploadOut(BaseModel):
 
 # ── Candidate Search ─────────────────────────────────────────────────────────────
 
+
 class CandidateSearchOut(ORMModel):
     id: UUID
     name: Optional[str] = None
@@ -526,6 +539,7 @@ class CandidateSearchOut(ORMModel):
 
 
 # ── Analytics ────────────────────────────────────────────────────────────────────
+
 
 class TrendPointOut(BaseModel):
     date: str

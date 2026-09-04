@@ -9,7 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import FitmentResult, JobPosting, Resume
 from services.embedding_service import refresh_job_embedding
-from services.fitment_rationale_service import generate_fitment_rationale, template_rationale
+from services.fitment_rationale_service import (
+    generate_fitment_rationale,
+    template_rationale,
+)
 
 
 async def ensure_job_embedding(db: AsyncSession, job: JobPosting) -> list[float]:
@@ -19,26 +22,30 @@ async def ensure_job_embedding(db: AsyncSession, job: JobPosting) -> list[float]
     return list(job.embedding)
 
 
-async def compute_fitment(db: AsyncSession, job: JobPosting, limit: int = 20) -> list[FitmentResult]:
+async def compute_fitment(
+    db: AsyncSession, job: JobPosting, limit: int = 20
+) -> list[FitmentResult]:
     """Rank candidates by resume↔job embedding distance; skill-overlap heuristic fallback."""
     await ensure_job_embedding(db, job)
 
     try:
         rows = (
-            await db.execute(
-                text(
-                    """
+            (
+                await db.execute(
+                    text("""
                     SELECT r.candidate_id, r.id AS resume_id,
                            (r.embedding <-> :job_emb) AS distance
                     FROM resumes r
                     WHERE r.embedding IS NOT NULL
                     ORDER BY r.embedding <-> :job_emb
                     LIMIT :lim
-                    """
-                ),
-                {"job_emb": str(job.embedding), "lim": limit},
+                    """),
+                    {"job_emb": str(job.embedding), "lim": limit},
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
     except Exception:
         rows = []
 
@@ -79,7 +86,11 @@ async def compute_fitment(db: AsyncSession, job: JobPosting, limit: int = 20) ->
         cand_skills = {s.lower() for s in content.get("highlightedSkills", [])}
         overlap = job_skills & cand_skills if job_skills else set()
         base = 55 + 10 * len(overlap)
-        if resume.target_vertical and job.department and resume.target_vertical.lower() in (job.department or "").lower():
+        if (
+            resume.target_vertical
+            and job.department
+            and resume.target_vertical.lower() in (job.department or "").lower()
+        ):
             base += 8
         score = min(96.0, float(base))
         rationale = (
@@ -102,7 +113,12 @@ async def compute_fitment(db: AsyncSession, job: JobPosting, limit: int = 20) ->
             existing.rationale = rationale
             results.append(existing)
         else:
-            fr = FitmentResult(job_id=job.id, candidate_id=candidate_id, score=score, rationale=rationale)
+            fr = FitmentResult(
+                job_id=job.id,
+                candidate_id=candidate_id,
+                score=score,
+                rationale=rationale,
+            )
             db.add(fr)
             results.append(fr)
     await db.flush()
@@ -123,13 +139,17 @@ async def ranked_candidates_for_job(db: AsyncSession, job: JobPosting) -> list:
             await db.execute(
                 select(CandidateProfile)
                 .options(
-                    selectinload(CandidateProfile.skills).selectinload(CandidateSkill.skill),
+                    selectinload(CandidateProfile.skills).selectinload(
+                        CandidateSkill.skill
+                    ),
                     selectinload(CandidateProfile.user),
                 )
                 .where(CandidateProfile.user_id == fr.candidate_id)
             )
         ).scalar_one_or_none()
-        skills = [cs.skill.name for cs in (profile.skills if profile else []) if cs.skill]
+        skills = [
+            cs.skill.name for cs in (profile.skills if profile else []) if cs.skill
+        ]
         email = profile.user.email if profile and profile.user else None
         name = email.split("@")[0].replace(".", " ").title() if email else "Candidate"
         display_name = None
@@ -141,7 +161,9 @@ async def ranked_candidates_for_job(db: AsyncSession, job: JobPosting) -> list:
             job_department=job.department,
             job_skills=list(job.required_skills or []),
             candidate_name=display_name or name,
-            candidate_title=(profile.preferred_sectors or [None])[0] if profile else None,
+            candidate_title=(
+                (profile.preferred_sectors or [None])[0] if profile else None
+            ),
             candidate_skills=skills,
             score=fr.score,
         )
@@ -155,7 +177,9 @@ async def ranked_candidates_for_job(db: AsyncSession, job: JobPosting) -> list:
                 rationale=rationale,
                 rationale_source=source,
                 skills=skills,
-                location=(profile.preferred_locations or [None])[0] if profile else None,
+                location=(
+                    (profile.preferred_locations or [None])[0] if profile else None
+                ),
             )
         )
     await db.flush()

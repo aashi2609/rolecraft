@@ -115,7 +115,12 @@ async def generate_content(
         try:
             timeout = 60.0 * attempt
             async with httpx.AsyncClient(timeout=timeout) as client:
-                logger.debug("Groq API call attempt %d/%d with model %s", attempt, retries, used_model)
+                logger.debug(
+                    "Groq API call attempt %d/%d with model %s",
+                    attempt,
+                    retries,
+                    used_model,
+                )
                 resp = await client.post(_GENERATE_URL, json=payload, headers=headers)
                 resp.raise_for_status()
                 data = resp.json()
@@ -145,9 +150,13 @@ async def generate_content(
             )
         except httpx.HTTPStatusError as exc:
             status_code = exc.response.status_code
-            error_text = exc.response.text[:200] if exc.response.text else "No error details"
+            error_text = (
+                exc.response.text[:200] if exc.response.text else "No error details"
+            )
             last_error = AIServiceError(f"Groq HTTP {status_code}: {error_text}")
-            logger.warning("Groq HTTP error (attempt %d/%d): %s", attempt, retries, last_error)
+            logger.warning(
+                "Groq HTTP error (attempt %d/%d): %s", attempt, retries, last_error
+            )
 
             if status_code == 429 and attempt < retries:
                 retry_after = exc.response.headers.get("Retry-After")
@@ -155,7 +164,9 @@ async def generate_content(
                     wait = min(int(retry_after), 60)
                 else:
                     wait = 2**attempt * 2
-                logger.info("Rate limited. Waiting %ds before retry %d...", wait, attempt + 1)
+                logger.info(
+                    "Rate limited. Waiting %ds before retry %d...", wait, attempt + 1
+                )
                 await asyncio.sleep(wait)
                 continue
             if 400 <= status_code < 500 and status_code != 429:

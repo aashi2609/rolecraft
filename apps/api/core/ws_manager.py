@@ -28,7 +28,11 @@ class ConnectionManager:
             if user_id not in self._connections:
                 self._connections[user_id] = set()
             self._connections[user_id].add(websocket)
-        logger.info("WS connected: user=%s  (total=%d)", user_id, len(self._connections[user_id]))
+        logger.info(
+            "WS connected: user=%s  (total=%d)",
+            user_id,
+            len(self._connections[user_id]),
+        )
 
     async def disconnect(self, user_id: UUID, websocket: WebSocket) -> None:
         """Remove a WebSocket connection for a user."""

@@ -1,4 +1,5 @@
 """Verify upload validation. Run: PYTHONPATH=. python -m pytest tests/security/test_uploads.py -v"""
+
 from __future__ import annotations
 
 import uuid
@@ -12,7 +13,12 @@ def _signup() -> str:
     uid = uuid.uuid4().hex[:8]
     r = httpx.post(
         f"{BASE}/auth/signup",
-        json={"email": f"up_{uid}@t.com", "password": "testpass123", "role": "candidate", "name": "U"},
+        json={
+            "email": f"up_{uid}@t.com",
+            "password": "testpass123",
+            "role": "candidate",
+            "name": "U",
+        },
         timeout=30,
     )
     r.raise_for_status()

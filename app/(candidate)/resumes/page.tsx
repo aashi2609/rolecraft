@@ -118,7 +118,7 @@ export default function ResumesPage() {
           <Card className="w-full max-w-md p-6 m-4 animate-in fade-in zoom-in-95">
             <h3 className="text-xl font-bold mb-2">Custom Tailored Resume</h3>
             <p className="text-muted-foreground text-sm mb-4">
-              Enter a specific job role (e.g. "Senior React Developer") and our AI will generate a tailored resume PDF on the fly based on your profile!
+              Enter a specific job role (e.g. &quot;Senior React Developer&quot;) and our AI will generate a tailored resume PDF on the fly based on your profile!
             </p>
             <input 
               type="text" 

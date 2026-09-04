@@ -1,4 +1,5 @@
 """Unit tests for tightened Pydantic schema validation (Tier 3 item 3)."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -42,17 +43,23 @@ def test_salary_ge_zero_and_max_gte_min() -> None:
         JobCreate(title="Eng", min_salary=-1)
     with pytest.raises(ValidationError):
         JobCreate(title="Eng", min_salary=100, max_salary=50)
-    ok = JobCreate(title="Eng", min_salary=50, max_salary=100, employment_type="Full-time")
+    ok = JobCreate(
+        title="Eng", min_salary=50, max_salary=100, employment_type="Full-time"
+    )
     assert ok.max_salary == 100
 
 
 def test_experience_dates_and_is_current() -> None:
     with pytest.raises(ValidationError):
-        ExperienceIn(from_date=date(2022, 1, 1), to_date=date(2021, 1, 1), is_current=False)
+        ExperienceIn(
+            from_date=date(2022, 1, 1), to_date=date(2021, 1, 1), is_current=False
+        )
     # is_current=True skips ordering even if to_date < from_date is omitted
     current = ExperienceIn(from_date=date(2022, 1, 1), to_date=None, is_current=True)
     assert current.is_current is True
-    ok = ExperienceIn(from_date=date(2020, 1, 1), to_date=date(2021, 6, 1), is_current=False)
+    ok = ExperienceIn(
+        from_date=date(2020, 1, 1), to_date=date(2021, 6, 1), is_current=False
+    )
     assert ok.to_date == date(2021, 6, 1)
 
 

@@ -13,8 +13,8 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from models import CandidateProfile, CandidateSkill, Resume
 from core.config import get_settings
+from models import CandidateProfile, CandidateSkill, Resume
 from services.ai_client import AIServiceError, generate_content
 from services.ats_scorer import ATSResult, score_resume
 from services.data_cleaner import CleanedProfile, clean_profile
@@ -27,7 +27,12 @@ settings = get_settings()
 # ── Stage-1 deterministic fallback ────────────────────────────────────────────
 
 VERTICAL_EMPHASIS = {
-    "electronics": ["circuit design", "embedded systems", "lab work", "hardware projects"],
+    "electronics": [
+        "circuit design",
+        "embedded systems",
+        "lab work",
+        "hardware projects",
+    ],
     "software": ["programming projects", "software skills", "APIs", "version control"],
     "marketing": ["communication", "campaigns", "analytics", "client-facing work"],
     "design": ["UI/UX craft", "prototyping", "user research", "visual systems"],
@@ -38,7 +43,9 @@ VERTICAL_EMPHASIS = {
 
 
 def _score_for(vertical: str, skills: list[str]) -> int:
-    seed = int(hashlib.md5(f"{vertical}:{','.join(skills)}".encode()).hexdigest()[:8], 16)
+    seed = int(
+        hashlib.md5(f"{vertical}:{','.join(skills)}".encode()).hexdigest()[:8], 16
+    )
     rng = random.Random(seed)
     return min(98, 78 + rng.randint(0, 18) + min(6, len(skills)))
 
@@ -93,10 +100,18 @@ async def _generate_deterministic(
             {
                 "name": p.project_name or "Project",
                 "description": p.responsibilities or "",
-                "bullets": [b.strip() for b in (p.achievements or "").split("\n") if b.strip()]
+                "bullets": [
+                    b.strip() for b in (p.achievements or "").split("\n") if b.strip()
+                ]
                 or ([p.responsibilities] if p.responsibilities else []),
-                "technologies": [t.strip() for t in (p.tools_used or "").split(",") if t.strip()],
-                "url": p.org if p.org and ("http" in p.org or p.org.startswith("www.")) else "",
+                "technologies": [
+                    t.strip() for t in (p.tools_used or "").split(",") if t.strip()
+                ],
+                "url": (
+                    p.org
+                    if p.org and ("http" in p.org or p.org.startswith("www."))
+                    else ""
+                ),
             }
             for p in (profile.projects or [])[:3]
         ],
@@ -106,7 +121,9 @@ async def _generate_deterministic(
         ],
     }
     score = _score_for(vertical, skill_names)
-    embedding_text = f"{vertical} {' '.join(highlighted)} {content['summary']} {mapping_notes}"
+    embedding_text = (
+        f"{vertical} {' '.join(highlighted)} {content['summary']} {mapping_notes}"
+    )
     embedding = await embed_text(embedding_text)
     return {
         "content": content,
@@ -249,7 +266,9 @@ def _build_profile_prompt(cleaned: CleanedProfile, vertical: str) -> str:
                 line += f" ({exp['from_date']} – {exp.get('to_date', 'Present')})"
             sections.append(line)
             if exp.get("responsibilities"):
-                sections.append(f"    Responsibilities: {exp['responsibilities'][:500]}")
+                sections.append(
+                    f"    Responsibilities: {exp['responsibilities'][:500]}"
+                )
 
     if cleaned.projects:
         sections.append("\n### Projects:")
@@ -379,6 +398,7 @@ async def _fix_with_ai(
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+
 async def generate_resume_for_vertical(
     profile: CandidateProfile,
     vertical: str,
@@ -390,12 +410,20 @@ async def generate_resume_for_vertical(
     # Try AI path
     if settings.groq_api_key:
         try:
-            logger.info("Attempting AI-powered resume generation for vertical: %s", vertical)
-            return await generate_with_autofix(profile, vertical, skill_names, user_email=user_email)
+            logger.info(
+                "Attempting AI-powered resume generation for vertical: %s", vertical
+            )
+            return await generate_with_autofix(
+                profile, vertical, skill_names, user_email=user_email
+            )
         except AIServiceError as exc:
             logger.warning("AI service error, falling back to deterministic: %s", exc)
         except Exception as exc:
-            logger.error("Unexpected error during AI generation, falling back to deterministic: %s", exc, exc_info=True)
+            logger.error(
+                "Unexpected error during AI generation, falling back to deterministic: %s",
+                exc,
+                exc_info=True,
+            )
 
     # Deterministic fallback
     logger.info("Using deterministic resume generation for vertical: %s", vertical)
@@ -446,12 +474,14 @@ async def generate_with_autofix(
             fixed_content = await _fix_with_ai(current_content, current_ats, vertical)
             fixed_ats = await score_resume(fixed_content, vertical)
 
-            iterations.append({
-                "iteration": i,
-                "score": fixed_ats.overall_score,
-                "passed": fixed_ats.passed,
-                "issues_count": len(fixed_ats.issues),
-            })
+            iterations.append(
+                {
+                    "iteration": i,
+                    "score": fixed_ats.overall_score,
+                    "passed": fixed_ats.passed,
+                    "issues_count": len(fixed_ats.issues),
+                }
+            )
 
             if fixed_ats.overall_score > best_score:
                 best_content = fixed_content
@@ -463,17 +493,21 @@ async def generate_with_autofix(
 
         except Exception as exc:
             logger.warning("Auto-fix iteration %d failed: %s", i, exc)
-            iterations.append({
-                "iteration": i,
-                "score": None,
-                "error": str(exc),
-            })
+            iterations.append(
+                {
+                    "iteration": i,
+                    "score": None,
+                    "error": str(exc),
+                }
+            )
             break
 
     # Step 5: Generate embedding
     highlighted = best_content.get("highlightedSkills", skill_names[:8])
     summary = best_content.get("summary", best_content.get("professional_summary", ""))
-    mapping_notes = best_content.get("mappingNotes", best_content.get("mapping_notes", ""))
+    mapping_notes = best_content.get(
+        "mappingNotes", best_content.get("mapping_notes", "")
+    )
     embedding_text = f"{vertical} {' '.join(highlighted)} {summary} {mapping_notes}"
     embedding = await embed_text(embedding_text)
 
@@ -651,7 +685,9 @@ async def parse_resume_pdf(
         for page in reader.pages:
             text += (page.extract_text() or "") + "\n"
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to read PDF: {exc}") from exc
+        raise HTTPException(
+            status_code=400, detail=f"Failed to read PDF: {exc}"
+        ) from exc
 
     prompt = _PARSE_PROMPT.format(text=text[:15000])
 
@@ -668,4 +704,6 @@ async def parse_resume_pdf(
     except Exception as exc:
         from fastapi import HTTPException as HTTPExc
 
-        raise HTTPExc(status_code=500, detail=f"Failed to parse resume with AI: {exc}") from exc
+        raise HTTPExc(
+            status_code=500, detail=f"Failed to parse resume with AI: {exc}"
+        ) from exc

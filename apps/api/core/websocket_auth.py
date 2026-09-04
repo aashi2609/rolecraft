@@ -1,4 +1,5 @@
 """WebSocket authentication helper."""
+
 from __future__ import annotations
 
 import asyncio
@@ -18,19 +19,19 @@ async def authenticate_websocket_connection(
     timeout: float = 10.0,
 ) -> UUID | None:
     """Authenticate a WebSocket connection using JWT token.
-    
+
     The client must send a JSON message with {"token": "<jwt>"} immediately
     after connecting. Returns the user_id if authentication succeeds, None otherwise.
-    
+
     Args:
         websocket: The WebSocket connection to authenticate
         timeout: Maximum time to wait for auth token (default 10 seconds)
-    
+
     Returns:
         The authenticated user's UUID, or None if authentication fails
     """
     await websocket.accept()
-    
+
     # Wait for the client to send their auth token
     try:
         auth_msg = await asyncio.wait_for(websocket.receive_json(), timeout=timeout)
@@ -57,10 +58,10 @@ async def handle_websocket_lifecycle(
     user_id: UUID,
 ) -> None:
     """Handle the lifecycle of an authenticated WebSocket connection.
-    
+
     Registers the connection, keeps it alive by responding to pings,
     and cleans up on disconnect.
-    
+
     Args:
         websocket: The authenticated WebSocket connection
         user_id: The authenticated user's UUID

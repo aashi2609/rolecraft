@@ -19,9 +19,21 @@ class VerticalPrompt:
 VERTICALS: dict[str, VerticalPrompt] = {
     "electronics": VerticalPrompt(
         key_skills=[
-            "Circuit Design", "Embedded Systems", "VLSI", "FPGA", "PCB Design",
-            "Verilog", "VHDL", "MATLAB", "Signal Processing", "Microcontrollers",
-            "IoT", "Analog Design", "Digital Design", "Oscilloscope", "Soldering",
+            "Circuit Design",
+            "Embedded Systems",
+            "VLSI",
+            "FPGA",
+            "PCB Design",
+            "Verilog",
+            "VHDL",
+            "MATLAB",
+            "Signal Processing",
+            "Microcontrollers",
+            "IoT",
+            "Analog Design",
+            "Digital Design",
+            "Oscilloscope",
+            "Soldering",
         ],
         resume_tone=(
             "Technical and precise. Emphasise hands-on lab work, hardware projects, "
@@ -29,9 +41,23 @@ VERTICALS: dict[str, VerticalPrompt] = {
             "Use industry-standard terminology."
         ),
         ats_keywords=[
-            "circuit design", "embedded systems", "PCB", "FPGA", "VLSI", "signal processing",
-            "microcontroller", "firmware", "hardware", "testing", "debug", "schematic",
-            "simulation", "prototype", "lab", "oscilloscope", "multimeter",
+            "circuit design",
+            "embedded systems",
+            "PCB",
+            "FPGA",
+            "VLSI",
+            "signal processing",
+            "microcontroller",
+            "firmware",
+            "hardware",
+            "testing",
+            "debug",
+            "schematic",
+            "simulation",
+            "prototype",
+            "lab",
+            "oscilloscope",
+            "multimeter",
         ],
         emphasis_rules=(
             "Highlight: hardware projects, lab experience, core electronics coursework, "
@@ -45,9 +71,24 @@ VERTICALS: dict[str, VerticalPrompt] = {
     ),
     "software": VerticalPrompt(
         key_skills=[
-            "Python", "JavaScript", "TypeScript", "Java", "C++", "React", "Node.js",
-            "SQL", "Git", "AWS", "Docker", "Kubernetes", "REST APIs", "CI/CD",
-            "Agile", "System Design", "Data Structures", "Algorithms",
+            "Python",
+            "JavaScript",
+            "TypeScript",
+            "Java",
+            "C++",
+            "React",
+            "Node.js",
+            "SQL",
+            "Git",
+            "AWS",
+            "Docker",
+            "Kubernetes",
+            "REST APIs",
+            "CI/CD",
+            "Agile",
+            "System Design",
+            "Data Structures",
+            "Algorithms",
         ],
         resume_tone=(
             "Clear and technically detailed. Lead with impact metrics (e.g. reduced load time by 40%, "
@@ -55,9 +96,22 @@ VERTICALS: dict[str, VerticalPrompt] = {
             "Mention specific frameworks, languages, and tools by name."
         ),
         ats_keywords=[
-            "software development", "programming", "full-stack", "backend", "frontend",
-            "API", "database", "cloud", "DevOps", "CI/CD", "agile", "scrum",
-            "version control", "testing", "debugging", "deployment",
+            "software development",
+            "programming",
+            "full-stack",
+            "backend",
+            "frontend",
+            "API",
+            "database",
+            "cloud",
+            "DevOps",
+            "CI/CD",
+            "agile",
+            "scrum",
+            "version control",
+            "testing",
+            "debugging",
+            "deployment",
         ],
         emphasis_rules=(
             "Highlight: programming projects, open-source contributions, technical achievements, "
@@ -71,9 +125,19 @@ VERTICALS: dict[str, VerticalPrompt] = {
     ),
     "marketing": VerticalPrompt(
         key_skills=[
-            "Content Strategy", "SEO", "SEM", "Social Media Marketing", "Google Analytics",
-            "Campaign Management", "Brand Strategy", "Copywriting", "Email Marketing",
-            "Market Research", "A/B Testing", "CRM", "Growth Hacking",
+            "Content Strategy",
+            "SEO",
+            "SEM",
+            "Social Media Marketing",
+            "Google Analytics",
+            "Campaign Management",
+            "Brand Strategy",
+            "Copywriting",
+            "Email Marketing",
+            "Market Research",
+            "A/B Testing",
+            "CRM",
+            "Growth Hacking",
         ],
         resume_tone=(
             "Results-driven and creative. Lead with measurable outcomes (e.g. grew engagement 3x, "
@@ -81,9 +145,20 @@ VERTICALS: dict[str, VerticalPrompt] = {
             "Balance creative vision with data-driven decision making."
         ),
         ats_keywords=[
-            "marketing strategy", "digital marketing", "content creation", "SEO",
-            "social media", "campaign", "analytics", "brand", "engagement",
-            "conversion", "growth", "audience", "ROI", "lead generation",
+            "marketing strategy",
+            "digital marketing",
+            "content creation",
+            "SEO",
+            "social media",
+            "campaign",
+            "analytics",
+            "brand",
+            "engagement",
+            "conversion",
+            "growth",
+            "audience",
+            "ROI",
+            "lead generation",
         ],
         emphasis_rules=(
             "Highlight: communication skills, campaigns, content creation, analytics, "
@@ -97,9 +172,18 @@ VERTICALS: dict[str, VerticalPrompt] = {
     ),
     "design": VerticalPrompt(
         key_skills=[
-            "UI/UX Design", "Figma", "Sketch", "Adobe XD", "User Research",
-            "Wireframing", "Prototyping", "Design Systems", "Typography",
-            "Information Architecture", "Usability Testing", "Visual Design",
+            "UI/UX Design",
+            "Figma",
+            "Sketch",
+            "Adobe XD",
+            "User Research",
+            "Wireframing",
+            "Prototyping",
+            "Design Systems",
+            "Typography",
+            "Information Architecture",
+            "Usability Testing",
+            "Visual Design",
         ],
         resume_tone=(
             "Creative yet structured. Demonstrate user-centred thinking and process. "
@@ -107,9 +191,19 @@ VERTICALS: dict[str, VerticalPrompt] = {
             "Include portfolio links prominently."
         ),
         ats_keywords=[
-            "UI design", "UX design", "user experience", "user interface", "wireframe",
-            "prototype", "figma", "design system", "usability", "user research",
-            "visual design", "interaction design", "responsive design",
+            "UI design",
+            "UX design",
+            "user experience",
+            "user interface",
+            "wireframe",
+            "prototype",
+            "figma",
+            "design system",
+            "usability",
+            "user research",
+            "visual design",
+            "interaction design",
+            "responsive design",
         ],
         emphasis_rules=(
             "Highlight: design projects, user research, prototyping work, design tools, "
@@ -122,9 +216,17 @@ VERTICALS: dict[str, VerticalPrompt] = {
     ),
     "sales": VerticalPrompt(
         key_skills=[
-            "CRM", "Pipeline Management", "Negotiation", "Client Relations",
-            "B2B Sales", "Lead Generation", "Revenue Growth", "Account Management",
-            "Sales Forecasting", "Cold Calling", "Presentation Skills",
+            "CRM",
+            "Pipeline Management",
+            "Negotiation",
+            "Client Relations",
+            "B2B Sales",
+            "Lead Generation",
+            "Revenue Growth",
+            "Account Management",
+            "Sales Forecasting",
+            "Cold Calling",
+            "Presentation Skills",
         ],
         resume_tone=(
             "Metrics-driven and achievement-focused. Lead every bullet with quantifiable results "
@@ -132,9 +234,19 @@ VERTICALS: dict[str, VerticalPrompt] = {
             "Show relationship-building and strategic thinking."
         ),
         ats_keywords=[
-            "sales", "revenue", "client", "account management", "pipeline",
-            "negotiation", "business development", "lead generation", "CRM",
-            "quota", "territory", "relationship management", "closing",
+            "sales",
+            "revenue",
+            "client",
+            "account management",
+            "pipeline",
+            "negotiation",
+            "business development",
+            "lead generation",
+            "CRM",
+            "quota",
+            "territory",
+            "relationship management",
+            "closing",
         ],
         emphasis_rules=(
             "Highlight: client-facing experience, revenue impact, relationship building, "
@@ -147,9 +259,22 @@ VERTICALS: dict[str, VerticalPrompt] = {
     ),
     "data": VerticalPrompt(
         key_skills=[
-            "SQL", "Python", "R", "Statistics", "Machine Learning", "Data Visualisation",
-            "Tableau", "Power BI", "Excel", "ETL", "Big Data", "A/B Testing",
-            "Pandas", "NumPy", "Scikit-learn", "TensorFlow",
+            "SQL",
+            "Python",
+            "R",
+            "Statistics",
+            "Machine Learning",
+            "Data Visualisation",
+            "Tableau",
+            "Power BI",
+            "Excel",
+            "ETL",
+            "Big Data",
+            "A/B Testing",
+            "Pandas",
+            "NumPy",
+            "Scikit-learn",
+            "TensorFlow",
         ],
         resume_tone=(
             "Analytical and precise. Emphasise quantitative achievements and insight generation. "
@@ -157,9 +282,20 @@ VERTICALS: dict[str, VerticalPrompt] = {
             "Reference specific tools, techniques, and statistical methods."
         ),
         ats_keywords=[
-            "data analysis", "SQL", "Python", "statistics", "machine learning",
-            "data visualisation", "ETL", "analytics", "insight", "reporting",
-            "dashboard", "data-driven", "modelling", "A/B testing",
+            "data analysis",
+            "SQL",
+            "Python",
+            "statistics",
+            "machine learning",
+            "data visualisation",
+            "ETL",
+            "analytics",
+            "insight",
+            "reporting",
+            "dashboard",
+            "data-driven",
+            "modelling",
+            "A/B testing",
         ],
         emphasis_rules=(
             "Highlight: data projects, analytical tools, statistical methods, insight generation, "
@@ -172,9 +308,16 @@ VERTICALS: dict[str, VerticalPrompt] = {
     ),
     "product": VerticalPrompt(
         key_skills=[
-            "Product Strategy", "Roadmap Planning", "Agile/Scrum", "Stakeholder Management",
-            "User Stories", "Market Analysis", "A/B Testing", "Data Analysis",
-            "Cross-functional Leadership", "Requirements Gathering",
+            "Product Strategy",
+            "Roadmap Planning",
+            "Agile/Scrum",
+            "Stakeholder Management",
+            "User Stories",
+            "Market Analysis",
+            "A/B Testing",
+            "Data Analysis",
+            "Cross-functional Leadership",
+            "Requirements Gathering",
         ],
         resume_tone=(
             "Strategic and cross-functional. Balance technical literacy with business acumen. "
@@ -182,9 +325,18 @@ VERTICALS: dict[str, VerticalPrompt] = {
             "Demonstrate ability to translate between technical and business stakeholders."
         ),
         ats_keywords=[
-            "product management", "roadmap", "stakeholder", "agile", "scrum",
-            "user stories", "requirements", "prioritisation", "metrics",
-            "cross-functional", "strategy", "market analysis",
+            "product management",
+            "roadmap",
+            "stakeholder",
+            "agile",
+            "scrum",
+            "user stories",
+            "requirements",
+            "prioritisation",
+            "metrics",
+            "cross-functional",
+            "strategy",
+            "market analysis",
         ],
         emphasis_rules=(
             "Highlight: leadership, cross-functional collaboration, data-driven decisions, "
@@ -196,16 +348,26 @@ VERTICALS: dict[str, VerticalPrompt] = {
     ),
     "general": VerticalPrompt(
         key_skills=[
-            "Communication", "Problem Solving", "Leadership", "Teamwork",
-            "Project Management", "Critical Thinking", "Adaptability",
+            "Communication",
+            "Problem Solving",
+            "Leadership",
+            "Teamwork",
+            "Project Management",
+            "Critical Thinking",
+            "Adaptability",
         ],
         resume_tone=(
             "Professional and well-rounded. Emphasise transferable strengths, "
             "adaptability, and diverse experience. Show a breadth of capabilities."
         ),
         ats_keywords=[
-            "communication", "leadership", "teamwork", "problem solving",
-            "project management", "collaboration", "analytical",
+            "communication",
+            "leadership",
+            "teamwork",
+            "problem solving",
+            "project management",
+            "collaboration",
+            "analytical",
         ],
         emphasis_rules=(
             "Highlight: strongest transferable skills from all domains, leadership roles, "
@@ -221,7 +383,10 @@ VERTICALS: dict[str, VerticalPrompt] = {
 def classify_vertical(vertical: str) -> str:
     """Map a free-form vertical string to a known bucket key."""
     v = vertical.lower()
-    if any(k in v for k in ("electron", "ece", "hardware", "embedded", "circuit", "vlsi", "fpga")):
+    if any(
+        k in v
+        for k in ("electron", "ece", "hardware", "embedded", "circuit", "vlsi", "fpga")
+    ):
         return "electronics"
     if any(k in v for k in ("market", "content", "seo", "brand", "growth")):
         return "marketing"
@@ -233,7 +398,19 @@ def classify_vertical(vertical: str) -> str:
         return "data"
     if any(k in v for k in ("product",)):
         return "product"
-    if any(k in v for k in ("software", "it", "developer", "engineer", "frontend", "backend", "devops", "fullstack")):
+    if any(
+        k in v
+        for k in (
+            "software",
+            "it",
+            "developer",
+            "engineer",
+            "frontend",
+            "backend",
+            "devops",
+            "fullstack",
+        )
+    ):
         return "software"
     return "general"
 

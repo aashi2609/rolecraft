@@ -1,15 +1,15 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from core.dependencies import CandidateUser, DbSession, check_plan_limit
 from models import CandidateProfile, CandidateSkill, Resume
 from schemas import ResumeGenerateRequest, ResumeOut
-from services.resume_service import generate_resume_for_vertical, parse_resume_pdf
 from services.pdf_service import build_resume_pdf_response, resolve_candidate_name
-
+from services.resume_service import generate_resume_for_vertical, parse_resume_pdf
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
 
@@ -35,16 +35,22 @@ async def _profile_with_skills(db, user_id: UUID) -> CandidateProfile:
 @router.post("/generate", response_model=list[ResumeOut])
 async def generate(body: ResumeGenerateRequest, user: CandidateUser, db: DbSession):
     if not body.target_verticals:
-        raise HTTPException(status_code=400, detail="Select at least one target vertical")
+        raise HTTPException(
+            status_code=400, detail="Select at least one target vertical"
+        )
 
-    await check_plan_limit(user, db, "resume_verticals", extra=len(body.target_verticals))
+    await check_plan_limit(
+        user, db, "resume_verticals", extra=len(body.target_verticals)
+    )
 
     profile = await _profile_with_skills(db, user.id)
     skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
     created: list[Resume] = []
 
     for i, vertical in enumerate(body.target_verticals):
-        payload = await generate_resume_for_vertical(profile, vertical, skill_names, user_email=user.email)
+        payload = await generate_resume_for_vertical(
+            profile, vertical, skill_names, user_email=user.email
+        )
         resume = Resume(
             candidate_id=user.id,
             target_vertical=vertical,
@@ -67,10 +73,16 @@ async def generate(body: ResumeGenerateRequest, user: CandidateUser, db: DbSessi
 @router.get("", response_model=list[ResumeOut])
 async def list_resumes(user: CandidateUser, db: DbSession):
     rows = (
-        await db.execute(
-            select(Resume).where(Resume.candidate_id == user.id).order_by(Resume.created_at.desc())
+        (
+            await db.execute(
+                select(Resume)
+                .where(Resume.candidate_id == user.id)
+                .order_by(Resume.created_at.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [ResumeOut.model_validate(r) for r in rows]
 
 
@@ -137,7 +149,9 @@ async def download_pdf(resume_id: UUID, user: CandidateUser, db: DbSession):
         raise HTTPException(status_code=404, detail="Resume not found")
 
     profile = (
-        await db.execute(select(CandidateProfile).where(CandidateProfile.user_id == user.id))
+        await db.execute(
+            select(CandidateProfile).where(CandidateProfile.user_id == user.id)
+        )
     ).scalar_one_or_none()
     weblinks = (profile.weblinks or {}) if profile else {}
     filename = f"resume_{row.target_vertical.replace(' ', '_').lower()}_v{row.version or 1}.pdf"
@@ -151,15 +165,14 @@ async def download_pdf(resume_id: UUID, user: CandidateUser, db: DbSession):
     )
 
 
-from pydantic import BaseModel
-
-
 class TailoredResumeRequest(BaseModel):
     target_role: str
 
 
 @router.post("/download-tailored")
-async def download_tailored_resume(body: TailoredResumeRequest, user: CandidateUser, db: DbSession):
+async def download_tailored_resume(
+    body: TailoredResumeRequest, user: CandidateUser, db: DbSession
+):
     """Generate and return a PDF tailored to a role without saving it."""
     await check_plan_limit(user, db, "resume_verticals", extra=1)
     profile = await _profile_with_skills(db, user.id)
@@ -173,13 +186,17 @@ async def download_tailored_resume(body: TailoredResumeRequest, user: CandidateU
         email=user.email,
         weblinks=profile.weblinks or {},
         filename=filename,
-        candidate_name=resolve_candidate_name(weblinks=profile.weblinks or {}, email=user.email),
+        candidate_name=resolve_candidate_name(
+            weblinks=profile.weblinks or {}, email=user.email
+        ),
         location=(profile.preferred_locations or [None])[0] or "",
     )
 
 
 @router.post("/parse")
-async def parse_resume(user: CandidateUser, db: DbSession, file: UploadFile = File(...)):
+async def parse_resume(
+    user: CandidateUser, db: DbSession, file: UploadFile = File(...)
+):
     await check_plan_limit(user, db, "resume_verticals", extra=1)
 
     from core.upload_limits import validate_upload
@@ -189,4 +206,3 @@ async def parse_resume(user: CandidateUser, db: DbSession, file: UploadFile = Fi
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
 
     return await parse_resume_pdf(db, user.id, data)
-

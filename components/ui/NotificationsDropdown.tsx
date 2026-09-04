@@ -37,7 +37,7 @@ export function NotificationsDropdown() {
     setLoading(true);
     try {
       const rows = await notificationsApi.mine();
-      setNotifications(rows || []);
+      setNotifications((rows as NotificationRow[]) || []);
     } catch {
       setNotifications([]);
     } finally {

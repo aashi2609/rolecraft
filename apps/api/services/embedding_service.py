@@ -1,4 +1,5 @@
 """Embedding helpers — OpenAI-compatible API when configured, mock fallback otherwise."""
+
 from __future__ import annotations
 
 import hashlib
@@ -57,7 +58,11 @@ def build_job_embedding_text(job: JobPosting) -> str:
 def build_resume_embedding_text(resume: Resume) -> str:
     content = resume.content or {}
     highlighted = content.get("highlightedSkills") or content.get("skills") or []
-    skills = " ".join(str(s) for s in highlighted) if isinstance(highlighted, list) else str(highlighted)
+    skills = (
+        " ".join(str(s) for s in highlighted)
+        if isinstance(highlighted, list)
+        else str(highlighted)
+    )
     summary = content.get("summary") or ""
     mapping = content.get("mappingNotes") or content.get("mapping_notes") or ""
     return f"{resume.target_vertical or ''} {skills} {summary} {mapping}".strip()
@@ -68,12 +73,18 @@ async def refresh_job_embedding(db: AsyncSession, job: JobPosting) -> None:
     await db.flush()
 
 
-async def refresh_resume_embeddings_for_candidate(db: AsyncSession, candidate_id: UUID) -> int:
+async def refresh_resume_embeddings_for_candidate(
+    db: AsyncSession, candidate_id: UUID
+) -> int:
     resumes = (
-        await db.execute(select(Resume).where(Resume.candidate_id == candidate_id))
-    ).scalars().all()
+        (await db.execute(select(Resume).where(Resume.candidate_id == candidate_id)))
+        .scalars()
+        .all()
+    )
     for resume in resumes:
-        resume.embedding = await embed_text(build_resume_embedding_text(resume) or "resume")
+        resume.embedding = await embed_text(
+            build_resume_embedding_text(resume) or "resume"
+        )
     if resumes:
         await db.flush()
     return len(resumes)

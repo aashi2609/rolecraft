@@ -1,16 +1,19 @@
 from typing import Any, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
-from pydantic import BaseModel
 
 from core.dependencies import DbSession, get_current_user
 from core.security import hash_password
 from models import (
-    Application, Company, CandidateProfile, JobPosting, JobStatus,
-    Subscription, SubscriptionStatus, User, UserRole,
+    Application,
+    JobPosting,
+    Subscription,
+    User,
+    UserRole,
 )
-from schemas import UserOut, SubscriptionOut, JobOut
 from services.admin_service import get_dashboard_stats
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -26,6 +29,7 @@ def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
 
 
 # ── Schemas ──────────────────────────────────────────────────────────────────
+
 
 class AdminUserOut(BaseModel):
     id: str
@@ -80,16 +84,19 @@ class UserStatusUpdate(BaseModel):
     role: Optional[str] = None
     is_active: Optional[bool] = None
 
+
 class UserCreate(BaseModel):
     email: str
     password: str
     role: str = "candidate"
     is_active: bool = True
 
+
 class SubStatusUpdate(BaseModel):
     plan_tier: Optional[str] = None
     status: Optional[str] = None
     role: Optional[str] = None
+
 
 class SubCreate(BaseModel):
     user_id: str
@@ -97,11 +104,13 @@ class SubCreate(BaseModel):
     plan_tier: str
     status: str = "active"
 
+
 class JobAdminUpdate(BaseModel):
     title: Optional[str] = None
     status: Optional[str] = None
     location: Optional[str] = None
     employment_type: Optional[str] = None
+
 
 class JobCreate(BaseModel):
     company_id: str
@@ -112,6 +121,7 @@ class JobCreate(BaseModel):
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
+
 
 @router.get("/me")
 async def get_me(current_admin: User = Depends(get_current_admin)) -> Any:
@@ -159,17 +169,27 @@ async def get_all_users(
         plan_tier = None
         sub_status = None
         if u.subscription:
-            plan_tier = str(u.subscription.plan_tier.value if hasattr(u.subscription.plan_tier, "value") else u.subscription.plan_tier)
-            sub_status = str(u.subscription.status.value if hasattr(u.subscription.status, "value") else u.subscription.status)
-        out.append(AdminUserOut(
-            id=str(u.id),
-            email=u.email,
-            role=str(u.role.value if hasattr(u.role, "value") else u.role),
-            created_at=u.created_at.isoformat(),
-            name=name,
-            plan_tier=plan_tier,
-            subscription_status=sub_status,
-        ))
+            plan_tier = str(
+                u.subscription.plan_tier.value
+                if hasattr(u.subscription.plan_tier, "value")
+                else u.subscription.plan_tier
+            )
+            sub_status = str(
+                u.subscription.status.value
+                if hasattr(u.subscription.status, "value")
+                else u.subscription.status
+            )
+        out.append(
+            AdminUserOut(
+                id=str(u.id),
+                email=u.email,
+                role=str(u.role.value if hasattr(u.role, "value") else u.role),
+                created_at=u.created_at.isoformat(),
+                name=name,
+                plan_tier=plan_tier,
+                subscription_status=sub_status,
+            )
+        )
     return out
 
 
@@ -191,7 +211,14 @@ async def update_user(
         user.email = update_data.email
     await db.commit()
     await db.refresh(user)
-    return {"ok": True, "id": str(user.id), "role": str(user.role.value if hasattr(user.role, "value") else user.role)}
+    return {
+        "ok": True,
+        "id": str(user.id),
+        "role": str(
+            user.role.value if hasattr(user.role, "value") else user.role
+        ),
+    }
+
 
 @router.post("/users")
 async def create_user(
@@ -204,12 +231,13 @@ async def create_user(
         email=create_data.email,
         password_hash=hashed_pwd,
         role=create_data.role,
-        is_active=create_data.is_active
+        is_active=create_data.is_active,
     )
     db.add(user)
     await db.commit()
     await db.refresh(user)
     return {"ok": True, "id": str(user.id)}
+
 
 @router.delete("/users/{user_id}")
 async def delete_user(
@@ -241,7 +269,11 @@ async def get_all_subscriptions(
         query = query.where(Subscription.status == status_filter)
     if plan:
         query = query.where(Subscription.plan_tier == plan)
-    query = query.order_by(Subscription.started_at.desc()).offset(skip).limit(limit)
+    query = (
+        query.order_by(Subscription.started_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
     result = await db.execute(query)
     subs = result.scalars().all()
 
@@ -252,17 +284,25 @@ async def get_all_subscriptions(
         user_name = None
         if s.user and s.user.company:
             user_name = s.user.company.name
-        out.append(AdminSubOut(
-            id=str(s.id),
-            user_id=str(s.user_id),
-            user_email=user_email,
-            user_name=user_name,
-            role=str(s.role.value if hasattr(s.role, "value") else s.role),
-            plan_tier=str(s.plan_tier.value if hasattr(s.plan_tier, "value") else s.plan_tier),
-            status=str(s.status.value if hasattr(s.status, "value") else s.status),
-            started_at=s.started_at.isoformat(),
-            renews_at=s.renews_at.isoformat() if s.renews_at else None,
-        ))
+        out.append(
+            AdminSubOut(
+                id=str(s.id),
+                user_id=str(s.user_id),
+                user_email=user_email,
+                user_name=user_name,
+                role=str(s.role.value if hasattr(s.role, "value") else s.role),
+                plan_tier=str(
+                    s.plan_tier.value
+                    if hasattr(s.plan_tier, "value")
+                    else s.plan_tier
+                ),
+                status=str(
+                    s.status.value if hasattr(s.status, "value") else s.status
+                ),
+                started_at=s.started_at.isoformat(),
+                renews_at=s.renews_at.isoformat() if s.renews_at else None,
+            )
+        )
     return out
 
 
@@ -286,6 +326,7 @@ async def update_subscription(
     await db.refresh(sub)
     return {"ok": True}
 
+
 @router.post("/subscriptions")
 async def create_subscription(
     create_data: SubCreate,
@@ -296,12 +337,13 @@ async def create_subscription(
         user_id=create_data.user_id,
         role=create_data.role,
         plan_tier=create_data.plan_tier,
-        status=create_data.status
+        status=create_data.status,
     )
     db.add(sub)
     await db.commit()
     await db.refresh(sub)
     return {"ok": True, "id": str(sub.id)}
+
 
 @router.delete("/subscriptions/{sub_id}")
 async def delete_subscription(
@@ -331,27 +373,41 @@ async def get_all_jobs(
         query = query.where(JobPosting.title.ilike(f"%{search}%"))
     if status_filter:
         query = query.where(JobPosting.status == status_filter)
-    query = query.order_by(JobPosting.created_at.desc()).offset(skip).limit(limit)
+    query = (
+        query.order_by(JobPosting.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
     result = await db.execute(query)
     jobs = result.scalars().all()
 
     out = []
     for j in jobs:
         # Count applications
-        app_count = await db.scalar(
-            select(func.count()).select_from(Application).where(Application.job_id == j.id)
-        ) or 0
-        out.append(AdminJobOut(
-            id=str(j.id),
-            title=j.title,
-            company_name=j.company.name if j.company else None,
-            company_id=str(j.company_id),
-            status=str(j.status.value if hasattr(j.status, "value") else j.status),
-            location=j.location or ", ".join(filter(None, [j.city, j.state, j.country])),
-            employment_type=j.employment_type,
-            created_at=j.created_at.isoformat(),
-            application_count=app_count,
-        ))
+        app_count = (
+            await db.scalar(
+                select(func.count())
+                .select_from(Application)
+                .where(Application.job_id == j.id)
+            )
+            or 0
+        )
+        out.append(
+            AdminJobOut(
+                id=str(j.id),
+                title=j.title,
+                company_name=j.company.name if j.company else None,
+                company_id=str(j.company_id),
+                status=str(
+                    j.status.value if hasattr(j.status, "value") else j.status
+                ),
+                location=j.location
+                or ", ".join(filter(None, [j.city, j.state, j.country])),
+                employment_type=j.employment_type,
+                created_at=j.created_at.isoformat(),
+                application_count=app_count,
+            )
+        )
     return out
 
 
@@ -377,6 +433,7 @@ async def update_job_status(
     await db.refresh(job)
     return {"ok": True}
 
+
 @router.post("/jobs")
 async def create_job(
     create_data: JobCreate,
@@ -388,12 +445,13 @@ async def create_job(
         title=create_data.title,
         status=create_data.status,
         location=create_data.location,
-        employment_type=create_data.employment_type
+        employment_type=create_data.employment_type,
     )
     db.add(job)
     await db.commit()
     await db.refresh(job)
     return {"ok": True, "id": str(job.id)}
+
 
 @router.delete("/jobs/{job_id}")
 async def delete_job(

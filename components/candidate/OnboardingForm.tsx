@@ -10,7 +10,6 @@ import { FileDropzone } from '@/components/ui/FileDropzone';
 import { TagInput } from '@/components/ui/TagInput';
 import { RepeatableSection } from '@/components/ui/RepeatableSection';
 import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
-import { Card } from '@/components/ui/Card';
 import { useUser } from '@/context/UserContext';
 import { SKILLS } from '@/lib/constants';
 import { candidateApi, resumesApi } from '@/lib/api';
@@ -48,7 +47,8 @@ export default function OnboardingForm() {
     setFormData((prev: any) => ({ ...prev, [key]: value }));
   };
 
-  const handleResumeUpload = async (file: File) => {
+  const handleResumeUpload = async (file: File | null) => {
+    if (!file) return;
     setIsParsing(true);
     try {
       const parsed = await resumesApi.parse(file);
@@ -203,7 +203,7 @@ export default function OnboardingForm() {
               <FileDropzone 
                 onFileSelect={handleResumeUpload} 
                 accept="application/pdf"
-                maxSize={5}
+                maxSizeMB={5}
               />
               {isParsing && (
                 <div className="mt-4 flex items-center justify-center text-primary font-medium animate-pulse">
@@ -213,7 +213,7 @@ export default function OnboardingForm() {
             </div>
 
             <FormField label="Photo Upload">
-              <FileDropzone onFileSelect={(f) => {/* TODO: Implement file upload */}} accept="image/*" />
+              <FileDropzone onFileSelect={(_file) => {/* TODO: Implement file upload */}} accept="image/*" />
             </FormField>
             
             <FormField label="Career Level" required>
@@ -235,7 +235,7 @@ export default function OnboardingForm() {
             </FormField>
 
             <FormField label="Resume Upload">
-              <FileDropzone onFileSelect={(f) => {/* TODO: Implement file upload */}} accept=".pdf,.doc,.docx" maxSizeMB={10} />
+              <FileDropzone onFileSelect={(_file) => {/* TODO: Implement file upload */}} accept=".pdf,.doc,.docx" maxSizeMB={10} />
             </FormField>
           </div>
         )}
@@ -284,7 +284,7 @@ export default function OnboardingForm() {
                     </FormField>
                   </div>
                   <FormField label="Marksheet / Certificate Upload">
-                    <FileDropzone onFileSelect={(f) => {/* TODO: Implement file upload */}} accept=".pdf,.jpg,.png" />
+                    <FileDropzone onFileSelect={(_file) => {/* TODO: Implement file upload */}} accept=".pdf,.jpg,.png" />
                   </FormField>
                 </div>
               )}
@@ -331,7 +331,7 @@ export default function OnboardingForm() {
                     <Textarea placeholder="Brief description of what you learned" className="min-h-[80px]" value={item.desc || ""} onChange={(e) => updateArrayItem('certifications', index, 'desc', e.target.value)} />
                   </FormField>
                   <FormField label="Certificate File (Optional)">
-                    <FileDropzone onFileSelect={(f) => {/* TODO: Implement file upload */}} />
+                    <FileDropzone onFileSelect={(_file) => {/* TODO: Implement file upload */}} />
                   </FormField>
                 </div>
               )}

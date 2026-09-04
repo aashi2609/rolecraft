@@ -144,7 +144,7 @@ export function SearchableCombobox({
                     className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:cursor-pointer text-primary"
                   >
                     <span className="mr-2 h-4 w-4 font-bold flex items-center justify-center">+</span>
-                    Add "{inputValue.trim()}"
+                    Add &quot;{inputValue.trim()}&quot;
                   </Command.Item>
                 </Command.Group>
               )}

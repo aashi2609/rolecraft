@@ -1,4 +1,5 @@
 """Subscription management service."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -7,15 +8,18 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from models import Subscription, UserRole, PlanTier, SubscriptionStatus
-from schemas import SubscriptionOut, SubscriptionCreate
+from models import PlanTier, Subscription, SubscriptionStatus, UserRole
+from schemas import SubscriptionCreate, SubscriptionOut
 
 
 async def get_active_subscription(db, user_id: UUID) -> Optional[Subscription]:
     """Get the active subscription for a user."""
     return await db.scalar(
         select(Subscription)
-        .where(Subscription.user_id == user_id, Subscription.status == SubscriptionStatus.active)
+        .where(
+            Subscription.user_id == user_id,
+            Subscription.status == SubscriptionStatus.active,
+        )
         .order_by(Subscription.started_at.desc())
     )
 
@@ -28,23 +32,37 @@ async def validate_plan_tier(tier_str: str, user_role: UserRole) -> PlanTier:
         raise ValueError("Invalid plan_tier") from exc
 
     # Validate plan tier matches user role
-    if user_role == UserRole.candidate and tier not in [PlanTier.free, PlanTier.basic, PlanTier.premium, PlanTier.elite]:
+    if user_role == UserRole.candidate and tier not in [
+        PlanTier.free,
+        PlanTier.basic,
+        PlanTier.premium,
+        PlanTier.elite,
+    ]:
         raise ValueError("Invalid plan tier for candidate role")
-    if user_role == UserRole.company and tier not in [PlanTier.starter, PlanTier.growth, PlanTier.scale]:
+    if user_role == UserRole.company and tier not in [
+        PlanTier.starter,
+        PlanTier.growth,
+        PlanTier.scale,
+    ]:
         raise ValueError("Invalid plan tier for company role")
-    
+
     return tier
 
 
 async def cancel_active_subscriptions(db, user_id: UUID) -> None:
     """Cancel all active subscriptions for a user."""
     existing = (
-        await db.execute(
-            select(Subscription).where(
-                Subscription.user_id == user_id, Subscription.status == SubscriptionStatus.active
+        (
+            await db.execute(
+                select(Subscription).where(
+                    Subscription.user_id == user_id,
+                    Subscription.status == SubscriptionStatus.active,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for s in existing:
         s.status = SubscriptionStatus.cancelled
 
@@ -76,7 +94,7 @@ async def upsert_subscription(
     user_role: UserRole,
 ) -> SubscriptionOut:
     """Create or update a subscription for a user.
-    
+
     Cancels existing active subscriptions and creates a new one.
     """
     # Validate and convert plan tier
@@ -87,5 +105,5 @@ async def upsert_subscription(
 
     # Create new subscription
     sub = await create_subscription(db, user_id, user_role, tier)
-    
+
     return SubscriptionOut.model_validate(sub)

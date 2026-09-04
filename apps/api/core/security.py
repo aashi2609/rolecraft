@@ -19,7 +19,9 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
-def create_access_token(*, user_id: UUID, role: str, expires_minutes: Optional[int] = None) -> str:
+def create_access_token(
+    *, user_id: UUID, role: str, expires_minutes: Optional[int] = None
+) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=expires_minutes or settings.access_token_expire_minutes
     )
@@ -33,6 +35,8 @@ def create_access_token(*, user_id: UUID, role: str, expires_minutes: Optional[i
 
 def decode_access_token(token: str) -> dict[str, Any]:
     try:
-        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        return jwt.decode(
+            token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
+        )
     except JWTError as exc:
         raise ValueError("Invalid or expired token") from exc

@@ -40,7 +40,13 @@ export default function CompanyProfileOnboarding() {
     industry: 'Technology / IT Services',
   });
 
-  const handleJdUpload = async (file: File) => {
+  const handleJdUpload = async (file: File | null) => {
+    if (!file) {
+      setJdFileName(null);
+      setParsedJd(null);
+      setJdNote(null);
+      return;
+    }
     setParsingJd(true);
     setJdFileName(file.name);
     setJdNote(null);

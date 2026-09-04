@@ -133,7 +133,7 @@ def _clean_education(edu_list) -> tuple[list[dict[str, Any]], list[str]]:
     cleaned: list[dict[str, Any]] = []
     seen_keys: set[str] = set()
 
-    for edu in (edu_list or []):
+    for edu in edu_list or []:
         degree = _normalise_text(getattr(edu, "degree", None) or "")
         institute = _normalise_text(getattr(edu, "institute", None) or "")
         field_of_study = _normalise_text(getattr(edu, "field_of_study", None) or "")
@@ -144,7 +144,9 @@ def _clean_education(edu_list) -> tuple[list[dict[str, Any]], list[str]]:
         # Dedup key
         key = f"{degree}|{institute}|{field_of_study}".lower()
         if key in seen_keys:
-            warnings.append(f"Duplicate education entry removed: {degree} at {institute}")
+            warnings.append(
+                f"Duplicate education entry removed: {degree} at {institute}"
+            )
             continue
         seen_keys.add(key)
 
@@ -176,7 +178,7 @@ def _clean_experience(exp_list) -> tuple[list[dict[str, Any]], list[str]]:
     cleaned: list[dict[str, Any]] = []
     seen_keys: set[str] = set()
 
-    for exp in (exp_list or []):
+    for exp in exp_list or []:
         company = _normalise_text(getattr(exp, "company_name", None) or "")
         role = _normalise_text(getattr(exp, "role", None) or "")
         designation = _normalise_text(getattr(exp, "designation", None) or "")
@@ -225,11 +227,13 @@ def _clean_projects(proj_list) -> tuple[list[dict[str, Any]], list[str]]:
     cleaned: list[dict[str, Any]] = []
     seen_keys: set[str] = set()
 
-    for proj in (proj_list or []):
+    for proj in proj_list or []:
         name = _normalise_text(getattr(proj, "project_name", None) or "")
         org = _normalise_text(getattr(proj, "org", None) or "")
         tools = _normalise_text(getattr(proj, "tools_used", None) or "")
-        responsibilities = _normalise_text(getattr(proj, "responsibilities", None) or "")
+        responsibilities = _normalise_text(
+            getattr(proj, "responsibilities", None) or ""
+        )
         achievements = _normalise_text(getattr(proj, "achievements", None) or "")
 
         key = name.lower()
@@ -264,7 +268,7 @@ def _clean_certifications(cert_list) -> tuple[list[dict[str, Any]], list[str]]:
     cleaned: list[dict[str, Any]] = []
     seen_keys: set[str] = set()
 
-    for cert in (cert_list or []):
+    for cert in cert_list or []:
         name = _normalise_text(getattr(cert, "name", None) or "")
         issuer = _normalise_text(getattr(cert, "issuing_org", None) or "")
         date = getattr(cert, "completion_date", None)
@@ -305,7 +309,7 @@ def clean_profile(profile: CandidateProfile, user_email: str = "") -> CleanedPro
 
     # Skills
     raw_skills: list[str] = []
-    for cs in (profile.skills or []):
+    for cs in profile.skills or []:
         skill_obj = getattr(cs, "skill", None)
         if skill_obj:
             name = getattr(skill_obj, "name", "")
@@ -314,7 +318,9 @@ def clean_profile(profile: CandidateProfile, user_email: str = "") -> CleanedPro
                 raw_skills.append(normalised)
     skills = _dedupe_strings(raw_skills)
     if not skills:
-        warnings.append("No skills found — resume will rely on experience and education only")
+        warnings.append(
+            "No skills found — resume will rely on experience and education only"
+        )
 
     # Education
     education, edu_warnings = _clean_education(profile.education)
@@ -329,26 +335,28 @@ def clean_profile(profile: CandidateProfile, user_email: str = "") -> CleanedPro
     warnings.extend(proj_warnings)
 
     # Certifications
-    certifications, cert_warnings = _clean_certifications(getattr(profile, "certifications", []))
+    certifications, cert_warnings = _clean_certifications(
+        getattr(profile, "certifications", [])
+    )
     warnings.extend(cert_warnings)
 
     # Strengths
-    strengths = _dedupe_strings([
-        _normalise_text(s) for s in (profile.strengths or [])
-    ])
+    strengths = _dedupe_strings([_normalise_text(s) for s in (profile.strengths or [])])
 
     # Name + weblinks
     raw_links = profile.weblinks or {}
-    weblinks = {k: _normalise_text(v) for k, v in raw_links.items() if _normalise_text(v)}
+    weblinks = {
+        k: _normalise_text(v) for k, v in raw_links.items() if _normalise_text(v)
+    }
     name = _normalise_text(raw_links.get("display_name", ""))
 
     # Locations / sectors
-    preferred_locations = _dedupe_strings([
-        _normalise_text(loc) for loc in (profile.preferred_locations or [])
-    ])
-    preferred_sectors = _dedupe_strings([
-        _normalise_text(sec) for sec in (profile.preferred_sectors or [])
-    ])
+    preferred_locations = _dedupe_strings(
+        [_normalise_text(loc) for loc in (profile.preferred_locations or [])]
+    )
+    preferred_sectors = _dedupe_strings(
+        [_normalise_text(sec) for sec in (profile.preferred_sectors or [])]
+    )
 
     return CleanedProfile(
         name=name,

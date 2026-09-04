@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -8,6 +8,11 @@ import { FormField, Input } from '@/components/ui/FormField';
 import { useUser } from '@/context/UserContext';
 import { planDisplayName, isFreePlan, getPlanById } from '@/lib/plans';
 import { authApi, companyApi } from '@/lib/api';
+
+interface CompanyProfile {
+  name?: string;
+  email?: string;
+}
 
 export default function CompanySettingsPage() {
   const { plan, companyProfile, refreshSession } = useUser();
@@ -22,10 +27,15 @@ export default function CompanySettingsPage() {
   const [passwordMsg, setPasswordMsg] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    setFullName(String(companyProfile?.name || ''));
-    setEmail(String(companyProfile?.email || ''));
+  const updateFormData = useCallback(() => {
+    const profile = companyProfile as CompanyProfile | null;
+    setFullName(String(profile?.name || ''));
+    setEmail(String(profile?.email || ''));
   }, [companyProfile]);
+
+  useEffect(() => {
+    updateFormData();
+  }, [updateFormData]);
 
   const saveAccount = async () => {
     setSaving(true);

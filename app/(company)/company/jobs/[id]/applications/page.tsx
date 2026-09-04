@@ -1,12 +1,24 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { applicationsApi, jobsApi } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { ArrowLeft, Inbox, Clock, CheckCircle2, XCircle, Users } from 'lucide-react';
 import Link from 'next/link';
+
+interface Job {
+  id: string;
+  title: string;
+}
+
+interface Application {
+  id: string;
+  status: string;
+  applied_at: string;
+  candidate_name?: string;
+}
 
 const STATUS_CONFIG: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
   Applied: {
@@ -54,38 +66,39 @@ export default function JobApplicationsPage() {
   const router = useRouter();
   const jobId = params.id as string;
 
-  const [job, setJob] = useState<any>(null);
-  const [applications, setApplications] = useState<any[]>([]);
+  const [job, setJob] = useState<Job | null>(null);
+  const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const [jobData, appsData] = await Promise.all([
-          jobsApi.get(jobId),
-          applicationsApi.forJob(jobId),
-        ]);
-        setJob(jobData);
-        setApplications(appsData);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+  const loadData = useCallback(async () => {
+    try {
+      const [jobData, appsData] = await Promise.all([
+        jobsApi.get(jobId),
+        applicationsApi.forJob(jobId),
+      ]);
+      setJob(jobData as Job);
+      setApplications(appsData as Application[]);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-    load();
   }, [jobId]);
 
-  const updateStatus = async (appId: string, status: string) => {
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const updateStatus = useCallback(async (appId: string, status: string) => {
     try {
       await applicationsApi.setStatus(appId, status);
-      setApplications(applications.map(a => 
+      setApplications(prev => prev.map(a => 
         a.id === appId ? { ...a, status } : a
       ));
     } catch (err) {
       console.error(err);
     }
-  };
+  }, []);
 
   if (loading) {
     return <div className="py-8 px-4 text-center">Loading applications...</div>;
@@ -112,7 +125,7 @@ export default function JobApplicationsPage() {
           <Inbox className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
           <h3 className="text-lg font-bold text-foreground mb-2">No applications yet</h3>
           <p className="text-muted-foreground text-sm">
-            Candidates haven't applied to this job yet.
+            Candidates haven&apos;t applied to this job yet.
           </p>
         </Card>
       ) : (

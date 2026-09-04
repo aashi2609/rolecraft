@@ -1,7 +1,8 @@
 """Promote a user to admin. Run from apps/api:
 
-    PYTHONPATH=. python scripts/make_admin.py you@email.com
+PYTHONPATH=. python scripts/make_admin.py you@email.com
 """
+
 from __future__ import annotations
 
 import argparse

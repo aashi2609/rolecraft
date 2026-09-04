@@ -47,7 +47,9 @@ engine = create_async_engine(
     pool_pre_ping=True,
     connect_args=_connect_args,
 )
-AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+AsyncSessionLocal = async_sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
 
 
 class Base(DeclarativeBase):

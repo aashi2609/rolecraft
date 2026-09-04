@@ -19,7 +19,7 @@ export default function SavedJobsPage() {
         <div className="mb-8 flex justify-between items-end">
           <div>
             <h1 className="text-3xl font-bold text-ink mb-2">Saved Jobs</h1>
-            <p className="text-ink-muted">Keep track of the roles you're interested in applying for.</p>
+            <p className="text-ink-muted">Keep track of the roles you&apos;re interested in applying for.</p>
           </div>
           <div className="text-ink-muted font-medium">
             {savedJobsData.length} Saved
@@ -29,7 +29,7 @@ export default function SavedJobsPage() {
         {savedJobsData.length === 0 ? (
           <Card className="text-center py-20 border-dashed">
             <Bookmark className="w-16 h-16 text-ink-muted/40 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-ink mb-2">You haven't saved any jobs yet</h3>
+            <h3 className="text-xl font-bold text-ink mb-2">You haven&apos;t saved any jobs yet</h3>
             <p className="text-ink-muted mb-6 max-w-md mx-auto">
               When you see a job you like, click the bookmark icon to save it for later.
             </p>

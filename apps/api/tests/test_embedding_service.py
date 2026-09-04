@@ -1,4 +1,5 @@
 """Unit tests for embedding_service and embedding_client."""
+
 from __future__ import annotations
 
 import asyncio

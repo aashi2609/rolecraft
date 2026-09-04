@@ -56,16 +56,22 @@ def _upload_local(object_name: str, data: bytes) -> tuple[str, str]:
     return url, object_name
 
 
-def _upload_gcs(object_name: str, data: bytes, content_type: str | None) -> tuple[str, str]:
+def _upload_gcs(
+    object_name: str, data: bytes, content_type: str | None
+) -> tuple[str, str]:
     try:
         from google.cloud import storage
     except ImportError as exc:
-        raise HTTPException(status_code=500, detail="google-cloud-storage not installed") from exc
+        raise HTTPException(
+            status_code=500, detail="google-cloud-storage not installed"
+        ) from exc
 
     client = storage.Client(project=settings.gcs_project_id or None)
     bucket = client.bucket(settings.gcs_bucket_name)
     blob = bucket.blob(object_name)
-    blob.upload_from_string(data, content_type=content_type or "application/octet-stream")
+    blob.upload_from_string(
+        data, content_type=content_type or "application/octet-stream"
+    )
     try:
         blob.make_public()
         url = blob.public_url

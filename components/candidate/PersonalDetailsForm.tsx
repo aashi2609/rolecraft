@@ -1,13 +1,26 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { FormField, Input, Textarea } from '@/components/ui/FormField';
 import { TagInput } from '@/components/ui/TagInput';
-import { RepeatableSection } from '@/components/ui/RepeatableSection';
 import { candidateApi } from '@/lib/api';
 import { useUser } from '@/context/UserContext';
+
+interface CandidateProfile {
+  dob?: string;
+  gender?: string;
+  marital_status?: string;
+  present_address?: string;
+  permanent_address?: string;
+  preferred_locations?: string[];
+  preferred_sectors?: string[];
+  strengths?: string[];
+  weaknesses?: string[];
+  annual_family_income?: string;
+  weblinks?: Record<string, string>;
+}
 
 export default function PersonalDetailsForm() {
   const router = useRouter();
@@ -30,24 +43,28 @@ export default function PersonalDetailsForm() {
     family: [] as Record<string, string>[],
   });
 
-  useEffect(() => {
-    const p = candidateProfile || {};
-    const links = (p.weblinks as Record<string, string>) || {};
+  const updateFormData = useCallback(() => {
+    const p = (candidateProfile as CandidateProfile) || {};
+    const links = p.weblinks || {};
     setFormData((prev) => ({
       ...prev,
       dob: p.dob ? String(p.dob).slice(0, 10) : '',
-      gender: (p.gender as string) || '',
-      marital_status: (p.marital_status as string) || '',
-      present_address: (p.present_address as string) || '',
-      permanent_address: (p.permanent_address as string) || '',
-      preferred_locations: (p.preferred_locations as string[]) || [],
-      preferred_sectors: (p.preferred_sectors as string[]) || [],
-      strengths: (p.strengths as string[]) || [],
-      weaknesses: (p.weaknesses as string[]) || [],
-      annual_family_income: (p.annual_family_income as string) || '',
+      gender: p.gender || '',
+      marital_status: p.marital_status || '',
+      present_address: p.present_address || '',
+      permanent_address: p.permanent_address || '',
+      preferred_locations: p.preferred_locations || [],
+      preferred_sectors: p.preferred_sectors || [],
+      strengths: p.strengths || [],
+      weaknesses: p.weaknesses || [],
+      annual_family_income: p.annual_family_income || '',
       weblinks: links,
     }));
   }, [candidateProfile]);
+
+  useEffect(() => {
+    updateFormData();
+  }, [updateFormData]);
 
   const updateForm = (key: string, value: unknown) => {
     setFormData((prev) => ({ ...prev, [key]: value }));

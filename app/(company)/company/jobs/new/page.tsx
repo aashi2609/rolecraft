@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
@@ -11,7 +11,6 @@ import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
 import { UpsellPrompt } from '@/components/UpsellPrompt';
 import { useUser } from '@/context/UserContext';
 import {
-  CITIES,
   DEPARTMENTS,
   EMPLOYMENT_TYPES,
   JOB_TYPES,
@@ -19,6 +18,45 @@ import {
 } from '@/lib/constants';
 import { isFreePlan, maxJobPostings } from '@/lib/plans';
 import { jobsApi } from '@/lib/api';
+
+interface Job {
+  id: string | number;
+  title: string;
+  department: string;
+  status: string;
+  location?: string;
+  employmentType?: string;
+  matched?: number;
+  shortlisted?: number;
+  date?: string;
+  skills?: string[];
+}
+
+interface ParsedJD {
+  title?: string | null;
+  department?: string | null;
+  job_role?: string | null;
+  job_level?: string | null;
+  employment_type?: string | null;
+  experience_range?: string | null;
+  experience_min?: number | null;
+  experience_max?: number | null;
+  min_salary?: number | null;
+  max_salary?: number | null;
+  salary_unit?: string | null;
+  country?: string | null;
+  state?: string | null;
+  city?: string | null;
+  location?: string | null;
+  job_type?: string | null;
+  description?: string | null;
+  responsibilities?: string | null;
+  requirements?: string | null;
+  benefits?: string | null;
+  required_skills?: string[];
+  parse_source?: string | null;
+  parse_warning?: string | null;
+}
 
 type JobDraft = {
   id: number | null;
@@ -82,56 +120,96 @@ function PostJobContent() {
   const [parsingJd, setParsingJd] = useState(false);
   const [jdParseNote, setJdParseNote] = useState<string | null>(null);
 
-  const activeCount = jobs.filter((j) => j.status === 'Live' || j.status === 'Draft').length;
+  const activeCount = jobs.filter((j: Job) => j.status === 'Live' || j.status === 'Draft').length;
   const atCap = !editId && isFreePlan(plan) && activeCount >= maxJobPostings(plan);
+
+  const fillFromJob = useCallback((existing: Job) => {
+    const jt = String((existing as unknown as { jobType?: string; job_type?: string }).jobType || (existing as unknown as { job_type?: string }).job_type || '').toLowerCase();
+    let jobType = 'On-site';
+    if (jt.includes('remote')) jobType = 'Remote';
+    else if (jt.includes('hybrid')) jobType = 'Hybrid';
+    else if (jt.includes('site') || jt.includes('onsite')) jobType = 'On-site';
+
+    const existingWithFields = existing as unknown as {
+      id: string | number;
+      title?: string;
+      department?: string;
+      vertical?: string;
+      jobRole?: string;
+      job_role?: string;
+      role?: string;
+      jobLevel?: string;
+      job_level?: string;
+      level?: string;
+      employmentType?: string;
+      employment_type?: string;
+      experience?: string;
+      experience_range?: string;
+      salaryMin?: number | string;
+      min_salary?: number;
+      salaryMax?: number | string;
+      max_salary?: number;
+      salaryUnit?: string;
+      salary_unit?: string;
+      location?: string;
+      country?: string;
+      state?: string;
+      city?: string;
+      skills?: string[];
+      required_skills?: string[];
+      openings?: number;
+      num_openings?: number;
+      deadline?: string;
+      application_deadline?: string;
+      description?: string;
+      responsibilities?: string;
+      requirements?: string;
+      benefits?: string;
+    };
+
+    setDraft({
+      id: existingWithFields.id != null ? Number(existingWithFields.id) : null,
+      title: existingWithFields.title || '',
+      department: existingWithFields.department || existingWithFields.vertical || '',
+      role: existingWithFields.jobRole || existingWithFields.job_role || existingWithFields.role || '',
+      level: existingWithFields.jobLevel || existingWithFields.job_level || existingWithFields.level || '',
+      employmentType: existingWithFields.employmentType || existingWithFields.employment_type || '',
+      experience: existingWithFields.experience || existingWithFields.experience_range || '',
+      salaryMin:
+        existingWithFields.salaryMin != null && existingWithFields.salaryMin !== ''
+          ? String(existingWithFields.salaryMin)
+          : existingWithFields.min_salary != null
+            ? String(existingWithFields.min_salary)
+            : '',
+      salaryMax:
+        existingWithFields.salaryMax != null && existingWithFields.salaryMax !== ''
+          ? String(existingWithFields.salaryMax)
+          : existingWithFields.max_salary != null
+            ? String(existingWithFields.max_salary)
+            : '',
+      salaryUnit:
+        existingWithFields.salaryUnit === 'Per month' || existingWithFields.salary_unit === 'Per month'
+          ? 'Per month'
+          : 'Per annum',
+      location: existingWithFields.location || '',
+      country: existingWithFields.country || '',
+      state: existingWithFields.state || '',
+      city: existingWithFields.city || '',
+      jobType,
+      skills: existingWithFields.skills || existingWithFields.required_skills || [],
+      openings: String(existingWithFields.openings ?? existingWithFields.num_openings ?? 1),
+      deadline: existingWithFields.deadline || existingWithFields.application_deadline || '',
+      description: existingWithFields.description || '',
+      responsibilities: existingWithFields.responsibilities || '',
+      requirements: existingWithFields.requirements || '',
+      benefits: existingWithFields.benefits || '',
+    });
+  }, []);
 
   useEffect(() => {
     if (!editId) return;
 
-    const fillFromJob = (existing: any) => {
-      const jt = String(existing.jobType || existing.job_type || '').toLowerCase();
-      let jobType = 'On-site';
-      if (jt.includes('remote')) jobType = 'Remote';
-      else if (jt.includes('hybrid')) jobType = 'Hybrid';
-      else if (jt.includes('site') || jt.includes('onsite')) jobType = 'On-site';
-
-      setDraft({
-        id: existing.id,
-        title: existing.title || '',
-        department: existing.department || existing.vertical || '',
-        role: existing.jobRole || existing.job_role || existing.role || '',
-        level: existing.jobLevel || existing.job_level || existing.level || '',
-        employmentType: existing.employmentType || existing.employment_type || '',
-        experience: existing.experience || existing.experience_range || '',
-        salaryMin:
-          existing.salaryMin != null && existing.salaryMin !== ''
-            ? String(existing.salaryMin)
-            : existing.min_salary != null
-              ? String(existing.min_salary)
-              : '',
-        salaryMax:
-          existing.salaryMax != null && existing.salaryMax !== ''
-            ? String(existing.salaryMax)
-            : existing.max_salary != null
-              ? String(existing.max_salary)
-              : '',
-        salaryUnit: existing.salaryUnit || existing.salary_unit || 'Per annum',
-        location: existing.location || '',
-        country: existing.country || '',
-        state: existing.state || '',
-        city: existing.city || '',
-        jobType,
-        skills: existing.skills || existing.required_skills || [],
-        openings: String(existing.openings ?? existing.num_openings ?? 1),
-        deadline: existing.deadline || existing.application_deadline || '',
-        description: existing.description || '',
-        responsibilities: existing.responsibilities || '',
-        requirements: existing.requirements || '',
-        benefits: existing.benefits || '',
-      });
-    };
-
-    const existing = jobs.find((j) => String(j.id) === editId);
+    const existing = jobs.find((j: Job) => String(j.id) === editId);
     if (existing) {
       fillFromJob(existing);
       return;
@@ -141,22 +219,9 @@ function PostJobContent() {
     let cancelled = false;
     jobsApi
       .get(editId)
-      .then((raw: any) => {
+      .then((raw: unknown) => {
         if (cancelled || !raw) return;
-        fillFromJob({
-          ...raw,
-          jobRole: raw.job_role,
-          jobLevel: raw.job_level,
-          employmentType: raw.employment_type,
-          experience: raw.experience_range,
-          salaryMin: raw.min_salary,
-          salaryMax: raw.max_salary,
-          salaryUnit: raw.salary_unit,
-          skills: raw.required_skills,
-          openings: raw.num_openings,
-          deadline: raw.application_deadline,
-          jobType: raw.job_type,
-        });
+        fillFromJob(raw as Job);
       })
       .catch(() => {
         /* leave blank if fetch fails */
@@ -164,7 +229,7 @@ function PostJobContent() {
     return () => {
       cancelled = true;
     };
-  }, [editId, jobs]);
+  }, [editId, jobs, fillFromJob]);
 
   const step1Valid = useMemo(() => {
     return Boolean(
@@ -186,7 +251,7 @@ function PostJobContent() {
     setDraft((prev) => ({ ...prev, [key]: value }));
   };
 
-  const applyParsedJd = (parsed: Awaited<ReturnType<typeof jobsApi.parseJd>>) => {
+  const applyParsedJd = useCallback((parsed: ParsedJD) => {
     setDraft((prev) => {
       const next = { ...prev };
       if (parsed.title) next.title = parsed.title;
@@ -232,16 +297,17 @@ function PostJobContent() {
       if (parsed.required_skills?.length) next.skills = parsed.required_skills;
       return next;
     });
-  };
+  }, []);
 
   // Autofill from company-onboarding JD upload
   useEffect(() => {
     if (editId) return;
+    
     const fromJd = searchParams.get('fromJd');
     try {
       const raw = localStorage.getItem('rolecraft_parsed_jd');
       if (!raw) return;
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(raw) as ParsedJD;
       applyParsedJd(parsed);
       setJdParseNote(
         fromJd
@@ -252,10 +318,9 @@ function PostJobContent() {
     } catch {
       /* ignore */
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editId, searchParams]);
+  }, [editId, searchParams, applyParsedJd]);
 
-  const handleJdUpload = async (file: File) => {
+  const handleJdUpload = useCallback(async (file: File) => {
     setUploadedFileName(file.name);
     setParsingJd(true);
     setJdParseNote(null);
@@ -278,9 +343,9 @@ function PostJobContent() {
     } finally {
       setParsingJd(false);
     }
-  };
+  }, [applyParsedJd]);
 
-  const persist = async (status: 'Live' | 'Draft') => {
+  const persist = useCallback(async (status: 'Live' | 'Draft') => {
     if (atCap && status === 'Live') return;
     setSaving(true);
     const apiBody = {
@@ -311,8 +376,8 @@ function PostJobContent() {
 
     try {
       if (draft.id) {
-        const updated: any = await jobsApi.update(String(draft.id), apiBody);
-        if (status !== (jobs.find((j) => String(j.id) === String(draft.id))?.status || '')) {
+        const updated = (await jobsApi.update(String(draft.id), apiBody)) as Job;
+        if (status !== (jobs.find((j: Job) => String(j.id) === String(draft.id))?.status || '')) {
           await jobsApi.setStatus(String(draft.id), status.toLowerCase());
         }
         updateJob({
@@ -322,18 +387,18 @@ function PostJobContent() {
           status: status,
         });
       } else {
-        const created: any = await jobsApi.create(apiBody);
+        const created = (await jobsApi.create(apiBody)) as Job;
         addJob({
           id: created.id,
           title: created.title,
           department: created.department,
           location: created.location,
-          employmentType: created.employment_type,
+          employmentType: created.employmentType,
           status: status,
           matched: 0,
           shortlisted: 0,
-          date: created.created_at?.slice?.(0, 10),
-          skills: created.required_skills || [],
+          date: (created as unknown as { created_at?: string }).created_at?.slice?.(0, 10),
+          skills: (created as unknown as { required_skills?: string[] }).required_skills || [],
         });
       }
       router.push('/company/jobs');
@@ -359,7 +424,7 @@ function PostJobContent() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [atCap, draft, jobs, updateJob, addJob, router]);
 
   if (atCap) {
     return (

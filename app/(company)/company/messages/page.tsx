@@ -1,10 +1,27 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useUser } from '@/context/UserContext';
 import { Button } from '@/components/ui/Button';
 import { Send, MessageSquare } from 'lucide-react';
 import { messagesApi } from '@/lib/api';
+
+interface Message {
+  threadId?: string;
+  id: string;
+  companyName?: string;
+  participant_label?: string;
+  lastMessage?: string;
+  timestamp: string;
+  otherUserId?: string;
+}
+
+interface ChatMessageRaw {
+  id: string;
+  sender_id: string;
+  body: string;
+  sent_at: string;
+}
 
 type Thread = {
   id: string;
@@ -46,49 +63,56 @@ export default function CompanyMessagesPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
 
-  useEffect(() => {
-    setThreads(
-      (messages || []).map((m: any) => ({
-        id: m.threadId || m.id,
-        threadId: m.threadId || m.id,
-        candidateName: m.companyName || m.participant_label || 'Candidate',
-        lastMessage: m.lastMessage || '',
-        timestamp: m.timestamp,
-        otherUserId: m.otherUserId,
-      }))
-    );
+  const loadThreads = useCallback(() => {
+    const threadData = (messages || []).map((m: Message) => ({
+      id: m.threadId || m.id,
+      threadId: m.threadId || m.id,
+      candidateName: m.companyName || m.participant_label || 'Candidate',
+      lastMessage: m.lastMessage || '',
+      timestamp: m.timestamp,
+      otherUserId: m.otherUserId,
+    }));
+    setThreads(threadData);
     setLoading(false);
   }, [messages]);
+
+  useEffect(() => {
+    loadThreads();
+  }, [loadThreads]);
+
+  const loadChatMessages = useCallback(async (threadId: string) => {
+    try {
+      const rows: ChatMessageRaw[] = await messagesApi.getThread(threadId);
+      setChat(
+        rows.map((m) => ({
+          id: m.id,
+          senderId: m.sender_id,
+          body: m.body,
+          sentAt: m.sent_at,
+          isMine: String(m.sender_id) === String(userId),
+        }))
+      );
+    } catch {
+      setChat([]);
+    }
+  }, [userId]);
 
   useEffect(() => {
     if (!activeThread) {
       setChat([]);
       return;
     }
-    messagesApi
-      .getThread(activeThread)
-      .then((rows: any[]) => {
-        setChat(
-          rows.map((m) => ({
-            id: m.id,
-            senderId: m.sender_id,
-            body: m.body,
-            sentAt: m.sent_at,
-            isMine: String(m.sender_id) === String(userId),
-          }))
-        );
-      })
-      .catch(() => setChat([]));
-  }, [activeThread, userId]);
+    loadChatMessages(activeThread);
+  }, [activeThread, loadChatMessages]);
 
-  const handleSend = async () => {
+  const handleSend = useCallback(async () => {
     if (!newMessage.trim() || !activeThread) return;
     setSending(true);
     const active = threads.find((t) => t.threadId === activeThread);
     try {
       await messagesApi.send(activeThread, newMessage.trim(), active?.otherUserId);
       setNewMessage('');
-      const rows: any[] = await messagesApi.getThread(activeThread);
+      const rows: ChatMessageRaw[] = await messagesApi.getThread(activeThread);
       setChat(
         rows.map((m) => ({
           id: m.id,
@@ -104,7 +128,7 @@ export default function CompanyMessagesPage() {
     } finally {
       setSending(false);
     }
-  };
+  }, [activeThread, newMessage, refreshMessages, threads, userId]);
 
   if (loading) {
     return (

@@ -1,4 +1,5 @@
 """OpenAI-compatible embedding API client with mock fallback."""
+
 from __future__ import annotations
 
 import logging

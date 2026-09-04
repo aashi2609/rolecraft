@@ -1,4 +1,5 @@
 """Live Groq integration audit — run from apps/api with PYTHONPATH=."""
+
 from __future__ import annotations
 
 import asyncio
@@ -95,8 +96,12 @@ async def main() -> None:
     try:
         resume = await _generate_ai(cleaned, "software")
         print("  status: OK")
-        print(f"  professional_summary: {resume.get('professional_summary', '')[:120]}...")
-        print(f"  skills.technical: {resume.get('skills', {}).get('technical', [])[:5]}")
+        print(
+            f"  professional_summary: {resume.get('professional_summary', '')[:120]}..."
+        )
+        print(
+            f"  skills.technical: {resume.get('skills', {}).get('technical', [])[:5]}"
+        )
     except Exception as exc:
         print(f"  status: FAIL — {type(exc).__name__}: {exc}")
     print()
@@ -127,7 +132,9 @@ async def main() -> None:
     print()
 
     print("=== TEST 3: Fitment rationale ===")
-    print("  NOT APPLICABLE — embeddings use EMBEDDING_API_KEY (OpenAI-compatible) or mock fallback; no Groq call.")
+    print(
+        "  NOT APPLICABLE — embeddings use EMBEDDING_API_KEY (OpenAI-compatible) or mock fallback; no Groq call."
+    )
     print()
 
     print("=== TEST 4: PDF parse prompt (minimal generate_content) ===")

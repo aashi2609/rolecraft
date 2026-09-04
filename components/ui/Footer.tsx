@@ -27,9 +27,9 @@ export function Footer() {
           <div>
             <h4 className="font-semibold text-ink mb-4 text-sm uppercase tracking-wider">Product</h4>
             <div className="flex flex-col gap-3">
-              <a href="/#features" className="text-sm text-ink-muted hover:text-brand-blue transition-colors">Features</a>
+              <Link href="/#features" className="text-sm text-ink-muted hover:text-brand-blue transition-colors">Features</Link>
               <Link href="/pricing" className="text-sm text-ink-muted hover:text-brand-blue transition-colors">Pricing</Link>
-              <a href="/#companies" className="text-sm text-ink-muted hover:text-brand-blue transition-colors">For Companies</a>
+              <Link href="/#companies" className="text-sm text-ink-muted hover:text-brand-blue transition-colors">For Companies</Link>
             </div>
           </div>
           

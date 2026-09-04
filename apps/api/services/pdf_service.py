@@ -41,7 +41,9 @@ def _ensure_url(url: str) -> str:
     return u
 
 
-def _extract_contact(content: dict[str, Any], weblinks: Optional[dict] = None) -> dict[str, str]:
+def _extract_contact(
+    content: dict[str, Any], weblinks: Optional[dict] = None
+) -> dict[str, str]:
     info: dict[str, str] = {}
     merged: dict[str, Any] = {}
     if isinstance(content.get("weblinks"), dict):
@@ -74,7 +76,11 @@ def _normalise_skills(skills_data) -> dict[str, list[str]]:
         known = {"technical", "soft"}
         out: dict[str, list[str]] = {"technical": [], "soft": []}
         for k, v in skills_data.items():
-            items = [str(s).strip() for s in (v or []) if str(s).strip()] if isinstance(v, list) else []
+            items = (
+                [str(s).strip() for s in (v or []) if str(s).strip()]
+                if isinstance(v, list)
+                else []
+            )
             if not items:
                 continue
             key = str(k).lower()
@@ -139,7 +145,9 @@ def _heading(pdf: FPDF, title: str) -> None:
     pdf.ln(2.5)
 
 
-def _row_left_right(pdf: FPDF, left: str, right: str, *, left_style: str = "B", size: float = 10) -> None:
+def _row_left_right(
+    pdf: FPDF, left: str, right: str, *, left_style: str = "B", size: float = 10
+) -> None:
     """Print left-aligned title and right-aligned date on one line."""
     usable = pdf.epw
     right_txt = _safe(right)
@@ -182,7 +190,11 @@ def generate_pdf(
     contact = _extract_contact(resume_content, weblinks)
     phone = phone or contact.get("phone") or ""
     skills = _normalise_skills(resume_content.get("skills", {}))
-    summary = resume_content.get("professional_summary") or resume_content.get("summary") or ""
+    summary = (
+        resume_content.get("professional_summary")
+        or resume_content.get("summary")
+        or ""
+    )
     location = location or _safe(resume_content.get("location") or "")
 
     pdf = _ResumePDF(format="A4", unit="mm")
@@ -206,7 +218,11 @@ def generate_pdf(
         contact_parts.append((_safe(phone), f"tel:{re.sub(r'[^0-9+]', '', phone)}"))
     if location:
         contact_parts.append((_safe(location), None))
-    for key, label in (("linkedin", "LinkedIn"), ("github", "GitHub"), ("portfolio", "Portfolio")):
+    for key, label in (
+        ("linkedin", "LinkedIn"),
+        ("github", "GitHub"),
+        ("portfolio", "Portfolio"),
+    ):
         url = contact.get(key)
         if url:
             contact_parts.append((label, url))
@@ -268,7 +284,9 @@ def generate_pdf(
             title = _safe(exp.get("title"))
             company = _safe(exp.get("company"))
             dates = _safe(exp.get("dates"))
-            location_exp = _safe(exp.get("location") or exp.get("employment_type") or "")
+            location_exp = _safe(
+                exp.get("location") or exp.get("employment_type") or ""
+            )
             _row_left_right(pdf, title or "Role", dates)
             if company or location_exp:
                 pdf.set_font("Helvetica", "I", 9)
@@ -303,7 +321,9 @@ def generate_pdf(
             if gpa:
                 pdf.set_font("Helvetica", "", 9)
                 pdf.set_text_color(70, 70, 70)
-                pdf.multi_cell(usable, 4.5, f"CGPA: {gpa}" if "cgpa" not in gpa.lower() else gpa)
+                pdf.multi_cell(
+                    usable, 4.5, f"CGPA: {gpa}" if "cgpa" not in gpa.lower() else gpa
+                )
             highlights = edu.get("highlights") or []
             if isinstance(highlights, str):
                 highlights = [highlights]
@@ -320,7 +340,11 @@ def generate_pdf(
     if skill_cats:
         _heading(pdf, "Skills")
         for cat, items in skill_cats:
-            label = "Technical" if cat == "technical" else ("Soft" if cat == "soft" else str(cat).title())
+            label = (
+                "Technical"
+                if cat == "technical"
+                else ("Soft" if cat == "soft" else str(cat).title())
+            )
             pdf.set_font("Helvetica", "B", 9)
             pdf.set_text_color(26, 26, 26)
             pdf.write(5, f"{label}: ")
@@ -395,7 +419,9 @@ def generate_pdf(
         pdf.set_font("Helvetica", "", 10)
         pdf.set_text_color(40, 40, 40)
         for a in achievements:
-            text = _safe(a if not isinstance(a, dict) else a.get("title") or a.get("name") or "")
+            text = _safe(
+                a if not isinstance(a, dict) else a.get("title") or a.get("name") or ""
+            )
             if text:
                 pdf.multi_cell(usable, 5, f"- {text}")
 
@@ -448,5 +474,7 @@ def build_resume_pdf_response(
         from fastapi import HTTPException
 
         logger.exception("PDF generation failed")
-        raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"PDF generation failed: {exc}"
+        ) from exc
     return create_pdf_response(pdf_bytes, filename)

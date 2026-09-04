@@ -5,6 +5,7 @@
 Uses in-process TestClient so results track the code under test (not a stale
 uvicorn on :8000).
 """
+
 from __future__ import annotations
 
 import uuid
@@ -15,12 +16,13 @@ from fastapi.testclient import TestClient
 
 from core.config import get_settings
 from main import app
-from services import resume_service
 
 settings = get_settings()
 
 
-def _signup(client: TestClient, email: str, role: str, password: str = "testpass123A") -> dict:
+def _signup(
+    client: TestClient, email: str, role: str, password: str = "testpass123A"
+) -> dict:
     r = client.post(
         "/auth/signup",
         json={"email": email, "password": password, "role": role, "name": "Test User"},
@@ -31,7 +33,11 @@ def _signup(client: TestClient, email: str, role: str, password: str = "testpass
 
 
 def test_cors(client: TestClient) -> None:
-    allowed = settings.cors_origin_list[0] if settings.cors_origin_list else "http://localhost:3000"
+    allowed = (
+        settings.cors_origin_list[0]
+        if settings.cors_origin_list
+        else "http://localhost:3000"
+    )
 
     evil = client.get("/health", headers={"Origin": "https://evil.com"})
     acao_evil = evil.headers.get("access-control-allow-origin")
@@ -65,10 +71,14 @@ def test_idor_candidates_and_jobs(client: TestClient) -> None:
         },
     )
 
-    r = client.get(f"/candidates/{id_b}", headers={"Authorization": f"Bearer {token_a}"})
+    r = client.get(
+        f"/candidates/{id_b}", headers={"Authorization": f"Bearer {token_a}"}
+    )
     assert r.status_code == 404, f"status={r.status_code}"
 
-    r = client.get(f"/candidates/{id_a}", headers={"Authorization": f"Bearer {token_a}"})
+    r = client.get(
+        f"/candidates/{id_a}", headers={"Authorization": f"Bearer {token_a}"}
+    )
     assert r.status_code == 200, f"status={r.status_code}"
 
     r = client.get(
@@ -109,7 +119,9 @@ def test_idor_candidates_and_jobs(client: TestClient) -> None:
 
 
 def test_parse_auth_required(client: TestClient) -> None:
-    with patch("services.ai_client.generate_content", new_callable=AsyncMock) as mock_groq:
+    with patch(
+        "services.ai_client.generate_content", new_callable=AsyncMock
+    ) as mock_groq:
         r = client.post(
             "/resumes/parse",
             files={"file": ("resume.pdf", b"%PDF-1.4 minimal", "application/pdf")},
@@ -119,6 +131,7 @@ def test_parse_auth_required(client: TestClient) -> None:
 
 
 def test_plan_limit_before_groq(client: TestClient) -> None:
+    """Free plan: 1 resume slot. New generations blocked; regenerate/improve allowed."""
     uid = uuid.uuid4().hex[:8]
     cand = _signup(client, f"plan_{uid}@test.com", "candidate")
     token = cand["access_token"]
@@ -131,46 +144,60 @@ def test_plan_limit_before_groq(client: TestClient) -> None:
     if gen.status_code not in (200, 402, 403):
         pytest.skip(f"initial generate failed ({gen.status_code})")
 
-    with patch("services.ai_client.generate_content", new_callable=AsyncMock) as mock_groq:
-        with patch.object(
-            resume_service,
-            "generate_resume_for_vertical",
+    with patch(
+        "services.ai_client.generate_content", new_callable=AsyncMock
+    ) as mock_groq:
+        with patch(
+            "routers.resumes.generate_resume_for_vertical",
             new_callable=AsyncMock,
         ) as mock_resume:
-            mock_resume.return_value = {
-                "content": {"summary": "x"},
-                "ats_score": 80,
-                "embedding": [0.0] * 10,
-                "generation_metadata": {},
-            }
+            with patch(
+                "routers.resumes.parse_resume_pdf",
+                new_callable=AsyncMock,
+            ) as mock_parse:
+                mock_resume.return_value = {
+                    "content": {"summary": "x"},
+                    "ats_score": 80,
+                    "embedding": [0.0] * 1536,
+                    "generation_metadata": {},
+                }
+                mock_parse.return_value = {"ok": True}
 
-            r = client.post(
-                "/resumes/parse",
-                headers={"Authorization": f"Bearer {token}"},
-                files={"file": ("resume.pdf", b"%PDF-1.4", "application/pdf")},
-            )
-            assert r.status_code == 403, f"status={r.status_code}"
-            assert mock_groq.await_count == 0
-
-            resumes = client.get("/resumes", headers={"Authorization": f"Bearer {token}"})
-            if resumes.status_code == 200 and resumes.json():
-                rid = resumes.json()[0]["id"]
+                # Creating another resume (parse) must be blocked before AI work.
                 r = client.post(
-                    f"/resumes/{rid}/regenerate",
+                    "/resumes/parse",
                     headers={"Authorization": f"Bearer {token}"},
+                    files={"file": ("resume.pdf", b"%PDF-1.4", "application/pdf")},
                 )
                 assert r.status_code == 403, f"status={r.status_code}"
-                assert mock_resume.await_count == 0, f"calls={mock_resume.await_count}"
+                assert mock_groq.await_count == 0
+                assert mock_parse.await_count == 0
 
+                resumes = client.get(
+                    "/resumes", headers={"Authorization": f"Bearer {token}"}
+                )
+                if resumes.status_code == 200 and resumes.json():
+                    rid = resumes.json()[0]["id"]
+                    # Regenerating / improving an existing resume does not consume a new slot.
+                    r = client.post(
+                        f"/resumes/{rid}/regenerate",
+                        headers={"Authorization": f"Bearer {token}"},
+                    )
+                    assert (
+                        r.status_code == 200
+                    ), f"status={r.status_code} body={r.text[:200]}"
+                    assert mock_resume.await_count >= 1
+
+                    r = client.post(
+                        f"/resumes/{rid}/improve",
+                        headers={"Authorization": f"Bearer {token}"},
+                    )
+                    assert r.status_code == 200, f"status={r.status_code}"
+
+                # Tailored download creates new content — still capped on free plan.
                 r = client.post(
-                    f"/resumes/{rid}/improve",
+                    "/resumes/download-tailored",
                     headers={"Authorization": f"Bearer {token}"},
+                    json={"target_role": "Engineer"},
                 )
                 assert r.status_code == 403, f"status={r.status_code}"
-
-            r = client.post(
-                "/resumes/download-tailored",
-                headers={"Authorization": f"Bearer {token}"},
-                json={"target_role": "Engineer"},
-            )
-            assert r.status_code == 403, f"status={r.status_code}"

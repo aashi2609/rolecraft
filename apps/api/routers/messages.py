@@ -17,7 +17,9 @@ async def _participant_label(db, user_id: UUID) -> str:
     if user.role == UserRole.company:
         company = await db.scalar(select(Company).where(Company.user_id == user_id))
         return company.name if company and company.name else user.email
-    profile = await db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == user_id))
+    profile = await db.scalar(
+        select(CandidateProfile).where(CandidateProfile.user_id == user_id)
+    )
     if profile and profile.weblinks and profile.weblinks.get("display_name"):
         return profile.weblinks["display_name"]
     return user.email
@@ -30,20 +32,32 @@ def _user_participates(msg: Message, user_id: UUID) -> bool:
 @router.get("/threads", response_model=list[ThreadOut])
 async def list_threads(user: CurrentUser, db: DbSession):
     thread_ids = (
-        await db.execute(
-            select(Message.thread_id)
-            .where(or_(Message.sender_id == user.id, Message.recipient_id == user.id))
-            .distinct()
+        (
+            await db.execute(
+                select(Message.thread_id)
+                .where(
+                    or_(Message.sender_id == user.id, Message.recipient_id == user.id)
+                )
+                .distinct()
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     out: list[ThreadOut] = []
     for tid in thread_ids:
         msgs = (
-            await db.execute(
-                select(Message).where(Message.thread_id == tid).order_by(Message.sent_at.desc())
+            (
+                await db.execute(
+                    select(Message)
+                    .where(Message.thread_id == tid)
+                    .order_by(Message.sent_at.desc())
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if not msgs:
             continue
         last = msgs[0]
@@ -72,7 +86,9 @@ async def list_threads(user: CurrentUser, db: DbSession):
 @router.post("/threads", response_model=MessageOut)
 async def start_thread(body: MessageCreate, user: CurrentUser, db: DbSession):
     if not body.recipient_id:
-        raise HTTPException(status_code=400, detail="recipient_id is required to start a thread")
+        raise HTTPException(
+            status_code=400, detail="recipient_id is required to start a thread"
+        )
     recipient = await db.get(User, body.recipient_id)
     if not recipient:
         raise HTTPException(status_code=404, detail="Recipient not found")
@@ -91,10 +107,16 @@ async def start_thread(body: MessageCreate, user: CurrentUser, db: DbSession):
 @router.get("/threads/{thread_id}", response_model=list[MessageOut])
 async def get_thread(thread_id: UUID, user: CurrentUser, db: DbSession):
     msgs = (
-        await db.execute(
-            select(Message).where(Message.thread_id == thread_id).order_by(Message.sent_at.asc())
+        (
+            await db.execute(
+                select(Message)
+                .where(Message.thread_id == thread_id)
+                .order_by(Message.sent_at.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     if not msgs:
         raise HTTPException(status_code=404, detail="Thread not found")
     if not any(_user_participates(m, user.id) for m in msgs):
@@ -103,7 +125,9 @@ async def get_thread(thread_id: UUID, user: CurrentUser, db: DbSession):
 
 
 @router.post("/threads/{thread_id}", response_model=MessageOut)
-async def send_message(thread_id: UUID, body: MessageCreate, user: CurrentUser, db: DbSession):
+async def send_message(
+    thread_id: UUID, body: MessageCreate, user: CurrentUser, db: DbSession
+):
     existing = (
         await db.execute(select(Message).where(Message.thread_id == thread_id).limit(1))
     ).scalar_one_or_none()
@@ -115,12 +139,20 @@ async def send_message(thread_id: UUID, body: MessageCreate, user: CurrentUser, 
     recipient_id = body.recipient_id
     if not recipient_id:
         first = (
-            await db.execute(
-                select(Message).where(Message.thread_id == thread_id).order_by(Message.sent_at.asc())
+            (
+                await db.execute(
+                    select(Message)
+                    .where(Message.thread_id == thread_id)
+                    .order_by(Message.sent_at.asc())
+                )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         if first:
-            recipient_id = first.recipient_id if first.sender_id == user.id else first.sender_id
+            recipient_id = (
+                first.recipient_id if first.sender_id == user.id else first.sender_id
+            )
 
     msg = Message(
         thread_id=thread_id,

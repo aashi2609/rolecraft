@@ -1,4 +1,5 @@
 """Verify ProfileItemService CRUD ownership for education/certs/experience/projects."""
+
 from __future__ import annotations
 
 import uuid
@@ -92,10 +93,14 @@ def test_all_profile_item_crud_and_ownership(client: TestClient) -> None:
         assert r.status_code == 200
         assert any(x["id"] == item_id for x in r.json()), f"{path} list: {r.text}"
 
-        r = client.put(f"/candidates/me/{path}/{item_id}", headers=h_own, json=update_body)
+        r = client.put(
+            f"/candidates/me/{path}/{item_id}", headers=h_own, json=update_body
+        )
         assert r.status_code == 200, f"{path} update: {r.text}"
 
-        r = client.put(f"/candidates/me/{path}/{item_id}", headers=h_oth, json=update_body)
+        r = client.put(
+            f"/candidates/me/{path}/{item_id}", headers=h_oth, json=update_body
+        )
         assert r.status_code == 404, f"{path} other update: {r.status_code} {r.text}"
 
         r = client.delete(f"/candidates/me/{path}/{item_id}", headers=h_oth)

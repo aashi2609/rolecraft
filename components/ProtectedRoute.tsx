@@ -4,7 +4,7 @@ import { useUser } from '@/context/UserContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-export function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: ('candidate' | 'company')[] }) {
+export function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: ('candidate' | 'company' | 'admin')[] }) {
   const { isAuthenticated, role, loading } = useUser();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);

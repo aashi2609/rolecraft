@@ -1,4 +1,5 @@
 """Unit tests for analytics_service cache."""
+
 from __future__ import annotations
 
 from uuid import uuid4

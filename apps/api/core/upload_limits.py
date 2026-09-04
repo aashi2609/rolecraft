@@ -120,7 +120,9 @@ async def validate_upload(
     if ext and ext.lower() in _EXT_TO_MIME:
         ext_mime = _EXT_TO_MIME[ext.lower()]
         if declared and ext_mime != declared:
-            raise HTTPException(status_code=400, detail="Filename extension does not match content type")
+            raise HTTPException(
+                status_code=400, detail="Filename extension does not match content type"
+            )
 
     data = await _read_bounded(file, max_bytes)
     if not data:
@@ -140,6 +142,8 @@ async def validate_upload(
         )
 
     if ext and ext.lower() in _EXT_TO_MIME and _EXT_TO_MIME[ext.lower()] != detected:
-        raise HTTPException(status_code=400, detail="Filename extension does not match file content")
+        raise HTTPException(
+            status_code=400, detail="Filename extension does not match file content"
+        )
 
     return data, _EXT_BY_MIME[detected], detected

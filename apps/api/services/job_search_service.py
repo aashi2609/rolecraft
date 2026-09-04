@@ -1,4 +1,5 @@
 """Job search service with composable filters."""
+
 from __future__ import annotations
 
 from typing import Optional
@@ -6,7 +7,14 @@ from typing import Optional
 from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
-from models import Application, ApplicationStatus, Company, JobPosting, JobStatus, JobType
+from models import (
+    Application,
+    ApplicationStatus,
+    Company,
+    JobPosting,
+    JobStatus,
+    JobType,
+)
 from schemas import JobOut
 
 
@@ -170,17 +178,25 @@ async def enrich_job(db, job: JobPosting) -> JobOut:
     except Exception:
         company = None
 
-    matched = await db.scalar(
-        select(func.count()).select_from(Application).where(Application.job_id == job.id)
-    ) or 0
-    shortlisted = await db.scalar(
-        select(func.count())
-        .select_from(Application)
-        .where(
-            Application.job_id == job.id,
-            Application.status == ApplicationStatus.shortlisted,
+    matched = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Application)
+            .where(Application.job_id == job.id)
         )
-    ) or 0
+        or 0
+    )
+    shortlisted = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Application)
+            .where(
+                Application.job_id == job.id,
+                Application.status == ApplicationStatus.shortlisted,
+            )
+        )
+        or 0
+    )
     data = JobOut.model_validate(job)
     data.company_name = company.name if company else None
     # Enum values already coerced by JobOut validators; keep explicit .value for clarity
@@ -219,7 +235,7 @@ async def search_jobs(
     """
     # Build base query with company preloaded
     query = select(JobPosting).options(selectinload(JobPosting.company))
-    
+
     # Apply filters in sequence
     query = apply_status_filter(query, status, mine)
     query = apply_title_filter(query, title)
@@ -238,13 +254,13 @@ async def search_jobs(
     query = apply_exclude_country_filter(query, exclude_country)
     query = apply_exclude_state_filter(query, exclude_state)
     query = apply_exclude_city_filter(query, exclude_city)
-    
+
     # Order by creation date
     query = query.order_by(JobPosting.created_at.desc())
-    
+
     # Execute query
     jobs = (await db.execute(query)).scalars().all()
-    
+
     # Enrich results
     out = []
     for job in jobs:

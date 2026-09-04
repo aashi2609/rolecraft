@@ -1,9 +1,13 @@
 """Unit tests for fitment rationale (template + LLM flag fallback)."""
+
 from __future__ import annotations
 
 import asyncio
 
-from services.fitment_rationale_service import generate_fitment_rationale, template_rationale
+from services.fitment_rationale_service import (
+    generate_fitment_rationale,
+    template_rationale,
+)
 
 
 def test_template_rationale_skill_overlap() -> None:

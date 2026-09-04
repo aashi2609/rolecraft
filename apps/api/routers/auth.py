@@ -6,8 +6,22 @@ from sqlalchemy.orm import selectinload
 
 from core.dependencies import CurrentUser, DbSession
 from core.security import create_access_token, hash_password, verify_password
-from models import CandidateProfile, Company, PlanTier, Subscription, SubscriptionStatus, User, UserRole
-from schemas import ChangePasswordRequest, ForgotPasswordRequest, SigninRequest, SignupRequest, TokenResponse
+from models import (
+    CandidateProfile,
+    Company,
+    PlanTier,
+    Subscription,
+    SubscriptionStatus,
+    User,
+    UserRole,
+)
+from schemas import (
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
+    SigninRequest,
+    SignupRequest,
+    TokenResponse,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -30,7 +44,9 @@ async def signup(body: SignupRequest, db: DbSession):
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    user = User(email=body.email.lower(), password_hash=hash_password(body.password), role=role)
+    user = User(
+        email=body.email.lower(), password_hash=hash_password(body.password), role=role
+    )
     db.add(user)
     await db.flush()
 
@@ -63,29 +79,42 @@ async def signup(body: SignupRequest, db: DbSession):
 @router.post("/signin", response_model=TokenResponse)
 async def signin(body: SigninRequest, db: DbSession):
     result = await db.execute(
-        select(User).options(selectinload(User.subscription)).where(User.email == body.email.lower())
+        select(User)
+        .options(selectinload(User.subscription))
+        .where(User.email == body.email.lower())
     )
     user = result.scalar_one_or_none()
     if not user or not verify_password(body.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
+        )
 
     plan = user.subscription.plan_tier.value if user.subscription else None
     token = create_access_token(user_id=user.id, role=user.role.value)
-    return TokenResponse(access_token=token, user_id=user.id, role=user.role.value, plan=plan)
+    return TokenResponse(
+        access_token=token, user_id=user.id, role=user.role.value, plan=plan
+    )
 
 
 @router.post("/forgot-password")
 async def forgot_password(body: ForgotPasswordRequest):
     # Always succeed — do not leak account existence
-    return {"message": "If an account exists for that email, password reset instructions have been sent."}
+    return {
+        "message": "If an account exists for that email, password reset instructions have been sent."
+    }
 
 
 @router.post("/change-password")
-async def change_password(body: ChangePasswordRequest, user: CurrentUser, db: DbSession):
+async def change_password(
+    body: ChangePasswordRequest, user: CurrentUser, db: DbSession
+):
     # new_password complexity already enforced by ChangePasswordRequest
     row = await db.get(User, user.id)
     if not row or not verify_password(body.current_password, row.password_hash):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
     row.password_hash = hash_password(body.new_password)
     await db.flush()
     return {"message": "Password updated successfully"}
