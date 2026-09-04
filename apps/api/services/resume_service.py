@@ -80,9 +80,11 @@ async def _generate_deterministic(
         ],
         "education": [
             {
-                "degree": f"{ed.degree or ''} {ed.field_of_study or ''}".strip() or "Degree",
+                "degree": f"{ed.degree or ''}{(' in ' + ed.field_of_study) if ed.field_of_study else ''}".strip()
+                or "Degree",
                 "institution": ed.institute or "Institution",
                 "year": str(ed.passing_year or ""),
+                "gpa": ed.cgpa or "",
                 "highlights": [],
             }
             for ed in (profile.education or [])[:2]
@@ -90,12 +92,18 @@ async def _generate_deterministic(
         "projects": [
             {
                 "name": p.project_name or "Project",
-                "description": p.responsibilities or p.achievements or "",
-                "technologies": (p.tools_used or "").split(",") if p.tools_used else [],
+                "description": p.responsibilities or "",
+                "bullets": [b.strip() for b in (p.achievements or "").split("\n") if b.strip()]
+                or ([p.responsibilities] if p.responsibilities else []),
+                "technologies": [t.strip() for t in (p.tools_used or "").split(",") if t.strip()],
+                "url": p.org if p.org and ("http" in p.org or p.org.startswith("www.")) else "",
             }
             for p in (profile.projects or [])[:3]
         ],
-        "certifications": [],
+        "certifications": [
+            {"name": c.name, "issuer": c.issuing_org or ""}
+            for c in (profile.certifications or [])[:5]
+        ],
     }
     score = _score_for(vertical, skill_names)
     embedding_text = f"{vertical} {' '.join(highlighted)} {content['summary']} {mapping_notes}"

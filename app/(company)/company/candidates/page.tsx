@@ -90,6 +90,20 @@ export default function SearchCandidatesPage() {
   const [hidden, setHidden] = useState<(string | number)[]>([]);
   const [savedIds, setSavedIds] = useState<(string | number)[]>([]);
 
+  const downloadCandidateResume = async (candidateId: string) => {
+    try {
+      await candidateApi.downloadResumePdf(candidateId);
+    } catch (e: unknown) {
+      const msg =
+        e instanceof ApiError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : 'Failed to download resume';
+      showToast('error', msg);
+    }
+  };
+
   // Fetch candidates from API
   const fetchCandidates = async () => {
     setLoading(true);
@@ -538,7 +552,11 @@ export default function SearchCandidatesPage() {
                               >
                                 View Profile
                               </Button>
-                              <Button size="sm" variant="outline">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => downloadCandidateResume(String(c.id))}
+                              >
                                 View Resume
                               </Button>
                               <div className="relative">
@@ -664,6 +682,7 @@ export default function SearchCandidatesPage() {
       <CandidateProfileModal
         isOpen={profileOpen}
         onClose={() => setProfileOpen(false)}
+        onDownloadResume={downloadCandidateResume}
         candidate={
           selectedCandidate
             ? {
@@ -674,6 +693,8 @@ export default function SearchCandidatesPage() {
                 rationale: selectedCandidate.rationale ?? undefined,
                 rationaleSource: selectedCandidate.rationaleSource,
                 vertical: selectedCandidate.title,
+                title: selectedCandidate.title,
+                skills: selectedCandidate.skills,
                 badgeColor: 'bg-green-100 text-green-700',
                 isShortlisted: shortlisted.includes(selectedCandidate.id),
               }

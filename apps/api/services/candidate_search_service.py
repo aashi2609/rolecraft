@@ -234,9 +234,14 @@ def transform_profile_to_search_out(profile: CandidateProfile, salary_min: Optio
     match_score = calculate_match_score(skill_names, exp_years)
     rationale = template_rationale(skill_names, skill_names)
 
+    links = profile.weblinks or {}
+    display_name = (links.get("display_name") or links.get("full_name") or "").strip() or None
+    if not display_name and profile.user and profile.user.email:
+        display_name = profile.user.email.split("@")[0].replace(".", " ").title()
+
     return CandidateSearchOut(
         id=profile.user_id,
-        name=profile.user.email.split("@")[0].replace(".", " ").title() if profile.user else None,
+        name=display_name,
         title=job_title,
         experience_years=exp_years if exp_years > 0 else None,
         location=profile.preferred_locations[0] if profile.preferred_locations else profile.present_address,

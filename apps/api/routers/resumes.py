@@ -8,7 +8,7 @@ from core.dependencies import CandidateUser, DbSession, check_plan_limit
 from models import CandidateProfile, CandidateSkill, Resume
 from schemas import ResumeGenerateRequest, ResumeOut
 from services.resume_service import generate_resume_for_vertical, parse_resume_pdf
-from services.pdf_service import build_resume_pdf_response
+from services.pdf_service import build_resume_pdf_response, resolve_candidate_name
 
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
@@ -146,6 +146,8 @@ async def download_pdf(resume_id: UUID, user: CandidateUser, db: DbSession):
         email=user.email,
         weblinks=weblinks,
         filename=filename,
+        candidate_name=resolve_candidate_name(weblinks=weblinks, email=user.email),
+        location=(profile.preferred_locations or [None])[0] if profile else "",
     )
 
 
@@ -171,6 +173,8 @@ async def download_tailored_resume(body: TailoredResumeRequest, user: CandidateU
         email=user.email,
         weblinks=profile.weblinks or {},
         filename=filename,
+        candidate_name=resolve_candidate_name(weblinks=profile.weblinks or {}, email=user.email),
+        location=(profile.preferred_locations or [None])[0] or "",
     )
 
 

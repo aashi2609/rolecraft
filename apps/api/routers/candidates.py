@@ -15,6 +15,7 @@ from models import (
     Education,
     Experience,
     Project,
+    Resume,
     Skill,
     User,
 )
@@ -35,6 +36,7 @@ from schemas import (
 )
 from services.candidate_search_service import search_candidates
 from services.embedding_service import refresh_resume_embeddings_for_candidate
+from services.pdf_service import build_resume_pdf_response, resolve_candidate_name
 from services.profile_item_service import ProfileItemService
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
@@ -357,6 +359,34 @@ async def search_candidates_endpoint(
 async def get_candidate_public_profile(candidate_id: UUID, user: CompanyUser, db: DbSession):
     """Employer-facing profile — no PII (address, income, DOB, family, etc.)."""
     return _to_public_out(await _load_profile(db, candidate_id))
+
+
+@router.get("/{candidate_id}/resume.pdf")
+async def download_candidate_resume_pdf(candidate_id: UUID, user: CompanyUser, db: DbSession):
+    """Employer download of the candidate's latest/default generated resume as PDF."""
+    profile = await _load_profile(db, candidate_id)
+    resume = (
+        await db.execute(
+            select(Resume)
+            .where(Resume.candidate_id == candidate_id)
+            .order_by(Resume.is_default.desc(), Resume.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if not resume:
+        raise HTTPException(status_code=404, detail="No resume available for this candidate")
+
+    email = profile.user.email if profile.user else ""
+    weblinks = profile.weblinks or {}
+    filename = f"resume_{resume.target_vertical.replace(' ', '_').lower()}.pdf"
+    return build_resume_pdf_response(
+        resume_content=resume.content or {},
+        email=email,
+        weblinks=weblinks,
+        filename=filename,
+        candidate_name=resolve_candidate_name(weblinks=weblinks, email=email),
+        location=(profile.preferred_locations or [None])[0] or profile.present_address or "",
+    )
 
 
 @router.get("/{candidate_id}", response_model=CandidateProfileOut)
