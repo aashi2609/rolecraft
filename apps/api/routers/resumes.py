@@ -87,7 +87,7 @@ async def regenerate(resume_id: UUID, user: CandidateUser, db: DbSession):
     row = await db.get(Resume, resume_id)
     if not row or row.candidate_id != user.id:
         raise HTTPException(status_code=404, detail="Not found")
-    await check_plan_limit(user, db, "resume_verticals", extra=1)
+    # Regenerating an existing vertical does not consume a free-plan slot.
     profile = await _profile_with_skills(db, user.id)
     skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
     payload = await generate_resume_for_vertical(
@@ -111,7 +111,7 @@ async def improve(resume_id: UUID, user: CandidateUser, db: DbSession):
     row = await db.get(Resume, resume_id)
     if not row or row.candidate_id != user.id:
         raise HTTPException(status_code=404, detail="Not found")
-    await check_plan_limit(user, db, "resume_verticals", extra=1)
+    # Improve updates the same resume — no extra plan slot.
     profile = await _profile_with_skills(db, user.id)
     skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
     payload = await generate_resume_for_vertical(

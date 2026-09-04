@@ -27,12 +27,15 @@ export default function ResumesPage() {
 
   const free = isFreePlan(plan);
   const reachedCap = free && resumes.length >= 1;
+  const [limitError, setLimitError] = useState<string | null>(null);
 
   const handleGenerateClick = () => {
     if (reachedCap) {
+      setLimitError('Free plan allows 1 tailored resume. Upgrade to generate another vertical.');
       router.push('/subscribe?role=candidate');
       return;
     }
+    setLimitError(null);
     router.push('/onboarding/generate?skipProfile=true');
   };
 
@@ -44,6 +47,7 @@ export default function ResumesPage() {
       await resumesApi.downloadPdf(id, `resume_${vertical}.pdf`);
     } catch (err: any) {
       console.error('Download failed:', err);
+      alert(err?.message || 'PDF download failed. Please try again.');
     } finally {
       setDownloadingId(null);
     }
@@ -52,11 +56,22 @@ export default function ResumesPage() {
   const handleRegenerate = async (resume: any) => {
     const id = String(resume.id);
     setRegeneratingId(id);
+    setLimitError(null);
     try {
       await resumesApi.regenerate(id);
       await refreshResumes();
     } catch (err: any) {
       console.error('Regenerate failed:', err);
+      const msg = err?.message || 'Regenerate failed';
+      const isLimit =
+        err?.status === 402 ||
+        err?.status === 403 ||
+        /upgrade|limit|plan/i.test(msg);
+      if (isLimit) {
+        setLimitError(msg);
+      } else {
+        alert(msg);
+      }
     } finally {
       setRegeneratingId(null);
     }
@@ -127,11 +142,14 @@ export default function ResumesPage() {
         </div>
       )}
 
-      {reachedCap && (
+      {(reachedCap || limitError) && (
         <UpsellPrompt
           className="mb-8"
           title="Generation cap reached"
-          description="Free plan allows 1 tailored resume at a time. Upgrade for unlimited multi-vertical generations."
+          description={
+            limitError ||
+            'Free plan allows 1 tailored resume at a time. Upgrade for unlimited multi-vertical generations.'
+          }
         />
       )}
 
