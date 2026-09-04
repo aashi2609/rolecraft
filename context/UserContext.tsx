@@ -123,9 +123,15 @@ function mapJob(j: any) {
     state: j.state,
     city: j.city,
     employmentType: j.employment_type,
-    jobType: j.job_type
-      ? String(j.job_type).charAt(0).toUpperCase() + String(j.job_type).slice(1)
-      : undefined,
+    jobType: (() => {
+      const raw = String(j.job_type || '').toLowerCase().replace(/[_-]/g, '');
+      if (raw === 'remote') return 'Remote';
+      if (raw === 'hybrid') return 'Hybrid';
+      if (raw === 'onsite') return 'On-site';
+      return j.job_type
+        ? String(j.job_type).charAt(0).toUpperCase() + String(j.job_type).slice(1)
+        : undefined;
+    })(),
     jobRole: j.job_role ?? null,
     jobLevel: j.job_level ?? null,
     salaryMin: j.min_salary != null ? String(j.min_salary) : '',

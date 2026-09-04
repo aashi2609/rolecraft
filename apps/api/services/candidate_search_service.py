@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from sqlalchemy import func, or_, and_, select
@@ -133,32 +133,37 @@ def apply_title_filter(query, title: Optional[str]):
     )
 
 
+def _as_date(value) -> date | None:
+    """Normalize date/datetime/str to date for safe subtraction."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.strptime(value[:10], "%Y-%m-%d").date()
+        except ValueError:
+            return None
+    return None
+
+
 def calculate_experience_years(experience_list) -> int:
     """Calculate total experience years from experience entries."""
     if not experience_list:
         return 0
-    
-    latest_exp = max(experience_list, key=lambda e: e.from_date or "", default=None)
+
+    latest_exp = max(experience_list, key=lambda e: e.from_date or date.min, default=None)
     if not latest_exp or not latest_exp.from_date:
         return 0
-    
-    end_date = latest_exp.to_date if latest_exp.to_date else datetime.now()
-    start_date = latest_exp.from_date
-    
-    if isinstance(start_date, str):
-        try:
-            start_date = datetime.strptime(start_date, "%Y-%m-%d")
-        except:
-            return 0
-    if isinstance(end_date, str):
-        try:
-            end_date = datetime.strptime(end_date, "%Y-%m-%d")
-        except:
-            end_date = datetime.now()
-    
-    if start_date and end_date:
-        return (end_date - start_date).days // 365
-    return 0
+
+    start_date = _as_date(latest_exp.from_date)
+    end_date = _as_date(latest_exp.to_date) or date.today()
+    if not start_date:
+        return 0
+
+    return max(0, (end_date - start_date).days // 365)
 
 
 def get_job_title(experience_list) -> Optional[str]:
@@ -166,7 +171,7 @@ def get_job_title(experience_list) -> Optional[str]:
     if not experience_list:
         return None
     
-    latest_exp = max(experience_list, key=lambda e: e.from_date or "", default=None)
+    latest_exp = max(experience_list, key=lambda e: e.from_date or date.min, default=None)
     if latest_exp:
         return latest_exp.role or latest_exp.designation
     return None

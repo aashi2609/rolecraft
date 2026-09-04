@@ -106,7 +106,7 @@ export default function MyJobsPage() {
                     <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
                     <div className="absolute right-0 top-10 z-20 w-40 rounded-lg border border-border bg-white shadow-md py-1">
                       <Link
-                        href="/company/jobs/new"
+                        href={`/company/jobs/new?edit=${job.id}`}
                         className="block px-3 py-2 text-sm hover:bg-secondary"
                         onClick={() => setMenuOpen(null)}
                       >

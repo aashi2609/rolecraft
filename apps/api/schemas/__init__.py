@@ -267,6 +267,7 @@ class CompanyUpdate(BaseModel):
 class CompanyOut(ORMModel):
     user_id: UUID
     name: str
+    email: Optional[str] = None
     logo_url: Optional[str] = None
     about: Optional[str] = None
     size: Optional[str] = None

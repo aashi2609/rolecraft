@@ -87,32 +87,83 @@ function PostJobContent() {
 
   useEffect(() => {
     if (!editId) return;
+
+    const fillFromJob = (existing: any) => {
+      const jt = String(existing.jobType || existing.job_type || '').toLowerCase();
+      let jobType = 'On-site';
+      if (jt.includes('remote')) jobType = 'Remote';
+      else if (jt.includes('hybrid')) jobType = 'Hybrid';
+      else if (jt.includes('site') || jt.includes('onsite')) jobType = 'On-site';
+
+      setDraft({
+        id: existing.id,
+        title: existing.title || '',
+        department: existing.department || existing.vertical || '',
+        role: existing.jobRole || existing.job_role || existing.role || '',
+        level: existing.jobLevel || existing.job_level || existing.level || '',
+        employmentType: existing.employmentType || existing.employment_type || '',
+        experience: existing.experience || existing.experience_range || '',
+        salaryMin:
+          existing.salaryMin != null && existing.salaryMin !== ''
+            ? String(existing.salaryMin)
+            : existing.min_salary != null
+              ? String(existing.min_salary)
+              : '',
+        salaryMax:
+          existing.salaryMax != null && existing.salaryMax !== ''
+            ? String(existing.salaryMax)
+            : existing.max_salary != null
+              ? String(existing.max_salary)
+              : '',
+        salaryUnit: existing.salaryUnit || existing.salary_unit || 'Per annum',
+        location: existing.location || '',
+        country: existing.country || '',
+        state: existing.state || '',
+        city: existing.city || '',
+        jobType,
+        skills: existing.skills || existing.required_skills || [],
+        openings: String(existing.openings ?? existing.num_openings ?? 1),
+        deadline: existing.deadline || existing.application_deadline || '',
+        description: existing.description || '',
+        responsibilities: existing.responsibilities || '',
+        requirements: existing.requirements || '',
+        benefits: existing.benefits || '',
+      });
+    };
+
     const existing = jobs.find((j) => String(j.id) === editId);
-    if (!existing) return;
-    setDraft({
-      id: existing.id,
-      title: existing.title || '',
-      department: existing.department || existing.vertical || '',
-      role: (existing as any).jobRole || (existing as any).role || '',
-      level: (existing as any).jobLevel || (existing as any).level || '',
-      employmentType: existing.employmentType || '',
-      experience: existing.experience || '',
-      salaryMin: existing.salaryMin || '',
-      salaryMax: existing.salaryMax || '',
-      salaryUnit: existing.salaryUnit || 'Per annum',
-      location: existing.location || '',
-      country: (existing as any).country || '',
-      state: (existing as any).state || '',
-      city: (existing as any).city || '',
-      jobType: existing.jobType || 'On-site',
-      skills: existing.skills || [],
-      openings: String(existing.openings ?? 1),
-      deadline: existing.deadline || '',
-      description: existing.description || '',
-      responsibilities: existing.responsibilities || '',
-      requirements: existing.requirements || '',
-      benefits: existing.benefits || '',
-    });
+    if (existing) {
+      fillFromJob(existing);
+      return;
+    }
+
+    // Fallback: fetch from API if not yet in context
+    let cancelled = false;
+    jobsApi
+      .get(editId)
+      .then((raw: any) => {
+        if (cancelled || !raw) return;
+        fillFromJob({
+          ...raw,
+          jobRole: raw.job_role,
+          jobLevel: raw.job_level,
+          employmentType: raw.employment_type,
+          experience: raw.experience_range,
+          salaryMin: raw.min_salary,
+          salaryMax: raw.max_salary,
+          salaryUnit: raw.salary_unit,
+          skills: raw.required_skills,
+          openings: raw.num_openings,
+          deadline: raw.application_deadline,
+          jobType: raw.job_type,
+        });
+      })
+      .catch(() => {
+        /* leave blank if fetch fails */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [editId, jobs]);
 
   const step1Valid = useMemo(() => {

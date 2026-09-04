@@ -55,7 +55,6 @@ function buildCompanyNav(): NavItem[] {
       icon: Briefcase,
       children: [
         { label: 'My Jobs', href: '/company/jobs' },
-        { label: 'Post a New Job', href: '/company/jobs/new' },
         { label: 'Search Candidates', href: '/company/candidates' },
       ],
     },
