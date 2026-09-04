@@ -29,6 +29,7 @@ export default function OnboardingForm() {
   const { setCandidateProfile, setProfileComplete } = useUser();
   const [currentStep, setCurrentStep] = useState(0);
   const [isParsing, setIsParsing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<any>({
     careerLevel: '',
     education: [],
@@ -94,13 +95,12 @@ export default function OnboardingForm() {
   };
 
   const handleSave = async () => {
+    if (saving) return;
+
     if (currentStep < STEPS.length - 1) {
       try {
         if (currentStep === 0 && formData.careerLevel) {
           await candidateApi.updateMe({ career_level: formData.careerLevel });
-        }
-        if (currentStep === 4 && formData.skills?.length) {
-          await candidateApi.putSkills(formData.skills);
         }
       } catch (err) {
         console.error('Step save failed', err);
@@ -109,19 +109,23 @@ export default function OnboardingForm() {
       return;
     }
 
+    setSaving(true);
     try {
-      await candidateApi.updateMe({ career_level: formData.careerLevel });
+      if (formData.careerLevel) {
+        await candidateApi.updateMe({ career_level: formData.careerLevel });
+      }
       if (formData.skills?.length) {
         await candidateApi.putSkills(formData.skills);
       }
       for (const ed of formData.education || []) {
+        if (!ed.level && !ed.degree && !ed.university && !ed.institute) continue;
         await candidateApi.addEducation({
           qualification_level: ed.level,
           degree: ed.degree || ed.field,
           institute: ed.institute || ed.university,
           field_of_study: ed.field || ed.degree,
           passing_year: ed.year ? Number(ed.year) : undefined,
-          cgpa: ed.cgpa,
+          cgpa: ed.cgpa || ed.score,
         });
       }
       for (const c of formData.certifications || []) {
@@ -130,20 +134,29 @@ export default function OnboardingForm() {
           name: c.name,
           issuing_org: c.org || c.issuer,
           description: c.desc,
+          credential_id: c.id || undefined,
+          completion_date: c.date || undefined,
         });
       }
       for (const e of formData.experience || []) {
+        if (!e.company && !e.role && !e.title) continue;
         await candidateApi.addExperience({
           company_name: e.company,
           role: e.title || e.role,
           designation: e.title || e.role,
+          employment_type: e.type || undefined,
+          current_salary: e.salary || undefined,
+          from_date: e.fromDate || undefined,
+          to_date: e.currentlyWorking ? undefined : e.toDate || undefined,
           responsibilities: e.desc || e.description,
-          is_current: Boolean(e.current),
+          is_current: Boolean(e.currentlyWorking || e.current),
+          gap_reason: e.gap || undefined,
         });
       }
       for (const p of formData.projects || []) {
+        if (!p.name && !p.desc && !p.tools) continue;
         await candidateApi.addProject({
-          org: p.org,
+          org: p.org || undefined,
           project_name: p.name,
           team_size: p.size ? Number(p.size) : undefined,
           tools_used: p.tools,
@@ -152,6 +165,7 @@ export default function OnboardingForm() {
       }
     } catch (err: any) {
       alert(err?.detail || err?.message || 'Failed to save profile. Please try again.');
+      setSaving(false);
       return;
     }
     setCandidateProfile({
@@ -421,11 +435,15 @@ export default function OnboardingForm() {
         )}
 
         <div className="mt-8 pt-6 border-t border-border-soft flex items-center justify-between">
-          <Button variant="ghost" onClick={prevStep} disabled={currentStep === 0}>
+          <Button variant="ghost" onClick={prevStep} disabled={currentStep === 0 || saving}>
             Back
           </Button>
-          <Button variant="primary" onClick={handleSave}>
-            {currentStep === STEPS.length - 1 ? 'Finish' : 'Save & Continue'}
+          <Button variant="primary" onClick={handleSave} disabled={saving}>
+            {saving
+              ? 'Saving...'
+              : currentStep === STEPS.length - 1
+                ? 'Finish'
+                : 'Save & Continue'}
           </Button>
         </div>
       </div>

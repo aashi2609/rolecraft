@@ -3,7 +3,7 @@ import uuid as uuid_mod
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import selectinload
 
@@ -284,12 +284,14 @@ async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
             seen.add(key)
             unique_names.append(name)
 
+    # Clear existing links; expire ORM state so deleted rows aren't re-flushed.
     await db.execute(delete(CandidateSkill).where(CandidateSkill.candidate_id == user.id))
     await db.flush()
+    db.expire_all()
 
     linked: set[UUID] = set()
     for name in unique_names:
-        skill = await db.scalar(select(Skill).where(Skill.name == name))
+        skill = await db.scalar(select(Skill).where(func.lower(Skill.name) == name.lower()))
         if not skill:
             stmt = (
                 insert(Skill)
@@ -297,9 +299,13 @@ async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
                 .on_conflict_do_nothing(index_elements=["name"])
             )
             await db.execute(stmt)
-            skill = await db.scalar(select(Skill).where(Skill.name == name))
+            skill = await db.scalar(select(Skill).where(func.lower(Skill.name) == name.lower()))
         if skill and skill.id not in linked:
-            db.add(CandidateSkill(candidate_id=user.id, skill_id=skill.id))
+            await db.execute(
+                insert(CandidateSkill)
+                .values(candidate_id=user.id, skill_id=skill.id)
+                .on_conflict_do_nothing(index_elements=["candidate_id", "skill_id"])
+            )
             linked.add(skill.id)
     await db.flush()
     await _sync_candidate_embeddings(db, user.id)
