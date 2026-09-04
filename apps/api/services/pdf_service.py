@@ -138,8 +138,8 @@ def generate_pdf(
 ) -> bytes:
     """Generate a PDF from the resume content.
 
-    Returns raw PDF bytes. Uses WeasyPrint if available, otherwise
-    raises an ImportError with a helpful message.
+    Prefers WeasyPrint. On Windows (or when GTK/Pango libs are missing),
+    falls back to printable HTML bytes so download still works.
     """
     html = render_resume_html(
         resume_content,
@@ -152,14 +152,14 @@ def generate_pdf(
 
     try:
         from weasyprint import HTML
-        pdf_bytes = HTML(string=html).write_pdf()
-        return pdf_bytes
-    except ImportError:
+
+        return HTML(string=html).write_pdf()
+    except Exception as exc:
+        # ImportError, OSError (missing GTK), and runtime WeasyPrint failures
         logger.warning(
-            "WeasyPrint is not installed. Install it with: pip install weasyprint. "
-            "Returning raw HTML as fallback."
+            "WeasyPrint PDF failed (%s); returning printable HTML fallback.",
+            exc,
         )
-        # Return HTML as PDF-like bytes (browser can open it)
         return html.encode("utf-8")
 
 
@@ -167,11 +167,13 @@ def create_pdf_response(
     pdf_bytes: bytes,
     filename: str,
 ) -> Any:
-    """Create a FastAPI Response object for PDF download."""
+    """Create a FastAPI Response object for PDF (or HTML fallback) download."""
     from fastapi import Response
 
     is_pdf = pdf_bytes[:4] == b"%PDF"
     media_type = "application/pdf" if is_pdf else "text/html"
+    if not is_pdf and filename.lower().endswith(".pdf"):
+        filename = filename[:-4] + ".html"
 
     return Response(
         content=pdf_bytes,

@@ -275,6 +275,7 @@ async def get_skills(user: CandidateUser, db: DbSession):
 
 @router.put("/me/skills")
 async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
+    candidate_id = user.id
     unique_names: list[str] = []
     seen: set[str] = set()
     for raw in body.skills:
@@ -284,10 +285,8 @@ async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
             seen.add(key)
             unique_names.append(name)
 
-    # Clear existing links; expire ORM state so deleted rows aren't re-flushed.
-    await db.execute(delete(CandidateSkill).where(CandidateSkill.candidate_id == user.id))
+    await db.execute(delete(CandidateSkill).where(CandidateSkill.candidate_id == candidate_id))
     await db.flush()
-    db.expire_all()
 
     linked: set[UUID] = set()
     for name in unique_names:
@@ -300,15 +299,19 @@ async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
             )
             await db.execute(stmt)
             skill = await db.scalar(select(Skill).where(func.lower(Skill.name) == name.lower()))
-        if skill and skill.id not in linked:
-            await db.execute(
-                insert(CandidateSkill)
-                .values(candidate_id=user.id, skill_id=skill.id)
-                .on_conflict_do_nothing(index_elements=["candidate_id", "skill_id"])
-            )
-            linked.add(skill.id)
+        if not skill:
+            continue
+        skill_id = skill.id
+        if skill_id in linked:
+            continue
+        await db.execute(
+            insert(CandidateSkill)
+            .values(candidate_id=candidate_id, skill_id=skill_id)
+            .on_conflict_do_nothing(index_elements=["candidate_id", "skill_id"])
+        )
+        linked.add(skill_id)
     await db.flush()
-    await _sync_candidate_embeddings(db, user.id)
+    await _sync_candidate_embeddings(db, candidate_id)
     return {"skills": unique_names}
 
 

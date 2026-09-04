@@ -322,10 +322,13 @@ export const resumesApi = {
     }
 
     const blob = await res.blob();
+    const cd = res.headers.get('Content-Disposition') || '';
+    const match = /filename="?([^"]+)"?/i.exec(cd);
+    const downloadName = match?.[1] || filename || 'resume.pdf';
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename || `resume.pdf`;
+    a.download = downloadName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

@@ -74,7 +74,7 @@ export default function PersonalDetailsForm() {
       };
       await candidateApi.updateMe(payload);
       await refreshSession();
-      router.push('/profile');
+      router.push('/dashboard');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to save profile');
     } finally {

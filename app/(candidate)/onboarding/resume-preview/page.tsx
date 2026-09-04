@@ -47,8 +47,9 @@ export default function ResumePreviewPage() {
     if (!resumeMeta?.id) return;
     try {
       await resumesApi.downloadPdf(String(resumeMeta.id), `${safeFileName}_${vertical.replace(/\s+/g, '_')}_Resume.pdf`);
-    } catch {
-      alert('PDF download failed. Try again from My Resumes.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'PDF download failed';
+      alert(`${msg}\n\nTip: open My Resumes and try Download again. On Windows, download may be HTML you can Print → Save as PDF.`);
     }
   };
 
