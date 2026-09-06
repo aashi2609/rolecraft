@@ -164,8 +164,22 @@ async def get_all_users(
         name = None
         if u.company:
             name = u.company.name
-        elif u.candidate_profile and u.candidate_profile.career_level:
-            name = u.email.split("@")[0].replace(".", " ").title()
+        elif u.candidate_profile:
+            # Try to get name from weblinks first
+            if u.candidate_profile.weblinks:
+                name = (
+                    u.candidate_profile.weblinks.get('full_name') or
+                    u.candidate_profile.weblinks.get('display_name') or
+                    u.candidate_profile.weblinks.get('name')
+                )
+            # Fallback to parsing email if no name in weblinks
+            if not name:
+                name = (
+                    u.email.split("@")[0]
+                    .replace(".", " ")
+                    .replace("_", " ")
+                    .title()
+                )
         plan_tier = None
         sub_status = None
         if u.subscription:
@@ -263,7 +277,10 @@ async def get_all_subscriptions(
     limit: int = 100,
 ) -> Any:
     query = select(Subscription).options(
-        selectinload(Subscription.user).selectinload(User.company)
+        selectinload(Subscription.user)
+        .selectinload(User.company),
+        selectinload(Subscription.user)
+        .selectinload(User.candidate_profile)
     )
     if status_filter:
         query = query.where(Subscription.status == status_filter)
@@ -282,8 +299,27 @@ async def get_all_subscriptions(
         user_email = s.user.email if s.user else None
         # Try to get a friendly name
         user_name = None
-        if s.user and s.user.company:
-            user_name = s.user.company.name
+        if s.user:
+            if s.user.company:
+                user_name = s.user.company.name
+            elif s.user.candidate_profile:
+                # Try to get name from weblinks first
+                if s.user.candidate_profile.weblinks:
+                    user_name = (
+                        s.user.candidate_profile.weblinks.get('full_name')
+                        or s.user.candidate_profile.weblinks.get(
+                            'display_name'
+                        )
+                        or s.user.candidate_profile.weblinks.get('name')
+                    )
+                # Fallback to parsing email if no name in weblinks
+                if not user_name:
+                    user_name = (
+                        s.user.email.split("@")[0]
+                        .replace(".", " ")
+                        .replace("_", " ")
+                        .title()
+                    )
         out.append(
             AdminSubOut(
                 id=str(s.id),
