@@ -193,3 +193,21 @@ button {
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: var(--ink-muted);
 }
+
+/* Mobile-friendly touch targets */
+@media (max-width: 768px) {
+  button, a, input[type="checkbox"], input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Prevent text size adjustment on iOS */
+  body {
+    -webkit-text-size-adjust: 100%;
+  }
+  
+  /* Better mobile form inputs */
+  input, textarea, select {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+}

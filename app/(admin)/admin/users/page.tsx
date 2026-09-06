@@ -183,7 +183,8 @@ export default function AdminUsersPage() {
       </div>
 
       <div className="border border-border-soft rounded-lg bg-surface-white overflow-hidden">
-        <div className="w-full overflow-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block w-full overflow-auto">
           <table className="w-full text-sm text-left">
             <thead className="border-b border-border-soft bg-surface-soft">
               <tr>
@@ -239,6 +240,50 @@ export default function AdminUsersPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden">
+          {loading ? (
+            <div className="p-8 text-center text-muted-foreground animate-pulse">
+              Loading users...
+            </div>
+          ) : users.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              No users found matching your filters.
+            </div>
+          ) : (
+            <div className="divide-y divide-border-soft">
+              {users.map((user) => (
+                <div key={user.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{user.email}</p>
+                      {user.name ? (
+                        <p className="text-sm text-muted-foreground capitalize mt-0.5">{user.name}</p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic mt-0.5">Profile incomplete</p>
+                      )}
+                    </div>
+                    <Badge variant={user.is_active !== false ? 'default' : 'secondary'}>
+                      {user.is_active !== false ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm capitalize px-2 py-1 bg-surface-soft rounded-md">{user.role}</span>
+                    <div className="flex gap-2">
+                      <Button variant="secondary" size="icon" onClick={() => openEditModal(user)} className="h-8 w-8">
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="destructive" size="icon" onClick={() => openDeleteModal(user)} className="h-8 w-8">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

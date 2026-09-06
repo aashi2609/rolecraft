@@ -18,6 +18,8 @@ import {
   ClipboardList,
   Bookmark,
   LogOut,
+  Menu,
+  X,
 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { useUser } from '@/context/UserContext';
@@ -185,6 +187,7 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useUser();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isOnboarding =
     pathname.includes('/onboarding') || pathname.includes('/resume/download');
 
@@ -201,13 +204,51 @@ export function AppShell({
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface-soft">
+      {/* Desktop Sidebar */}
       <div className="sticky top-0 h-screen hidden md:block">
         <DashboardSidebar role={role} />
       </div>
+
+      {/* Mobile Sidebar Overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Mobile Sidebar */}
+      <div
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 md:hidden",
+          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <DashboardSidebar role={role} />
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen(false)}
+          className="absolute top-4 right-4 p-2 rounded-lg hover:bg-surface-soft"
+          aria-label="Close menu"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
       <div className="flex min-w-0 flex-1 flex-col h-full overflow-hidden">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border-soft bg-surface-white/95 backdrop-blur px-4 md:px-8">
-          <div className="md:hidden">
-            <Logo href={role === 'company' ? '/company/dashboard' : '/dashboard'} />
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden p-2 -ml-2 rounded-lg hover:bg-surface-soft"
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="md:hidden">
+              <Logo href={role === 'company' ? '/company/dashboard' : '/dashboard'} />
+            </div>
           </div>
           <div className="flex-1" />
           <div className="flex items-center gap-2">
