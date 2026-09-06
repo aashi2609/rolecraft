@@ -18,6 +18,7 @@ from core.ws_manager import ws_manager
 from models import (
     Application,
     ApplicationStatus,
+    CandidateProfile,
     Company,
     JobPosting,
     Resume,
@@ -40,10 +41,38 @@ async def _app_out(db, app: Application) -> ApplicationOut:
     job = await db.get(JobPosting, app.job_id)
     company = await db.get(Company, job.company_id) if job else None
     user = await db.get(User, app.candidate_id)
-    # Use email prefix as display name (no dedicated name column exists yet)
-    candidate_name = (
-        user.email.split("@")[0].replace(".", " ").title() if user else None
-    )
+    
+    # Try to get candidate name from profile weblinks (resume parsing stores it here)
+    candidate_name = None
+    if user:
+        # Try to get from candidate profile weblinks
+        result = await db.execute(
+            select(CandidateProfile).where(CandidateProfile.user_id == user.id)
+        )
+        profile = result.scalar_one_or_none()
+        
+        if profile and profile.weblinks:
+            # Check for name variations in weblinks (from resume parsing or profile)
+            candidate_name = (
+                profile.weblinks.get('full_name') or 
+                profile.weblinks.get('name') or 
+                profile.weblinks.get('display_name') or
+                profile.weblinks.get('linkedin')  # Sometimes stored as LinkedIn URL, parse it
+            )
+        
+        # If still no name, try to get from resume metadata
+        if not candidate_name and app.resume_id:
+            resume = await db.get(Resume, app.resume_id)
+            if resume:
+                # Resume might have parsed candidate name in metadata or similar field
+                pass  # Resume model doesn't have candidate_name field currently
+        
+        # Final fallback: use email prefix and clean it up
+        if not candidate_name:
+            email_prefix = user.email.split("@")[0]
+            # Replace common separators with space and title case
+            candidate_name = email_prefix.replace(".", " ").replace("_", " ").replace("-", " ").title()
+    
     return ApplicationOut(
         id=app.id,
         candidate_id=app.candidate_id,

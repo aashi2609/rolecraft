@@ -28,6 +28,7 @@ export default function PersonalDetailsForm() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
+    full_name: '',
     dob: '',
     gender: '',
     marital_status: '',
@@ -48,6 +49,7 @@ export default function PersonalDetailsForm() {
     const links = p.weblinks || {};
     setFormData((prev) => ({
       ...prev,
+      full_name: links.display_name || links.full_name || '',
       dob: p.dob ? String(p.dob).slice(0, 10) : '',
       gender: p.gender || '',
       marital_status: p.marital_status || '',
@@ -75,6 +77,7 @@ export default function PersonalDetailsForm() {
     setError('');
     try {
       const payload: Record<string, unknown> = {
+        full_name: formData.full_name || null,
         dob: formData.dob || null,
         gender: formData.gender || null,
         marital_status: formData.marital_status || null,
@@ -109,6 +112,14 @@ export default function PersonalDetailsForm() {
         <section>
           <h2 className="text-xl font-bold text-ink border-b pb-2 mb-4">Basic Information</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField label="Full Name" required>
+              <Input
+                type="text"
+                placeholder="e.g., Aashi Kaur"
+                value={formData.full_name}
+                onChange={(e) => updateForm('full_name', e.target.value)}
+              />
+            </FormField>
             <FormField label="Date of Birth">
               <Input
                 type="date"
