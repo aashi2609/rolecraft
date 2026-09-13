@@ -54,9 +54,17 @@ async def make_admin(email: str) -> None:
         result = await db.execute(select(User).where(User.email == email.lower()))
         user = result.scalar_one_or_none()
         if not user:
-            print(f"User {email} not found.")
-            return
-        user.role = UserRole.admin
+            print(f"User {email} not found. Creating a new admin account with password 'admin123'...")
+            from core.security import hash_password
+            user = User(
+                email=email.lower(),
+                password_hash=hash_password("admin123"),
+                role=UserRole.admin
+            )
+            db.add(user)
+        else:
+            user.role = UserRole.admin
+        
         await db.commit()
         print(f"User {email} is now an admin.")
 
