@@ -120,3 +120,20 @@ async def change_password(
     row.password_hash = hash_password(body.new_password)
     await db.flush()
     return {"message": "Password updated successfully"}
+
+
+@router.delete("/me")
+async def delete_account(user: CurrentUser, db: DbSession):
+    # Fetch the user from the database
+    row = await db.get(User, user.id)
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    
+    # Due to ON DELETE CASCADE at the database level, deleting the user 
+    # will cleanly remove all associated records (profiles, resumes, jobs, etc.)
+    await db.delete(row)
+    await db.commit()
+    return {"message": "Account successfully deleted"}

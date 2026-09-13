@@ -174,6 +174,7 @@ export const authApi = {
     }),
   changePassword: (body: { current_password: string; new_password: string }) =>
     api('/auth/change-password', { method: 'POST', body: JSON.stringify(body) }),
+  deleteAccount: () => api('/auth/me', { method: 'DELETE' }),
 };
 
 export const candidateApi = {

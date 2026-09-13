@@ -2,9 +2,11 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { FormField, Input } from '@/components/ui/FormField';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useUser } from '@/context/UserContext';
 import { planDisplayName, isFreePlan, getPlanById } from '@/lib/plans';
 import { authApi, companyApi } from '@/lib/api';
@@ -26,6 +28,13 @@ export default function CompanySettingsPage() {
   const [accountMsg, setAccountMsg] = useState('');
   const [passwordMsg, setPasswordMsg] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteMsg, setDeleteMsg] = useState('');
+
+  const router = useRouter();
 
   const updateFormData = useCallback(() => {
     const profile = companyProfile as CompanyProfile | null;
@@ -72,6 +81,20 @@ export default function CompanySettingsPage() {
       setPasswordMsg('Password updated.');
     } catch (e: unknown) {
       setPasswordMsg(e instanceof Error ? e.message : 'Failed to update password');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE') return;
+    setIsDeleting(true);
+    setDeleteMsg('');
+    try {
+      await authApi.deleteAccount();
+      localStorage.removeItem('rolecraft_token');
+      window.location.href = '/';
+    } catch (err: any) {
+      setDeleteMsg(err?.detail || err?.message || 'Failed to delete account');
+      setIsDeleting(false);
     }
   };
 
@@ -148,12 +171,45 @@ export default function CompanySettingsPage() {
             <p className="text-ink-muted mb-4 text-sm">
               Deleting your company account will permanently remove all job postings and candidate data.
             </p>
-            <Button
-              variant="outline"
-              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-            >
-              Delete Account
-            </Button>
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                >
+                  Delete Account
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Are you absolutely sure?</DialogTitle>
+                  <DialogDescription>
+                    This action cannot be undone. This will permanently delete your company account,
+                    remove all your job postings, and delete all associated data from our servers.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <p className="text-sm font-medium">To confirm, please type "DELETE" below:</p>
+                  <Input 
+                    value={deleteConfirmation} 
+                    onChange={(e) => setDeleteConfirmation(e.target.value)} 
+                    placeholder="DELETE"
+                  />
+                  {deleteMsg && <p className="text-sm text-red-600">{deleteMsg}</p>}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
+                  <Button 
+                    variant="default" 
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                    onClick={handleDeleteAccount} 
+                    disabled={deleteConfirmation !== 'DELETE' || isDeleting}
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete Account'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </Card>
         </div>
       </div>

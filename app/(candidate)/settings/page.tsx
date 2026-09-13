@@ -2,9 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { FormField, Input } from '@/components/ui/FormField';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useUser } from '@/context/UserContext';
 import { planDisplayName, isFreePlan, getPlanById } from '@/lib/plans';
 import { getDisplayName } from '@/lib/profile';
@@ -24,6 +26,13 @@ export default function CandidateSettingsPage() {
   const [accountMsg, setAccountMsg] = useState('');
   const [passwordMsg, setPasswordMsg] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteMsg, setDeleteMsg] = useState('');
+
+  const router = useRouter();
 
   useEffect(() => {
     setFullName(getDisplayName(candidateProfile));
@@ -70,6 +79,23 @@ export default function CandidateSettingsPage() {
       setConfirmPassword('');
     } catch (err: any) {
       setPasswordMsg(err?.detail || err?.message || 'Password update failed');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE') return;
+    setIsDeleting(true);
+    setDeleteMsg('');
+    try {
+      await authApi.deleteAccount();
+      // Use the logout method from UserContext if available, or just redirect and let layout handle it
+      // Since logout is typically inside useUser, we need to extract it
+      // Let's assume it has logout or we can just clear storage
+      localStorage.removeItem('rolecraft_token');
+      window.location.href = '/';
+    } catch (err: any) {
+      setDeleteMsg(err?.detail || err?.message || 'Failed to delete account');
+      setIsDeleting(false);
     }
   };
 
@@ -151,7 +177,40 @@ export default function CandidateSettingsPage() {
           <Card className="p-6 border-red-200">
             <h2 className="text-xl font-bold text-red-600 mb-2">Danger Zone</h2>
             <p className="text-ink-muted mb-4 text-sm">Once you delete your account, there is no going back. Please be certain.</p>
-            <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700">Delete Account</Button>
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700">Delete Account</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Are you absolutely sure?</DialogTitle>
+                  <DialogDescription>
+                    This action cannot be undone. This will permanently delete your account
+                    and remove your data from our servers.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <p className="text-sm font-medium">To confirm, please type "DELETE" below:</p>
+                  <Input 
+                    value={deleteConfirmation} 
+                    onChange={(e) => setDeleteConfirmation(e.target.value)} 
+                    placeholder="DELETE"
+                  />
+                  {deleteMsg && <p className="text-sm text-red-600">{deleteMsg}</p>}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
+                  <Button 
+                    variant="default" 
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                    onClick={handleDeleteAccount} 
+                    disabled={deleteConfirmation !== 'DELETE' || isDeleting}
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete Account'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </Card>
         </div>
       </div>

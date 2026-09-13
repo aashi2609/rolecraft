@@ -82,15 +82,17 @@ class User(Base):
     )
 
     subscription: Mapped[Optional["Subscription"]] = relationship(
-        back_populates="user", uselist=False
+        back_populates="user", uselist=False, cascade="all, delete-orphan", passive_deletes=True
     )
     candidate_profile: Mapped[Optional["CandidateProfile"]] = relationship(
-        back_populates="user", uselist=False
+        back_populates="user", uselist=False, cascade="all, delete-orphan", passive_deletes=True
     )
     company: Mapped[Optional["Company"]] = relationship(
-        back_populates="user", uselist=False
+        back_populates="user", uselist=False, cascade="all, delete-orphan", passive_deletes=True
     )
-    notifications: Mapped[list["Notification"]] = relationship(back_populates="user")
+    notifications: Mapped[list["Notification"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class Subscription(Base):
