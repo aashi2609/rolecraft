@@ -459,6 +459,7 @@ export const savedJobsApi = {
 };
 
 export const hiddenJobsApi = {
+  list: () => api<{ job_ids: string[] }>('/jobs/hidden'),
   hide: (jobId: string) => api(`/jobs/${jobId}/hide`, { method: 'POST' }),
   unhide: (jobId: string) => api(`/jobs/${jobId}/hide`, { method: 'DELETE' }),
 };

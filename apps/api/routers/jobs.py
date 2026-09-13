@@ -221,6 +221,12 @@ async def ranked_candidates(job_id: UUID, user: CompanyUser, db: DbSession):
     return await ranked_candidates_for_job(db, job)
 
 
+@router.get("/hidden")
+async def list_hidden_jobs(user: CandidateUser, db: DbSession):
+    hidden = await db.scalars(
+        select(HiddenJob.job_id).where(HiddenJob.candidate_id == user.id)
+    )
+    return {"job_ids": [str(j) for j in hidden.all()]}
 
 
 

@@ -70,7 +70,8 @@ interface UserContextType extends UserState {
   addResume: (resume: any) => void;
   addMessage: (message: any) => void;
   hideJob: (jobId: string | number) => void;
-  toggleSavedCandidate: (id: string | number) => void;
+  unhideJob: (jobId: string | number) => void;
+  toggleSavedCandidate: (candidateId: string | number) => void;
   /** Real auth helpers used by signin/signup pages */
   signInWithApi: (email: string, password: string) => Promise<{ role: string; plan?: string; profileComplete: boolean; companyProfileComplete: boolean }>;
   signUpWithApi: (payload: {
@@ -307,6 +308,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       let resumes: any[] = [];
       let applications: any[] = [];
       let savedJobs: string[] = [];
+      let hiddenJobIds: string[] = [];
       let messages: any[] = [];
 
       if (role === 'company') {
@@ -326,6 +328,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
         applications = ((await applicationsApi.mine().catch(() => [])) as any[]).map(mapApplication);
         const saved = await savedJobsApi.list().catch(() => ({ job_ids: [] as string[] }));
         savedJobs = saved.job_ids || [];
+        const hidden = await hiddenJobsApi.list().catch(() => ({ job_ids: [] as string[] }));
+        hiddenJobIds = hidden.job_ids || [];
         const msgRaw = await messagesApi.threads().catch(() => []);
         messages = (msgRaw || []).map((t: any) => ({
           id: t.thread_id,
@@ -352,6 +356,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         resumes,
         applications,
         savedJobs,
+        hiddenJobIds,
         messages,
         loading: false,
       }));
@@ -545,9 +550,25 @@ export function UserProvider({ children }: { children: ReactNode }) {
       }));
     });
   };
-  const toggleSavedCandidate = (id: string | number) =>
+  const unhideJob = (jobId: string | number) => {
+    const sid = String(jobId);
+    setState((prev) => ({
+      ...prev,
+      hiddenJobIds: prev.hiddenJobIds.filter((id) => id !== sid),
+    }));
+    hiddenJobsApi.unhide(sid).catch((err) => {
+      console.error('Failed to unhide job:', err);
+      setState((prev) => ({
+        ...prev,
+        hiddenJobIds: prev.hiddenJobIds.includes(sid)
+          ? prev.hiddenJobIds
+          : [...prev.hiddenJobIds, sid],
+      }));
+    });
+  };
+  const toggleSavedCandidate = (candidateId: string | number) =>
     setState((prev) => {
-      const sid = String(id);
+      const sid = String(candidateId);
       const has = prev.savedCandidateIds.includes(sid);
       return {
         ...prev,
@@ -580,6 +601,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         addResume,
         addMessage,
         hideJob,
+        unhideJob,
         toggleSavedCandidate,
         signInWithApi,
         signUpWithApi,
