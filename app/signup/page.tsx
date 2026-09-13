@@ -13,9 +13,9 @@ import { isFreePlan, type PlanId } from '@/lib/plans';
 function SignupForm() {
   const searchParams = useSearchParams();
   const role = (searchParams.get('role') as 'candidate' | 'company') || 'candidate';
-  const plan = (searchParams.get('plan') as PlanId) || (role === 'company' ? 'starter' : 'basic');
+  const plan = (searchParams.get('plan') as PlanId) || (role === 'company' ? 'corporate_annual' : 'complete');
   const router = useRouter();
-  const { signUpWithApi, setPendingPlan, setPlan } = useUser();
+  const { signUpWithApi, setPlan } = useUser();
   const [industry, setIndustry] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -37,13 +37,9 @@ function SignupForm() {
         plan,
       });
 
-      if (isFreePlan(plan)) {
-        await setPlan(plan);
-        router.push(role === 'candidate' ? '/onboarding/profile' : '/onboarding/company-profile');
-      } else {
-        setPendingPlan(plan);
-        router.push(`/checkout?plan=${plan}&role=${role}&next=onboarding`);
-      }
+      // Auto-activate plan for now until real payment gateway (Stripe/Razorpay) is connected
+      await setPlan(plan);
+      router.push(role === 'candidate' ? '/onboarding/profile' : '/onboarding/company-profile');
     } catch (err: any) {
       setError(err?.detail || err?.message || 'Signup failed');
     } finally {
@@ -120,11 +116,7 @@ function SignupForm() {
             {error && <p className="text-sm text-red-600">{error}</p>}
 
             <Button type="submit" className="w-full mt-4" disabled={loading}>
-              {loading
-                ? 'Creating…'
-                : isFreePlan(plan)
-                  ? 'Create Account'
-                  : 'Continue to Checkout'}
+              {loading ? 'Creating Account…' : 'Create Account'}
             </Button>
           </form>
 

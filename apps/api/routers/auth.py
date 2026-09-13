@@ -27,13 +27,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _parse_plan(plan: str | None, role: UserRole) -> PlanTier:
-    raw = (plan or ("basic" if role == UserRole.candidate else "starter")).lower()
-    if raw == "free" and role == UserRole.candidate:
-        raw = "basic"
+    raw = (plan or ("complete" if role == UserRole.candidate else "corporate_annual")).lower()
+    if raw in ("free", "basic", "premium", "elite"):
+        raw = "complete"
+    elif raw in ("starter", "growth", "scale"):
+        raw = "corporate_annual"
     try:
         return PlanTier(raw)
     except ValueError:
-        return PlanTier.basic if role == UserRole.candidate else PlanTier.starter
+        return PlanTier.complete if role == UserRole.candidate else PlanTier.corporate_annual
 
 
 @router.post("/signup", response_model=TokenResponse)

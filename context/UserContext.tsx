@@ -172,7 +172,7 @@ const initialState: UserState = {
   userId: null,
   profileComplete: false,
   companyProfileComplete: false,
-  plan: 'basic',
+  plan: 'complete',
   planValidTill: defaultValidTill(),
   pendingPlan: null,
   candidateProfile: {},
@@ -259,7 +259,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     try {
       // Probe role via candidate/me or company/me
       let role: Role = null;
-      let plan: PlanId = 'basic';
+      let plan: PlanId = 'complete';
       let userId: string | null = null;
       let candidateProfile: Record<string, unknown> = {};
       let companyProfile: Record<string, unknown> = {};
@@ -437,8 +437,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
       isAuthenticated: true,
       role: res.role as Role,
       userId: res.user_id,
-      plan: (isFreePlan(res.plan) ? res.plan : 'basic') as PlanId,
-      pendingPlan: isFreePlan(res.plan) ? null : ((res.plan as PlanId) || null),
+      plan: (res.plan as PlanId) || (res.role === 'company' ? 'corporate_annual' : 'complete'),
+      pendingPlan: (res.plan as PlanId) || null,
     }));
     await refreshSession();
     return { role: res.role, plan: res.plan };

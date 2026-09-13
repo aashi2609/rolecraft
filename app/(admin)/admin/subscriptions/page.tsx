@@ -136,16 +136,14 @@ export default function AdminSubscriptionsPage() {
                   <select value={formData.plan_tier} onChange={e => setFormData({...formData, plan_tier: e.target.value})} className="flex h-10 w-full rounded-md border border-border-soft bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-blue capitalize">
                     {formData.role === 'company' ? (
                       <>
-                        <option value="starter">Starter</option>
-                        <option value="growth">Growth</option>
-                        <option value="scale">Scale</option>
+                        <option value="corporate_annual">Corporate Annual</option>
+                        <option value="corporate_lifetime">Corporate Lifetime</option>
                       </>
                     ) : (
                       <>
-                        <option value="free">Free</option>
-                        <option value="basic">Basic</option>
-                        <option value="premium">Premium</option>
-                        <option value="elite">Elite</option>
+                        <option value="resume_builder">Resume Builder</option>
+                        <option value="job_search">Job Search</option>
+                        <option value="complete">Complete</option>
                       </>
                     )}
                   </select>
@@ -261,16 +259,14 @@ export default function AdminSubscriptionsPage() {
               <select value={formData.plan_tier} onChange={e => setFormData({...formData, plan_tier: e.target.value})} className="flex h-10 w-full rounded-md border border-border-soft bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-blue capitalize">
                 {formData.role === 'company' ? (
                   <>
-                    <option value="starter">Starter</option>
-                    <option value="growth">Growth</option>
-                    <option value="scale">Scale</option>
+                    <option value="corporate_annual">Corporate Annual</option>
+                    <option value="corporate_lifetime">Corporate Lifetime</option>
                   </>
                 ) : (
                   <>
-                    <option value="free">Free</option>
-                    <option value="basic">Basic</option>
-                    <option value="premium">Premium</option>
-                    <option value="elite">Elite</option>
+                    <option value="resume_builder">Resume Builder</option>
+                    <option value="job_search">Job Search</option>
+                    <option value="complete">Complete</option>
                   </>
                 )}
               </select>

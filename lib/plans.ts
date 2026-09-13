@@ -1,11 +1,9 @@
 export type PlanId =
-  | 'basic'
-  | 'premium'
-  | 'elite'
-  | 'starter'
-  | 'growth'
-  | 'scale'
-  | 'free';
+  | 'resume_builder'
+  | 'job_search'
+  | 'complete'
+  | 'corporate_annual'
+  | 'corporate_lifetime';
 
 export type Role = 'candidate' | 'company';
 
@@ -15,62 +13,67 @@ export interface PlanDefinition {
   description: string;
   priceMonthly: number;
   priceAnnual: number;
-  currency: 'USD' | 'INR';
+  currency: 'INR';
   features: string[];
   popular?: boolean;
   isFree: boolean;
   role: Role;
+  billingText?: {
+    monthly: string;
+    annual: string;
+  };
 }
 
 export const CANDIDATE_PLANS: PlanDefinition[] = [
   {
-    id: 'basic',
-    name: 'Basic',
-    description: 'Essential tools for job seekers.',
-    priceMonthly: 0,
-    priceAnnual: 0,
+    id: 'resume_builder',
+    name: 'Resume Builder',
+    description: 'AI resume generation & tailoring for job seekers with existing job avenues.',
+    priceMonthly: 499,
+    priceAnnual: 399,
     currency: 'INR',
     features: [
-      'Basic profile creation',
-      'Search and apply for jobs',
-      '1 target role resume at a time',
-      'Limited search filters',
+      'Profile onboarding & management',
+      'AI-tailored resume generation across verticals',
+      'ATS score optimization & breakdown',
+      'Instant PDF export & downloads',
+      'No job application features',
     ],
-    isFree: true,
-    role: 'candidate',
-  },
-  {
-    id: 'premium',
-    name: 'Premium',
-    description: 'Maximize your visibility.',
-    priceMonthly: 999,
-    priceAnnual: 799,
-    currency: 'INR',
-    features: [
-      'Priority placement in search',
-      'See who viewed your profile',
-      'Multiple simultaneous target roles',
-      'Unlimited resume generation',
-      'Full job search filters',
-      'Cover letter builder',
-    ],
-    popular: true,
     isFree: false,
     role: 'candidate',
   },
   {
-    id: 'elite',
-    name: 'Elite',
-    description: 'Full access with AI tools.',
-    priceMonthly: 1999,
-    priceAnnual: 1499,
+    id: 'job_search',
+    name: 'Job Search',
+    description: 'Job application & AI matching for candidates with a ready resume.',
+    priceMonthly: 399,
+    priceAnnual: 299,
     currency: 'INR',
     features: [
-      'All Premium features',
-      'AI-powered cross-domain resume tailoring',
-      'Direct messaging with recruiters',
-      'Interview prep module',
+      'Browse & search all active job postings',
+      'AI job matches & fitment rationales',
+      'One-click job applications (using uploaded resume)',
+      'Saved jobs & application status tracking',
+      'Direct messaging with hiring teams',
     ],
+    isFree: false,
+    role: 'candidate',
+  },
+  {
+    id: 'complete',
+    name: 'Complete',
+    description: 'Full access to both AI resume generation and job application/matching.',
+    priceMonthly: 799,
+    priceAnnual: 599,
+    currency: 'INR',
+    features: [
+      'All Resume Builder features',
+      'All Job Search features',
+      'Unlimited AI resume tailoring per application',
+      'Priority recruiter visibility & badge',
+      'Full search filters & interview prep insights',
+    ],
+    popular: true,
     isFree: false,
     role: 'candidate',
   },
@@ -78,53 +81,37 @@ export const CANDIDATE_PLANS: PlanDefinition[] = [
 
 export const COMPANY_PLANS: PlanDefinition[] = [
   {
-    id: 'starter',
-    name: 'Starter',
-    description: 'Perfect for small teams hiring occasionally.',
-    priceMonthly: 0,
-    priceAnnual: 0,
-    currency: 'INR',
-    features: [
-      'Up to 2 active job postings',
-      'Basic candidate ranking',
-      'Limited candidate search filters',
-      'Email support',
-    ],
-    isFree: true,
-    role: 'company',
-  },
-  {
-    id: 'growth',
-    name: 'Growth',
-    description: 'For growing companies with consistent hiring needs.',
-    priceMonthly: 4999,
-    priceAnnual: 3999,
+    id: 'corporate_annual',
+    name: 'Corporate Annual',
+    description: 'Complete recruitment suite billed annually.',
+    priceMonthly: 29999, // displayed as Annual ₹29,999/yr
+    priceAnnual: 29999,
     currency: 'INR',
     features: [
       'Unlimited job postings',
-      'Priority ranking refresh',
-      'Full candidate search filters',
-      'See full candidate profiles',
+      'AI candidate search & smart matching',
+      'Full candidate profile viewing',
       'Direct candidate messaging',
+      'Standard support',
     ],
-    popular: true,
     isFree: false,
     role: 'company',
   },
   {
-    id: 'scale',
-    name: 'Scale',
-    description: 'Advanced tools for high-volume recruitment.',
-    priceMonthly: 12999,
-    priceAnnual: 9999,
+    id: 'corporate_lifetime',
+    name: 'Corporate Lifetime',
+    description: 'Lifetime unlimited recruitment access — pay once, use forever.',
+    priceMonthly: 79999, // displayed as Lifetime ₹79,999
+    priceAnnual: 79999,
     currency: 'INR',
     features: [
-      'Everything in Growth',
+      'Everything in Corporate Annual',
+      'Lifetime unlimited job postings & search',
+      'Zero recurring monthly or annual fees',
+      'Featured employer branding & placement',
       'Dedicated account support',
-      'Bulk hiring tools',
-      'Advanced analytics dashboard',
-      'Custom integrations',
     ],
+    popular: true,
     isFree: false,
     role: 'company',
   },
@@ -136,47 +123,45 @@ export function getPlansForRole(role: Role): PlanDefinition[] {
 
 export function getPlanById(id: string | null | undefined): PlanDefinition | undefined {
   if (!id) return undefined;
-  const normalized = id === 'free' ? 'basic' : id;
+  // Normalize legacy plan names if any exist
+  let normalized = id;
+  if (id === 'free' || id === 'basic') normalized = 'complete';
+  if (id === 'starter' || id === 'growth' || id === 'scale') normalized = 'corporate_annual';
   return [...CANDIDATE_PLANS, ...COMPANY_PLANS].find((p) => p.id === normalized);
 }
 
-export function isFreePlan(plan: PlanId | string | null | undefined): boolean {
-  if (!plan || plan === 'free' || plan === 'basic' || plan === 'starter') return true;
-  const def = getPlanById(plan);
-  return def?.isFree ?? true;
+export function isFreePlan(_plan: PlanId | string | null | undefined): boolean {
+  return false;
 }
 
-export function isPaidPlan(plan: PlanId | string | null | undefined): boolean {
-  return !isFreePlan(plan);
+export function isPaidPlan(_plan: PlanId | string | null | undefined): boolean {
+  return true;
 }
 
 export function planDisplayName(plan: PlanId | string | null | undefined): string {
   const def = getPlanById(plan);
   if (def) return def.name;
-  if (!plan || plan === 'free') return 'Basic';
-  return String(plan).charAt(0).toUpperCase() + String(plan).slice(1);
+  return String(plan || 'Complete').replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
-/** Free/basic: 1 target role at a time. Paid: unlimited. */
-export function maxTargetRoles(plan: PlanId | string | null | undefined): number {
-  return isFreePlan(plan) ? 1 : Number.POSITIVE_INFINITY;
+export function maxTargetRoles(_plan: PlanId | string | null | undefined): number {
+  return Number.POSITIVE_INFINITY;
 }
 
-/** Free/starter: 2 job postings. Paid: unlimited. */
-export function maxJobPostings(plan: PlanId | string | null | undefined): number {
-  return isFreePlan(plan) ? 2 : Number.POSITIVE_INFINITY;
+export function maxJobPostings(_plan: PlanId | string | null | undefined): number {
+  return Number.POSITIVE_INFINITY;
 }
 
-/** Free tiers get limited filters on search pages. */
-export function hasFullFilters(plan: PlanId | string | null | undefined): boolean {
-  return isPaidPlan(plan);
+export function hasFullFilters(_plan: PlanId | string | null | undefined): boolean {
+  return true;
 }
 
 export function formatPlanPrice(plan: PlanDefinition, annual: boolean): string {
-  const amount = annual ? plan.priceAnnual : plan.priceMonthly;
-  if (amount === 0) return plan.currency === 'INR' ? '₹0' : '$0';
-  if (plan.currency === 'INR') {
+  if (plan.role === 'company') {
+    const amount = plan.id === 'corporate_lifetime' ? plan.priceAnnual : annual ? plan.priceAnnual : plan.priceMonthly;
     return `₹${amount.toLocaleString('en-IN')}`;
   }
-  return `$${amount}`;
+  const amount = annual ? plan.priceAnnual : plan.priceMonthly;
+  return `₹${amount.toLocaleString('en-IN')}`;
 }
+

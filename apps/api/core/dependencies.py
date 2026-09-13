@@ -21,9 +21,6 @@ from models import (
 
 security = HTTPBearer(auto_error=False)
 
-FREE_CANDIDATE_PLANS = {PlanTier.free, PlanTier.basic}
-FREE_COMPANY_PLANS = {PlanTier.starter, PlanTier.free, PlanTier.basic}
-
 
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
@@ -95,49 +92,43 @@ async def get_user_plan(user: User, db: AsyncSession) -> PlanTier:
     sub = result.scalar_one_or_none()
     if sub:
         return sub.plan_tier
-    return PlanTier.basic if user.role == UserRole.candidate else PlanTier.starter
+    return PlanTier.complete if user.role == UserRole.candidate else PlanTier.corporate_annual
 
 
 async def check_plan_limit(
     user: User, db: AsyncSession, resource: str, extra: int = 1
 ) -> None:
-    """Raise 402/403 when free-tier caps are exceeded."""
+    """Validate feature category permissions based on user's active plan."""
+    if user.subscription and user.subscription.status != SubscriptionStatus.active:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="An active subscription is required to access RoleCraft services — please choose a plan to activate your account.",
+        )
+
     plan = await get_user_plan(user, db)
 
-    if resource == "resume_verticals":
-        if plan in FREE_CANDIDATE_PLANS and extra > 1:
-            raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail="Free plan allows 1 target role at a time. Upgrade to generate more.",
-            )
-        from models import Resume
-
-        count = await db.scalar(
-            select(func.count())
-            .select_from(Resume)
-            .where(Resume.candidate_id == user.id)
-        )
-        if plan in FREE_CANDIDATE_PLANS and (count or 0) >= 1:
+    # Resume creation/generation gating
+    if resource in ("resume_generation", "resume_verticals"):
+        if plan not in (PlanTier.resume_builder, PlanTier.complete):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="You've reached your plan's resume generation limit — upgrade to generate more.",
+                detail="Your plan doesn't include resume generation — upgrade to Resume Builder or Complete",
             )
 
-    if resource == "job_postings":
-        if plan not in FREE_COMPANY_PLANS:
-            return
-        count = await db.scalar(
-            select(func.count())
-            .select_from(JobPosting)
-            .where(
-                JobPosting.company_id == user.id,
-                JobPosting.status.in_([JobStatus.live, JobStatus.draft]),
-            )
-        )
-        if (count or 0) >= 2:
+    # Job search & application gating
+    elif resource in ("job_search", "applications", "messages"):
+        if user.role == UserRole.candidate and plan not in (PlanTier.job_search, PlanTier.complete):
             raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail="Free plan allows up to 2 active job postings. Upgrade for unlimited.",
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your plan doesn't include job search & applications — upgrade to Job Search or Complete",
+            )
+
+    # Corporate job postings gating
+    elif resource in ("job_postings", "candidate_search"):
+        if user.role == UserRole.company and plan not in (PlanTier.corporate_annual, PlanTier.corporate_lifetime):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your plan doesn't include corporate job posting and candidate search — please subscribe to a Corporate plan.",
             )
 
 

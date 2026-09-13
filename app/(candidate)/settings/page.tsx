@@ -125,17 +125,10 @@ export default function CandidateSettingsPage() {
                   {planDef?.description || (isFreePlan(plan) ? 'Basic features included' : 'Premium features active')}
                 </div>
               </div>
-              {!isFreePlan(plan) && (
-                <Link href="/pricing">
-                  <Button variant="outline">Change Plan</Button>
-                </Link>
-              )}
-            </div>
-            {isFreePlan(plan) && (
-              <Link href="/pricing">
-                <Button variant="primary">Upgrade to Premium</Button>
+              <Link href="/subscribe?role=candidate">
+                <Button variant="outline">Change Plan</Button>
               </Link>
-            )}
+            </div>
           </Card>
 
           <Card className="p-6">

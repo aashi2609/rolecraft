@@ -31,14 +31,12 @@ class UserRole(str, enum.Enum):
 
 class PlanTier(str, enum.Enum):
     # candidate
-    free = "free"
-    basic = "basic"
-    premium = "premium"
-    elite = "elite"
+    resume_builder = "resume_builder"
+    job_search = "job_search"
+    complete = "complete"
     # company
-    starter = "starter"
-    growth = "growth"
-    scale = "scale"
+    corporate_annual = "corporate_annual"
+    corporate_lifetime = "corporate_lifetime"
 
 
 class SubscriptionStatus(str, enum.Enum):

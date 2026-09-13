@@ -108,10 +108,8 @@ export default function CompanySettingsPage() {
                   {planDef?.description || (isFreePlan(plan) ? '2 active jobs limit' : 'Unlimited job postings')}
                 </div>
               </div>
-              <Link href="/company/pricing">
-                <Button variant="outline">
-                  {isFreePlan(plan) ? 'Upgrade Plan' : 'Change Plan'}
-                </Button>
+              <Link href="/subscribe?role=company">
+                <Button variant="outline">Change Plan</Button>
               </Link>
             </div>
           </Card>

@@ -31,10 +31,10 @@ function CheckoutForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, setPlan, role: ctxRole } = useUser();
-  const planId = (searchParams.get('plan') || 'premium') as PlanId;
   const roleParam = searchParams.get('role');
   const next = searchParams.get('next');
   const role = roleParam === 'company' || roleParam === 'candidate' ? roleParam : ctxRole;
+  const planId = (searchParams.get('plan') || (role === 'company' ? 'corporate_annual' : 'complete')) as PlanId;
   const planDef = getPlanById(planId);
 
   useEffect(() => {
@@ -48,7 +48,7 @@ function CheckoutForm() {
     setIsProcessing(true);
 
     const amount = isAnnual ? (planDef?.priceAnnual || 0) : (planDef?.priceMonthly || 0);
-    const currency = planDef?.currency || 'USD';
+    const currency = planDef?.currency || 'INR';
 
     const paymentDetails: PaymentDetails = {
       planId,

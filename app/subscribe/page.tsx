@@ -27,25 +27,18 @@ function SubscribeContent() {
   const plans = getPlansForRole(role);
 
   const selectPlan = (planId: PlanId) => {
-    // Logged-in upgrade / plan change
     if (isAuthenticated) {
-      if (isFreePlan(planId)) {
-        setPlan(planId);
-        // Route to onboarding if profile is not complete, otherwise to dashboard
-        if (role === 'company') {
-          router.push(companyProfileComplete ? '/company/dashboard' : '/onboarding/company-profile');
-        } else {
-          router.push(profileComplete ? '/dashboard' : '/onboarding/profile');
-        }
-        return;
-      }
       setPendingPlan(planId);
       router.push(`/checkout?plan=${planId}&role=${role}`);
       return;
     }
-
-    // New user entry flow: plan → signup
     router.push(`/signup?role=${role}&plan=${planId}`);
+  };
+
+  const getBillingPeriodLabel = (planId: string) => {
+    if (planId === 'corporate_lifetime') return 'one-time';
+    if (planId === 'corporate_annual') return '/year';
+    return isAnnual ? '/mo (billed annually)' : '/mo';
   };
 
   return (
@@ -70,42 +63,44 @@ function SubscribeContent() {
           {isAuthenticated
             ? `You're currently on ${currentPlan}. Select a plan to upgrade or switch.`
             : role === 'company'
-              ? 'Select a plan before creating your employer account. You can change it later.'
-              : 'Pick a plan before signup. Free to start — upgrade anytime for multi-role resumes.'}
+              ? 'Select a hiring plan before creating your company account.'
+              : 'Pick a plan to get started with RoleCraft.'}
         </p>
 
-        <div className="flex items-center justify-center gap-3 mb-12">
-          <span className={`text-sm font-medium ${!isAnnual ? 'text-foreground' : 'text-muted-foreground'}`}>
-            Monthly
-          </span>
-          <button
-            type="button"
-            className="w-14 h-7 rounded-full relative focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors"
-            onClick={() => setIsAnnual(!isAnnual)}
-            style={{ backgroundColor: isAnnual ? '#2563EB' : '#e2e8f0' }}
-            aria-label="Toggle annual billing"
-          >
-            <div
-              className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm ${
-                isAnnual ? 'left-8' : 'left-1'
-              }`}
-            />
-          </button>
-          <span className={`text-sm font-medium ${isAnnual ? 'text-foreground' : 'text-muted-foreground'}`}>
-            Annually{' '}
-            <span className="text-primary text-xs ml-1 bg-primary/10 px-2 py-0.5 rounded-full">
-              Save ~20%
+        {role === 'candidate' && (
+          <div className="flex items-center justify-center gap-3 mb-12">
+            <span className={`text-sm font-medium ${!isAnnual ? 'text-foreground' : 'text-muted-foreground'}`}>
+              Monthly
             </span>
-          </span>
-        </div>
+            <button
+              type="button"
+              className="w-14 h-7 rounded-full relative focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors"
+              onClick={() => setIsAnnual(!isAnnual)}
+              style={{ backgroundColor: isAnnual ? '#2563EB' : '#e2e8f0' }}
+              aria-label="Toggle annual billing"
+            >
+              <div
+                className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm ${
+                  isAnnual ? 'left-8' : 'left-1'
+                }`}
+              />
+            </button>
+            <span className={`text-sm font-medium ${isAnnual ? 'text-foreground' : 'text-muted-foreground'}`}>
+              Annually{' '}
+              <span className="text-primary text-xs ml-1 bg-primary/10 px-2 py-0.5 rounded-full font-semibold">
+                Save ~20%
+              </span>
+            </span>
+          </div>
+        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+        <div className={`grid grid-cols-1 ${plans.length === 2 ? 'md:grid-cols-2 max-w-3xl' : 'md:grid-cols-3'} gap-6 mx-auto text-left`}>
           {plans.map((plan) => {
             const isCurrent = isAuthenticated && currentPlan === plan.id;
             return (
               <Card
                 key={plan.id}
-                className={`relative flex flex-col p-6 ${
+                className={`pricing-card relative flex flex-col p-6 ${
                   plan.popular || isCurrent ? 'border-primary shadow-md ring-1 ring-primary/20' : ''
                 }`}
               >
@@ -116,7 +111,7 @@ function SubscribeContent() {
                 )}
                 {isCurrent && (
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">
-                    Current
+                    Current Plan
                   </div>
                 )}
                 <div className="mb-5">
@@ -127,8 +122,8 @@ function SubscribeContent() {
                   <span className="text-4xl font-bold text-foreground">
                     {formatPlanPrice(plan, isAnnual)}
                   </span>
-                  <span className="text-muted-foreground text-sm">
-                    /{plan.isFree ? 'forever' : 'mo'}
+                  <span className="text-muted-foreground text-xs font-medium">
+                    {getBillingPeriodLabel(plan.id)}
                   </span>
                 </div>
                 <ul className="space-y-3 mb-8 flex-1">
@@ -141,19 +136,15 @@ function SubscribeContent() {
                 </ul>
                 <Button
                   variant={plan.popular || isCurrent ? 'primary' : 'outline'}
-                  className="w-full"
+                  className="w-full btn-inside"
                   disabled={isCurrent}
                   onClick={() => selectPlan(plan.id)}
                 >
                   {isCurrent
                     ? 'Current plan'
-                    : plan.isFree
-                      ? isAuthenticated
-                        ? 'Switch to free'
-                        : 'Continue free'
-                      : isAuthenticated
-                        ? `Upgrade to ${plan.name}`
-                        : `Select ${plan.name}`}
+                    : isAuthenticated
+                      ? `Select ${plan.name}`
+                      : `Choose ${plan.name}`}
                 </Button>
               </Card>
             );

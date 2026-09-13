@@ -33,16 +33,14 @@ async def validate_plan_tier(tier_str: str, user_role: UserRole) -> PlanTier:
 
     # Validate plan tier matches user role
     if user_role == UserRole.candidate and tier not in [
-        PlanTier.free,
-        PlanTier.basic,
-        PlanTier.premium,
-        PlanTier.elite,
+        PlanTier.resume_builder,
+        PlanTier.job_search,
+        PlanTier.complete,
     ]:
         raise ValueError("Invalid plan tier for candidate role")
     if user_role == UserRole.company and tier not in [
-        PlanTier.starter,
-        PlanTier.growth,
-        PlanTier.scale,
+        PlanTier.corporate_annual,
+        PlanTier.corporate_lifetime,
     ]:
         raise ValueError("Invalid plan tier for company role")
 
