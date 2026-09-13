@@ -45,6 +45,15 @@ export default function JobDetailPage() {
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
+  const [selectedResumeId, setSelectedResumeId] = useState<string | undefined>(undefined);
+
+  const bestResume = job ? (resumes.find((r) => r.vertical === job.vertical) || resumes[0]) : resumes[0];
+
+  useEffect(() => {
+    if (bestResume && !selectedResumeId) {
+      setSelectedResumeId(bestResume.id);
+    }
+  }, [bestResume, selectedResumeId]);
 
   useEffect(() => {
     const id = String(jobId);
@@ -71,7 +80,6 @@ export default function JobDetailPage() {
 
   const isSaved = savedJobs.includes(String(job.id));
   const hasApplied = applications.some((a) => String(a.jobId) === String(job.id));
-  const bestResume = resumes.find((r) => r.vertical === job.vertical) || resumes[0];
 
   const handleApplyClick = () => {
     if (resumes.length === 0) {
@@ -89,7 +97,7 @@ export default function JobDetailPage() {
         companyName: job.companyName,
         status: 'Applied',
         appliedAt: new Date().toISOString(),
-        resumeId: bestResume?.id,
+        resumeId: selectedResumeId || bestResume?.id,
       });
     } catch {
       alert('You have already applied for this job.');
@@ -187,12 +195,27 @@ export default function JobDetailPage() {
             <p className="text-ink-muted text-sm mb-4">
               Apply to <strong>{job.title}</strong> at {job.companyName}?
             </p>
-            {bestResume && (
+            {resumes.length > 1 ? (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-ink mb-1">Select Resume to Send:</label>
+                <select
+                  className="w-full p-2 border border-border-soft rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue text-sm"
+                  value={selectedResumeId || bestResume?.id || ''}
+                  onChange={(e) => setSelectedResumeId(e.target.value)}
+                >
+                  {resumes.map(r => (
+                    <option key={r.id} value={r.id}>
+                      {r.vertical} resume — {r.score || r.atsScore || '—'}/100 ATS
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : bestResume ? (
               <p className="text-sm mb-4 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-primary" />
-                Using resume: {bestResume.vertical} ({bestResume.score || '—'}/100)
+                Using resume: {bestResume.vertical} ({bestResume.score || bestResume.atsScore || '—'}/100 ATS)
               </p>
-            )}
+            ) : null}
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setIsApplyModalOpen(false)}>Cancel</Button>
               <Button onClick={confirmApply}>Submit Application</Button>

@@ -99,37 +99,8 @@ async def check_plan_limit(
     user: User, db: AsyncSession, resource: str, extra: int = 1
 ) -> None:
     """Validate feature category permissions based on user's active plan."""
-    if user.subscription and user.subscription.status != SubscriptionStatus.active:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="An active subscription is required to access RoleCraft services — please choose a plan to activate your account.",
-        )
-
-    plan = await get_user_plan(user, db)
-
-    # Resume creation/generation gating
-    if resource in ("resume_generation", "resume_verticals"):
-        if plan not in (PlanTier.resume_builder, PlanTier.complete):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Your plan doesn't include resume generation — upgrade to Resume Builder or Complete",
-            )
-
-    # Job search & application gating
-    elif resource in ("job_search", "applications", "messages"):
-        if user.role == UserRole.candidate and plan not in (PlanTier.job_search, PlanTier.complete):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Your plan doesn't include job search & applications — upgrade to Job Search or Complete",
-            )
-
-    # Corporate job postings gating
-    elif resource in ("job_postings", "candidate_search"):
-        if user.role == UserRole.company and plan not in (PlanTier.corporate_annual, PlanTier.corporate_lifetime):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Your plan doesn't include corporate job posting and candidate search — please subscribe to a Corporate plan.",
-            )
+    # Temporarily bypassed as per user request to not add payment criteria yet.
+    return None
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]

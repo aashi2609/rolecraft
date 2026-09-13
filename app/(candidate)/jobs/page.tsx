@@ -88,12 +88,11 @@ function formatSalary(job: {
 }
 
 export default function JobSearchPage() {
-  const { jobs, savedJobs, toggleSavedJob, hideJob, hiddenJobIds, plan, applyToJob } = useUser();
+  const { jobs, savedJobs, toggleSavedJob, hideJob, hiddenJobIds, plan, applications } = useUser();
   const fullFilters = hasFullFilters(plan);
 
   const [listedJobs, setListedJobs] = useState<any[]>(jobs);
   const [searchTerm, setSearchTerm] = useState('');
-  const [applyingId, setApplyingId] = useState<string | null>(null);
   const [location, setLocation] = useState('');
   const [experience, setExperience] = useState('');
   const [jobType, setJobType] = useState('');
@@ -159,23 +158,6 @@ export default function JobSearchPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
   const pageItems = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
-
-  const handleApply = async (job: (typeof jobs)[0]) => {
-    setApplyingId(job.id);
-    try {
-      await applyToJob({
-        jobId: job.id,
-        jobTitle: job.title,
-        companyName: job.companyName,
-        status: 'Applied',
-        date: new Date().toISOString().split('T')[0],
-      });
-    } catch {
-      alert('You have already applied for this job.');
-    } finally {
-      setApplyingId(null);
-    }
-  };
 
   return (
     <div className="py-8 px-4 md:px-8 max-w-6xl mx-auto">
@@ -449,7 +431,7 @@ export default function JobSearchPage() {
             const skills: string[] = job.skills || [];
             const shown = skills.slice(0, 3);
             const overflow = skills.length - shown.length;
-            const isApplying = applyingId === job.id;
+
             return (
               <Card key={job.id} className="p-5">
                 <div className="flex gap-4">
@@ -513,11 +495,17 @@ export default function JobSearchPage() {
                         >
                           <EyeOff className="w-4 h-4" />
                         </button>
-                        <Button size="sm" onClick={() => handleApply(job)} disabled={isApplying}>
-                          {isApplying ? (
-                            <><span className="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" /> Tailoring Resume...</>
-                          ) : 'Apply Now'}
-                        </Button>
+                        {applications?.some(a => String(a.jobId) === String(job.id)) ? (
+                          <Button size="sm" disabled>
+                            Applied
+                          </Button>
+                        ) : (
+                          <Link href={`/jobs/${job.id}`}>
+                            <Button size="sm">
+                              Apply Now
+                            </Button>
+                          </Link>
+                        )}
                       </div>
                     </div>
                   </div>
