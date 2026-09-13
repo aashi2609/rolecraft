@@ -198,8 +198,8 @@ export default function OnboardingForm() {
             <h2 className="text-2xl font-bold text-ink">Basic Information</h2>
             
             <div className="bg-brand-blue/5 border border-brand-blue/20 rounded-xl p-6 mb-6">
-              <h3 className="text-lg font-semibold text-brand-blue mb-2">⚡ Magic Auto-fill</h3>
-              <p className="text-ink-muted text-sm mb-4">Upload your existing resume and let AI fill out all the tedious details for you!</p>
+              <h3 className="text-lg font-semibold text-brand-blue mb-2">⚡ Resume Auto-fill</h3>
+              <p className="text-ink-muted text-sm mb-4">Upload your existing resume and let AI extract and fill out your profile details automatically!</p>
               <FileDropzone 
                 onFileSelect={handleResumeUpload} 
                 accept="application/pdf"
@@ -232,10 +232,6 @@ export default function OnboardingForm() {
                   </button>
                 ))}
               </div>
-            </FormField>
-
-            <FormField label="Resume Upload">
-              <FileDropzone onFileSelect={(_file) => {/* TODO: Implement file upload */}} accept=".pdf,.doc,.docx" maxSizeMB={10} />
             </FormField>
           </div>
         )}
