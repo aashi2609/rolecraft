@@ -15,7 +15,7 @@ import { RoleSelectModal } from '@/components/RoleSelectModal';
 import { DashboardMockup } from '@/components/landing/DashboardMockup';
 import Link from 'next/link';
 
-const FEATURES = [
+const JOB_SEEKER_FEATURES = [
   {
     icon: FileText,
     title: 'Tailored Resumes',
@@ -31,20 +31,23 @@ const FEATURES = [
     title: 'Smart Job Matching',
     body: 'Rank openings by skill overlap, experience band, and salary so you apply where you actually fit.',
   },
+];
+
+const COMPANY_FEATURES = [
   {
     icon: Users,
     title: 'Ranked Candidate Search',
     body: 'Hiring teams get a scored shortlist with fitment rationale — not a flat pile of applications.',
   },
   {
-    icon: ClipboardList,
-    title: 'Real-Time Application Tracking',
-    body: 'Follow every apply from submitted to shortlisted in one inbox, without chasing email threads.',
+    icon: BadgeCheck,
+    title: 'AI Fitment Rationales',
+    body: 'Instantly understand exactly why a candidate matches your role with AI-generated reasoning.',
   },
   {
-    icon: BadgeCheck,
-    title: 'Verified Company Profiles',
-    body: 'Browse live roles on trusted employer pages with salary, skills, and openings in plain view.',
+    icon: ClipboardList,
+    title: 'Streamlined Hiring Pipeline',
+    body: 'Manage inbound applications and track candidate progress from submitted to shortlisted in one dashboard.',
   },
 ];
 
@@ -65,10 +68,16 @@ export default function LandingPage() {
 
           <div className="hidden md:flex items-center gap-8">
             <a
-              href="#features"
+              href="#job-seekers"
               className="text-sm text-ink-muted hover:text-ink transition-colors"
             >
-              Features
+              For Job Seekers
+            </a>
+            <a
+              href="#companies"
+              className="text-sm text-ink-muted hover:text-ink transition-colors"
+            >
+              For Companies
             </a>
             <Link
               href="/pricing"
@@ -76,12 +85,6 @@ export default function LandingPage() {
             >
               Pricing
             </Link>
-            <a
-              href="#companies"
-              className="text-sm text-ink-muted hover:text-ink transition-colors"
-            >
-              For Companies
-            </a>
           </div>
 
           <div className="flex items-center gap-2">
@@ -110,7 +113,7 @@ export default function LandingPage() {
           transition={{ duration: 0.4 }}
           className="inline-flex items-center rounded-full border border-border-soft bg-surface-white px-4 py-1.5 text-sm text-ink-muted shadow-soft mb-7"
         >
-          AI-tailored resumes, real fitment scoring ✨
+          AI-tailored resumes, real fitment scoring 
         </motion.div>
 
         <motion.h1
@@ -129,8 +132,7 @@ export default function LandingPage() {
           transition={{ duration: 0.45, delay: 0.12 }}
           className="mt-5 text-center text-base md:text-[17px] text-ink-muted max-w-[600px] leading-relaxed"
         >
-          One profile. Separate resumes for every vertical. Ranked candidates for every job —
-          so seekers get seen and companies hire with confidence.
+          One profile, tailored resumes for every role — and AI-ranked candidates for every job. Built for job seekers and hiring teams alike.
         </motion.p>
 
         <motion.div
@@ -247,44 +249,58 @@ export default function LandingPage() {
             Concrete tools for job seekers and hiring teams — not another generic career board.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
-            {FEATURES.map((f, i) => (
-              <motion.div
-                key={f.title}
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.15 }}
-                transition={{ delay: i * 0.08, duration: 0.5 }}
-                className={`rounded-2xl bg-surface-white p-6 border transition-all duration-300 shadow-[0_4px_16px_rgba(37,99,235,0.03)] hover:shadow-[0_8px_24px_rgba(37,99,235,0.08)] hover:-translate-y-1 ${
-                  i === 2 
-                    ? 'md:scale-105 border-brand-blue/30' 
-                    : 'border-border-soft hover:border-brand-blue/20'
-                }`}
-              >
-                <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-lg ${
-                  i % 3 === 0 ? 'bg-brand-blue/10 text-brand-blue' : 
-                  i % 3 === 1 ? 'bg-sky-500/10 text-sky-500' : 
-                  'bg-indigo-500/10 text-indigo-500'
-                }`}>
-                  <f.icon className="h-5 w-5" />
-                </div>
-                <h3 className="text-card-title text-ink mb-2 flex items-center gap-2">
-                  {f.title}
-                  {i === 2 && (
-                    <span className="inline-flex px-2 py-0.5 rounded-full bg-brand-blue/10 text-brand-blue text-[10px] font-bold uppercase tracking-wider">
-                      Core
-                    </span>
-                  )}
-                </h3>
-                <p className="text-sm text-ink-muted leading-relaxed">{f.body}</p>
-              </motion.div>
-            ))}
+          <div id="job-seekers" className="mb-16 pt-8">
+            <h3 className="text-2xl font-bold text-ink mb-8 text-center">For Job Seekers</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
+              {JOB_SEEKER_FEATURES.map((f, i) => (
+                <motion.div
+                  key={f.title}
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.15 }}
+                  transition={{ delay: i * 0.08, duration: 0.5 }}
+                  className="feature-card rounded-2xl bg-surface-white p-6 border border-border-soft shadow-[0_4px_16px_rgba(37,99,235,0.03)]"
+                >
+                  <div className="icon-chip mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-brand-blue/10 text-brand-blue">
+                    <f.icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-card-title text-ink mb-2 flex items-center gap-2">
+                    {f.title}
+                  </h3>
+                  <p className="text-sm text-ink-muted leading-relaxed">{f.body}</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
+          <div id="companies" className="pt-8">
+            <h3 className="text-2xl font-bold text-ink mb-8 text-center">For Companies</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
+              {COMPANY_FEATURES.map((f, i) => (
+                <motion.div
+                  key={f.title}
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.15 }}
+                  transition={{ delay: i * 0.08, duration: 0.5 }}
+                  className="feature-card rounded-2xl bg-surface-white p-6 border border-border-soft shadow-[0_4px_16px_rgba(37,99,235,0.03)]"
+                >
+                  <div className="icon-chip mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-500">
+                    <f.icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-card-title text-ink mb-2 flex items-center gap-2">
+                    {f.title}
+                  </h3>
+                  <p className="text-sm text-ink-muted leading-relaxed">{f.body}</p>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       {/* Companies CTA */}
-      <section id="companies" className="border-t border-border-soft bg-surface-soft py-16 md:py-20 px-4">
+      <section id="companies-cta" className="border-t border-border-soft bg-surface-soft py-16 md:py-20 px-4">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-section text-ink mb-3">Built for seekers and hiring teams</h2>
           <p className="text-ink-muted text-body mb-8">
