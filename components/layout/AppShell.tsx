@@ -43,7 +43,7 @@ function buildCandidateNav(): NavItem[] {
     { label: 'Resumes', href: '/resumes', icon: FileText },
     { label: 'Saved Jobs', href: '/saved-jobs', icon: Bookmark },
     { label: 'Messages', href: '/messages', icon: MessageSquare },
-    { label: 'My Profile', href: '/profile/personal-details', icon: User },
+    { label: 'My Profile', href: '/profile', icon: User },
     { label: 'Analytics', href: '/analytics', icon: BarChart3 },
     { label: 'Settings', href: '/settings', icon: Settings },
   ];

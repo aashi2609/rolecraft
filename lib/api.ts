@@ -184,12 +184,31 @@ export const candidateApi = {
     api('/candidates/me/skills', { method: 'PUT', body: JSON.stringify({ skills }) }),
   addEducation: (body: Record<string, unknown>) =>
     api('/candidates/me/education', { method: 'POST', body: JSON.stringify(body) }),
+  updateEducation: (id: string, body: Record<string, unknown>) =>
+    api(`/candidates/me/education/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteEducation: (id: string) =>
+    api(`/candidates/me/education/${id}`, { method: 'DELETE' }),
+
   addExperience: (body: Record<string, unknown>) =>
     api('/candidates/me/experience', { method: 'POST', body: JSON.stringify(body) }),
+  updateExperience: (id: string, body: Record<string, unknown>) =>
+    api(`/candidates/me/experience/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteExperience: (id: string) =>
+    api(`/candidates/me/experience/${id}`, { method: 'DELETE' }),
+
   addProject: (body: Record<string, unknown>) =>
     api('/candidates/me/projects', { method: 'POST', body: JSON.stringify(body) }),
+  updateProject: (id: string, body: Record<string, unknown>) =>
+    api(`/candidates/me/projects/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteProject: (id: string) =>
+    api(`/candidates/me/projects/${id}`, { method: 'DELETE' }),
+
   addCertification: (body: Record<string, unknown>) =>
     api('/candidates/me/certifications', { method: 'POST', body: JSON.stringify(body) }),
+  updateCertification: (id: string, body: Record<string, unknown>) =>
+    api(`/candidates/me/certifications/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteCertification: (id: string) =>
+    api(`/candidates/me/certifications/${id}`, { method: 'DELETE' }),
   get: (id: string) => api(`/candidates/${id}`),
   getPublicProfile: (id: string) => api(`/candidates/${id}/public-profile`),
   downloadResumePdf: async (id: string, filename?: string) => {
