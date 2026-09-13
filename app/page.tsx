@@ -89,13 +89,12 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              className="text-sm font-medium text-ink-muted hover:text-ink rounded-full px-4"
-              onClick={() => setRoleModalOpen(true)}
+            <Link
+              href="/signin"
+              className="inline-flex items-center justify-center h-10 px-4 py-2 text-sm font-medium text-ink-muted hover:text-ink hover:bg-surface-soft rounded-full transition-colors"
             >
               Sign In
-            </Button>
+            </Link>
             <Button
               className="rounded-full px-5 text-sm font-semibold shadow-[0_4px_14px_rgba(37,99,235,0.25)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.35)] transition-shadow bg-brand-blue hover:bg-brand-blue-deep text-white"
               onClick={() => setRoleModalOpen(true)}

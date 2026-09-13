@@ -38,6 +38,7 @@ yarn-error.log*
 # python
 apps/api/.venv/
 apps/api/.venv*/
+apps/api/venv/
 apps/api/uploads/
 __pycache__/
 *.pyc
