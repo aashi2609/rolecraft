@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { RoleSelectModal } from '@/components/RoleSelectModal';
 import { DashboardMockup } from '@/components/landing/DashboardMockup';
+import { SwapCTAGroup } from '@/components/ui/SwapCTAGroup';
 import Link from 'next/link';
 
 const JOB_SEEKER_FEATURES = [
@@ -139,23 +140,18 @@ export default function LandingPage() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.2 }}
-          className="mt-8 flex flex-wrap items-center justify-center gap-3"
+          className="mt-8"
         >
-          <Button
-            className="rounded-full px-8 h-12 text-[15px] font-semibold bg-brand-blue hover:bg-brand-blue-deep text-white shadow-[0_4px_14px_rgba(37,99,235,0.25)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.35)] transition-shadow"
-            onClick={() => setRoleModalOpen(true)}
-          >
-            Get Started Free
-          </Button>
-          <Button
-            variant="outline"
-            className="rounded-full px-8 h-12 text-[15px] font-semibold bg-surface-white border-border-soft text-ink hover:bg-surface-soft"
-            onClick={() =>
-              document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
-            }
-          >
-            See How It Works
-          </Button>
+          <SwapCTAGroup
+            action1={{
+              label: 'Get Started Free',
+              onClick: () => setRoleModalOpen(true)
+            }}
+            action2={{
+              label: 'See How It Works',
+              onClick: () => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
+            }}
+          />
         </motion.div>
 
         {/* Product mockup + glow */}
@@ -299,19 +295,25 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Companies CTA */}
-      <section id="companies-cta" className="border-t border-border-soft bg-surface-soft py-16 md:py-20 px-4">
+      {/* CTA Section */}
+      <section id="get-started" className="border-t border-border-soft bg-surface-soft py-16 md:py-20 px-4">
         <div className="max-w-2xl mx-auto text-center">
-          <h2 className="text-section text-ink mb-3">Built for seekers and hiring teams</h2>
+          <h2 className="text-section text-ink mb-3">Ready to get started?</h2>
           <p className="text-ink-muted text-body mb-8">
-            Start free. Upgrade when you need unlimited roles, postings, and full search filters.
+            Create an account in seconds and choose the path that fits your needs.
           </p>
-          <Button
-            className="rounded-full px-8 h-12 text-[15px] font-semibold bg-brand-blue hover:bg-brand-blue-deep text-white"
-            onClick={() => setRoleModalOpen(true)}
-          >
-            Choose your path
-          </Button>
+          <div className="mt-8">
+            <SwapCTAGroup
+              action1={{
+                label: 'For Job Seekers',
+                href: '/subscribe?role=candidate'
+              }}
+              action2={{
+                label: 'For Companies',
+                href: '/subscribe?role=company'
+              }}
+            />
+          </div>
         </div>
       </section>
 

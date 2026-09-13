@@ -6,16 +6,20 @@ import { Card } from '@/components/ui/Card';
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
-import { CANDIDATE_PLANS, formatPlanPrice } from '@/lib/plans';
+import { CANDIDATE_PLANS, COMPANY_PLANS, formatPlanPrice, Role } from '@/lib/plans';
+import { SwapCTAGroup } from '@/components/ui/SwapCTAGroup';
 
 export default function PricingPage() {
+  const [role, setRole] = useState<Role>('candidate');
   const [isAnnual, setIsAnnual] = useState(false);
+
+  const plans = role === 'candidate' ? CANDIDATE_PLANS : COMPANY_PLANS;
 
   return (
     <div className="min-h-screen bg-app-surface">
       <header className="flex items-center justify-between px-6 md:px-12 py-5 border-b border-border bg-white">
         <Logo />
-        <Link href="/subscribe?role=candidate">
+        <Link href={`/subscribe?role=${role}`}>
           <Button size="sm">Get Started</Button>
         </Link>
       </header>
@@ -25,8 +29,23 @@ export default function PricingPage() {
           Simple, transparent pricing
         </h1>
         <p className="text-muted-foreground mb-10 max-w-xl mx-auto">
-          Choose the plan that fits your career goals. Upgrade or downgrade anytime.
+          Choose the plan that fits your goals. Upgrade or downgrade anytime.
         </p>
+
+        <div className="mb-8">
+          <SwapCTAGroup
+            action1={{
+              label: 'For Job Seekers',
+              onClick: () => setRole('candidate'),
+              isActive: role === 'candidate'
+            }}
+            action2={{
+              label: 'For Companies',
+              onClick: () => setRole('company'),
+              isActive: role === 'company'
+            }}
+          />
+        </div>
 
         <div className="flex items-center justify-center gap-3 mb-12">
           <span className={`text-sm font-medium ${!isAnnual ? 'text-foreground' : 'text-muted-foreground'}`}>
@@ -50,10 +69,10 @@ export default function PricingPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-          {CANDIDATE_PLANS.map((plan) => (
+          {plans.map((plan) => (
             <Card
               key={plan.id}
-              className={`relative flex flex-col p-6 ${plan.popular ? 'border-primary shadow-md' : ''}`}
+              className={`pricing-card relative flex flex-col p-6 ${plan.popular ? 'border-primary shadow-md is-popular' : ''}`}
             >
               {plan.popular && (
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-bold uppercase">
@@ -76,8 +95,8 @@ export default function PricingPage() {
                   </li>
                 ))}
               </ul>
-              <Link href={plan.isFree ? `/signup?role=candidate&plan=${plan.id}` : `/checkout?plan=${plan.id}&role=candidate`} className="mt-auto block">
-                <Button variant={plan.popular ? 'primary' : 'outline'} className="w-full">
+              <Link href={plan.isFree ? `/signup?role=${role}&plan=${plan.id}` : `/checkout?plan=${plan.id}&role=${role}`} className="mt-auto block">
+                <Button variant={plan.popular ? 'primary' : 'outline'} className="btn-inside w-full">
                   {plan.isFree ? 'Get Started' : `Choose ${plan.name}`}
                 </Button>
               </Link>

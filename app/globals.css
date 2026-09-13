@@ -212,15 +212,30 @@ button {
   }
 }
 
-/* Feature Card Hover Animations */
-.feature-card {
+/* Feature & Pricing Card Hover Animations */
+.feature-card, .pricing-card {
   transition: transform 200ms ease-out, box-shadow 200ms ease-out, border-color 200ms ease-out;
 }
+
 .feature-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 12px 24px rgba(37, 99, 235, 0.12);
   border-color: rgba(37, 99, 235, 0.25);
 }
+
+.pricing-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 16px 32px rgba(37, 99, 235, 0.14);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+.pricing-card.is-popular {
+  border-color: var(--brand-blue);
+}
+.pricing-card.is-popular:hover {
+  border-color: var(--brand-blue-deep);
+}
+
 .feature-card .icon-chip {
   transition: transform 200ms ease-out, filter 200ms ease-out;
 }
@@ -228,11 +243,76 @@ button {
   transform: scale(1.08);
   filter: brightness(0.95) saturate(1.2);
 }
+
+.pricing-card .btn-inside {
+  transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+}
+.pricing-card:hover .btn-inside {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37,99,235,0.2);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .feature-card:hover {
+  .feature-card:hover, .pricing-card:hover {
     transform: none;
   }
   .feature-card:hover .icon-chip {
     transform: none;
   }
+  .pricing-card:hover .btn-inside {
+    transform: none;
+  }
+}
+
+/* Swap CTA Group */
+.cta-group { 
+  display: inline-flex; 
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px; 
+}
+
+.cta-group .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  padding: 0 32px;
+  border-radius: 9999px;
+  font-size: 15px;
+  font-weight: 600;
+  transition: background-color 180ms ease-out, color 180ms ease-out, box-shadow 180ms ease-out, border-color 180ms ease-out;
+  background-color: var(--surface-white);
+  color: var(--ink);
+  border: 1px solid var(--border-soft);
+  cursor: pointer;
+}
+
+.cta-group .btn.is-primary {
+  background-color: var(--brand-blue);
+  color: var(--surface-white);
+  border-color: var(--brand-blue);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+}
+
+/* When hovering the group, un-fill the primary button unless IT is the one being hovered */
+.cta-group:has(.btn.is-secondary:hover) .btn.is-primary {
+  background-color: var(--surface-white);
+  color: var(--ink);
+  border-color: var(--border-soft);
+  box-shadow: none;
+}
+
+.cta-group .btn.is-secondary:hover {
+  background-color: var(--brand-blue);
+  color: var(--surface-white);
+  border-color: var(--brand-blue);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
+}
+
+.cta-group .btn.is-primary:hover {
+  background-color: var(--brand-blue-deep);
+  border-color: var(--brand-blue-deep);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
 }
