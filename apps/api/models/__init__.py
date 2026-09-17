@@ -30,6 +30,16 @@ class UserRole(str, enum.Enum):
 
 
 class PlanTier(str, enum.Enum):
+    # legacy candidate
+    basic = "basic"
+    free = "free"
+    premium = "premium"
+    elite = "elite"
+    # legacy company
+    starter = "starter"
+    growth = "growth"
+    scale = "scale"
+    
     # candidate
     resume_builder = "resume_builder"
     job_search = "job_search"
