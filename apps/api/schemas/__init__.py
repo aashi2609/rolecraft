@@ -313,6 +313,7 @@ class JobParsedJDOut(BaseModel):
 
 class JobCreate(BaseModel):
     title: str
+    company_id: Optional[UUID] = None
     department: Optional[str] = None
     # Match frontend EMPLOYMENT_TYPES (lib/constants.ts)
     employment_type: Optional[

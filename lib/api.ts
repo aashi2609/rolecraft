@@ -294,7 +294,7 @@ export const adminApi = {
     return api(`/admin/jobs?${q.toString()}`);
   },
   createJob: (data: any) =>
-    api(`/admin/jobs`, { method: 'POST', body: JSON.stringify(data) }),
+    api(`/jobs`, { method: 'POST', body: JSON.stringify(data) }),
   updateJob: (id: string, data: any) => 
     api(`/admin/jobs/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteJob: (id: string) =>

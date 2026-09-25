@@ -55,19 +55,38 @@ async def parse_jd(user: CompanyUser, file: UploadFile = File(...)):
     return JobParsedJDOut.model_validate(parsed)
 
 
+from typing import Annotated
+from core.dependencies import require_role
+
 @router.post("", response_model=JobOut)
-async def create_job(body: JobCreate, user: CompanyUser, db: DbSession):
+async def create_job(
+    body: JobCreate, 
+    user: Annotated[User, Depends(require_role(UserRole.company, UserRole.admin))], 
+    db: DbSession
+):
     # Convert string status to enum
     if body.status and body.status in JobStatus.__members__:
         status = JobStatus(body.status)
     else:
         status = JobStatus.draft
 
+    if user.role == UserRole.admin:
+        if not body.company_id:
+            raise HTTPException(status_code=400, detail="company_id is required for admins")
+        company_id = body.company_id
+        company_exists = await db.get(User, company_id)
+        if not company_exists or company_exists.role != UserRole.company:
+            raise HTTPException(status_code=400, detail="Company not found")
+    else:
+        if body.company_id and body.company_id != user.id:
+            raise HTTPException(status_code=403, detail="Cannot create job for another company")
+        company_id = user.id
+
     if status in (JobStatus.live, JobStatus.draft):
         await check_plan_limit(user, db, "job_postings")
 
     job = JobPosting(
-        company_id=user.id,
+        company_id=company_id,
         title=body.title,
         department=body.department,
         employment_type=body.employment_type,
