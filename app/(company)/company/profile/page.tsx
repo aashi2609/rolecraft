@@ -9,6 +9,7 @@ import { FileDropzone } from '@/components/ui/FileDropzone';
 import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
 import { companyApi } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
+import { Copy, Check } from 'lucide-react';
 
 const CITIES = [
   'Bengaluru', 'Mumbai', 'New Delhi', 'Hyderabad', 'Pune', 'Chennai', 
@@ -24,7 +25,8 @@ const INDUSTRIES = [
 
 export default function EditCompanyProfilePage() {
   const router = useRouter();
-  const { companyProfile, setCompanyProfileComplete } = useUser();
+  const { companyProfile, setCompanyProfileComplete, userId } = useUser();
+  const [copied, setCopied] = useState(false);
   const [formData, setFormData] = useState({
     name: (companyProfile?.name as string) || 'Example Company',
     about: (companyProfile?.about as string) || '',
@@ -33,6 +35,14 @@ export default function EditCompanyProfilePage() {
     location: (companyProfile?.hq_location as string) || '',
     industry: (companyProfile?.industry as string) || 'Technology / IT Services',
   });
+
+  const handleCopy = () => {
+    if (userId) {
+      navigator.clipboard.writeText(userId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const handleSave = async () => {
     try {
@@ -63,6 +73,25 @@ export default function EditCompanyProfilePage() {
           <div className="space-y-6">
             <FormField label="Company Logo">
               <FileDropzone onFileSelect={(f) => {/* TODO: Implement file upload */}} accept="image/*" />
+            </FormField>
+
+            <FormField label="Company ID (share this with support if you need help creating a job posting)">
+              <div className="flex items-center gap-3">
+                <Input 
+                  value={userId || ''} 
+                  readOnly 
+                  className="bg-surface-soft text-ink-muted cursor-not-allowed font-mono text-sm"
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={handleCopy} 
+                  className="shrink-0 flex items-center gap-2"
+                >
+                  {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  {copied ? 'Copied!' : 'Copy'}
+                </Button>
+              </div>
             </FormField>
 
             <FormField label="Company Name" required>
