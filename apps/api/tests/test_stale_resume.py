@@ -103,6 +103,32 @@ async def test_stale_resume_skills_and_items(
     resp = await candidate_client.get(f"/resumes/{new_resume_id}")
     assert resp.json()["is_stale"] is True
 
+
+@pytest.mark.asyncio
+async def test_mark_current_clears_stale(
+    candidate_client: AsyncClient,
+    candidate_user,
+    db_session,
+    add_plan,
+):
+    await add_plan(candidate_user.id, PlanTier.complete)
+    await candidate_client.put("/candidates/me", json={"full_name": "Name"})
+    resp = await candidate_client.post(
+        "/resumes/generate", json={"target_verticals": ["Software"]}
+    )
+    resume_id = resp.json()[0]["id"]
+
+    await candidate_client.put("/candidates/me", json={"full_name": "Updated Name"})
+    resp = await candidate_client.get(f"/resumes/{resume_id}")
+    assert resp.json()["is_stale"] is True
+
+    resp = await candidate_client.post(f"/resumes/{resume_id}/mark-current")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == resume_id
+    assert body["is_stale"] is False
+
+
 @pytest.mark.asyncio
 async def test_regenerate_plan_gating(
     candidate_client: AsyncClient,

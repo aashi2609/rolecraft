@@ -1,8 +1,19 @@
 /**
  * RoleCraft API client — JWT in localStorage, Bearer on every request.
+ *
+ * Browser default: same-origin `/backend` (Next.js rewrite → FastAPI) to avoid
+ * CORS / Chrome local-network blocks on 127.0.0.1 cross-origin calls.
+ * Override with NEXT_PUBLIC_API_URL for production or direct API access.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+function resolveApiUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (configured) return configured.replace(/\/$/, "");
+  if (typeof window !== "undefined") return "/backend";
+  return "http://127.0.0.1:8000";
+}
+
+const API_URL = resolveApiUrl();
 const TOKEN_KEY = 'rolecraft_token';
 
 // Request cancellation manager
@@ -83,25 +94,26 @@ function calculateDelay(attempt: number): number {
 }
 
 export async function api<T = unknown>(path: string, opts: Opts = {}): Promise<T> {
-  const headers = new Headers(opts.headers || {});
-  if (!opts.formData && !headers.has('Content-Type') && opts.body) {
+  const { auth, formData, retries, signal, body, headers: optHeaders, ...fetchInit } = opts;
+  const headers = new Headers(optHeaders || {});
+  if (!formData && !headers.has('Content-Type') && body) {
     headers.set('Content-Type', 'application/json');
   }
-  if (opts.auth !== false) {
+  if (auth !== false) {
     const token = getToken();
     if (token) headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const maxRetries = opts.retries ?? MAX_RETRIES;
+  const maxRetries = retries ?? MAX_RETRIES;
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const res = await fetch(`${API_URL}${path}`, {
-        ...opts,
+        ...fetchInit,
         headers,
-        body: opts.formData ?? opts.body,
-        signal: opts.signal,
+        body: formData ?? body,
+        signal,
       });
 
       if (!res.ok) {
@@ -134,6 +146,13 @@ export async function api<T = unknown>(path: string, opts: Opts = {}): Promise<T
 
       // Don't retry on last attempt
       if (attempt === maxRetries) {
+        // Surface a clearer message for browser network/CORS failures
+        if (!(lastError instanceof ApiError) && /failed to fetch|networkerror|load failed/i.test(lastError.message)) {
+          throw new ApiError(
+            0,
+            `Cannot reach API at ${API_URL}. Is the backend running, and is CORS allowing this origin?`,
+          );
+        }
         throw lastError;
       }
 
@@ -399,7 +418,10 @@ export const resumesApi = {
       body: JSON.stringify({ target_verticals }),
     }),
   get: (id: string) => api(`/resumes/${id}`),
-  regenerate: (id: string) => api(`/resumes/${id}/regenerate`, { method: 'POST' }),
+  regenerate: (id: string) =>
+    api(`/resumes/${id}/regenerate`, { method: 'POST', retries: 0 }),
+  markCurrent: (id: string) =>
+    api(`/resumes/${id}/mark-current`, { method: 'POST', retries: 0 }),
   improve: (id: string) => api(`/resumes/${id}/improve`, { method: 'POST' }),
   downloadPdf: async (id: string, filename?: string) => {
     const headers = new Headers();

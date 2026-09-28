@@ -30,6 +30,9 @@ def mock_embedding(text: str) -> list[float]:
 
 
 async def embed_text(text: str) -> list[float]:
+    # Backup mode: never call the embedding provider (avoids long hangs / Failed to fetch).
+    if settings.force_deterministic_resumes:
+        return mock_embedding(text)
     if settings.embedding_api_key:
         try:
             return await fetch_embedding(text)

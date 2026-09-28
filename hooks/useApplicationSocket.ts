@@ -14,8 +14,18 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { getToken } from '@/lib/api';
 
-const WS_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000')
-  .replace(/^http/, 'ws');
+/** WS must be an absolute URL — relative /backend rewrites don't apply to WebSockets. */
+function resolveWsBase(): string {
+  const api = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (api && /^https?:\/\//i.test(api)) {
+    return api.replace(/^http/, 'ws').replace(/\/$/, '');
+  }
+  const direct =
+    process.env.NEXT_PUBLIC_WS_URL?.trim() || 'http://127.0.0.1:8000';
+  return direct.replace(/^http/, 'ws').replace(/\/$/, '');
+}
+
+const WS_BASE = resolveWsBase();
 
 const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 1_000;

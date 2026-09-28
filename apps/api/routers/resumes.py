@@ -184,6 +184,23 @@ async def regenerate(resume_id: UUID, user: CandidateUser, db: DbSession):
     return _resume_to_out(new_resume, profile.profile_updated_at)
 
 
+@router.post("/{resume_id}/mark-current", response_model=ResumeOut)
+async def mark_current(resume_id: UUID, user: CandidateUser, db: DbSession):
+    """Clear stale flag without regenerating content (API-key / demo backup)."""
+    row = await db.get(Resume, resume_id)
+    if not row or row.candidate_id != user.id:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    profile_updated_at = await _get_profile_updated_at(db, user.id)
+    if not profile_updated_at:
+        raise HTTPException(status_code=404, detail="Complete your profile first")
+
+    row.generated_from_profile_at = profile_updated_at
+    await db.flush()
+    await db.refresh(row)
+    return _resume_to_out(row, profile_updated_at)
+
+
 @router.post("/{resume_id}/improve", response_model=ResumeOut)
 async def improve(resume_id: UUID, user: CandidateUser, db: DbSession):
     """Trigger another auto-fix iteration on an existing resume."""
@@ -203,10 +220,10 @@ async def improve(resume_id: UUID, user: CandidateUser, db: DbSession):
     row.embedding = payload["embedding"]
     row.version = (row.version or 1) + 1
     row.pdf_path = None
+    row.generated_from_profile_at = profile.profile_updated_at
     await db.flush()
     await db.refresh(row)
-    profile_updated_at = await _get_profile_updated_at(db, user.id)
-    return _resume_to_out(row, profile_updated_at)
+    return _resume_to_out(row, profile.profile_updated_at)
 
 
 @router.get("/{resume_id}/download")

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { FileText, Download, RotateCcw, CheckCircle2, Sparkles, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, Download, RotateCcw, CheckCircle2, Sparkles, Loader2, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +20,7 @@ export default function ResumesPage() {
   );
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  const [markingCurrentId, setMarkingCurrentId] = useState<string | null>(null);
   const [expandedBreakdown, setExpandedBreakdown] = useState<string | null>(null);
   const [isCustomDownloadOpen, setIsCustomDownloadOpen] = useState(false);
   const [customRole, setCustomRole] = useState('');
@@ -74,6 +75,21 @@ export default function ResumesPage() {
       }
     } finally {
       setRegeneratingId(null);
+    }
+  };
+
+  const handleMarkCurrent = async (resume: any) => {
+    const id = String(resume.id);
+    setMarkingCurrentId(id);
+    setLimitError(null);
+    try {
+      await resumesApi.markCurrent(id);
+      await refreshResumes();
+    } catch (err: any) {
+      console.error('Mark current failed:', err);
+      alert(err?.message || 'Failed to mark resume as current');
+    } finally {
+      setMarkingCurrentId(null);
     }
   };
 
@@ -160,7 +176,7 @@ export default function ResumesPage() {
               <span className="text-xl">⚠️</span> Profile Updated
             </h3>
             <p className="text-yellow-700 text-sm mt-1 max-w-xl">
-              You recently updated your profile. Some of your generated resumes are now out of date. Click "Update Resume" on any outdated card below to regenerate it with your latest changes.
+              You recently updated your profile. Some resumes are out of date. Use &quot;Update Resume&quot; to regenerate from your profile, or &quot;Mark as current&quot; to clear the warning without regenerating.
             </p>
           </div>
         </div>
@@ -181,6 +197,7 @@ export default function ResumesPage() {
             const isDefault = defaultResumeId === resume.id;
             const isDownloading = downloadingId === String(resume.id);
             const isRegenerating = regeneratingId === String(resume.id);
+            const isMarkingCurrent = markingCurrentId === String(resume.id);
             const hasBreakdown = resume.atsBreakdown || resume.content?.ats_breakdown;
             const breakdown = resume.atsBreakdown || resume.content?.ats_breakdown;
             const isExpanded = expandedBreakdown === String(resume.id);
@@ -298,7 +315,7 @@ export default function ResumesPage() {
                     variant={resume.is_stale ? "default" : "outline"}
                     className={`w-full justify-start gap-3 ${resume.is_stale ? "bg-yellow-600 hover:bg-yellow-700 text-white" : ""}`}
                     onClick={() => handleRegenerate(resume)}
-                    disabled={isRegenerating}
+                    disabled={isRegenerating || isMarkingCurrent}
                   >
                     {isRegenerating ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -307,6 +324,22 @@ export default function ResumesPage() {
                     )}
                     {isRegenerating ? 'Updating…' : resume.is_stale ? 'Update Resume' : 'Regenerate AI'}
                   </Button>
+                  {resume.is_stale && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-3"
+                      onClick={() => handleMarkCurrent(resume)}
+                      disabled={isMarkingCurrent || isRegenerating}
+                      title="Clear outdated warning without regenerating content"
+                    >
+                      {isMarkingCurrent ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Check className="w-4 h-4 text-muted-foreground" />
+                      )}
+                      {isMarkingCurrent ? 'Marking…' : 'Mark as current'}
+                    </Button>
+                  )}
 
                   {!isDefault && (
                     <button

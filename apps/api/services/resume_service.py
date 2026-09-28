@@ -407,6 +407,14 @@ async def generate_resume_for_vertical(
     user_email: str = "",
 ) -> dict[str, Any]:
     """Generate a single vertical resume — AI with auto-fix, or deterministic fallback."""
+    # Backup mode: skip Groq entirely (avoids 401/429 hangs when API key is broken).
+    if settings.force_deterministic_resumes:
+        logger.info(
+            "FORCE_DETERMINISTIC_RESUMES enabled — using deterministic generation for %s",
+            vertical,
+        )
+        return await _generate_deterministic(profile, vertical, skill_names)
+
     # Try AI path
     if settings.groq_api_key:
         try:

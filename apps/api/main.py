@@ -54,4 +54,8 @@ app.mount("/static", StaticFiles(directory=str(uploads_dir)), name="static")
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "environment": settings.environment}
+    return {
+        "status": "ok",
+        "environment": settings.environment,
+        "force_deterministic_resumes": settings.force_deterministic_resumes,
+    }
