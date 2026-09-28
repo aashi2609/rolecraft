@@ -106,6 +106,8 @@ function mapResume(r: any) {
     atsBreakdown: r.ats_breakdown,
     version: r.version || 1,
     generationMethod: r.generation_metadata?.method || 'deterministic',
+    is_stale: r.is_stale || false,
+    generated_from_profile_at: r.generated_from_profile_at || null,
   };
 }
 

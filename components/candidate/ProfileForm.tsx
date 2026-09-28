@@ -7,6 +7,7 @@ import { FormField, Input, Textarea } from '@/components/ui/FormField';
 import { TagInput } from '@/components/ui/TagInput';
 import { candidateApi } from '@/lib/api';
 import { useUser } from '@/context/UserContext';
+import { useToast } from '@/components/ui/Toast';
 import {
   EducationSection,
   CertificationsSection,
@@ -36,7 +37,8 @@ interface CandidateProfile {
 
 export default function ProfileForm() {
   const router = useRouter();
-  const { candidateProfile, refreshSession } = useUser();
+  const { candidateProfile, refreshSession, resumes } = useUser();
+  const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -186,6 +188,11 @@ export default function ProfileForm() {
       );
 
       await refreshSession();
+      if (resumes && resumes.length > 0) {
+        showToast('warning', 'Profile updated. Your generated resumes are now out of date. Please regenerate them to include these changes.', 8000);
+      } else {
+        showToast('success', 'Profile saved successfully.');
+      }
       router.push('/dashboard');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to save profile');

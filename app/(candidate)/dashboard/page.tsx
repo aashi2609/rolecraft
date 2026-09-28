@@ -42,9 +42,6 @@ export default function CandidateDashboardPage() {
             Here&apos;s what&apos;s happening with your job search today.
           </p>
         </div>
-        <Link href="/profile/personal-details">
-          <Button variant="outline">Edit Profile</Button>
-        </Link>
       </div>
 
       {isFreePlan(plan) && (
@@ -67,18 +64,23 @@ export default function CandidateDashboardPage() {
             </p>
 
             <div className="flex flex-wrap gap-4">
-              {(resumes.length ? resumes : verticals.map((v) => ({ vertical: v, score: null, id: v }))).map(
+              {(resumes.length ? resumes : verticals.map((v) => ({ vertical: v, score: null, id: v, is_stale: false }))).map(
                 (r: any) => (
                   <div
                     key={r.id || r.vertical}
-                    className="flex items-center gap-4 p-4 border border-border rounded-lg bg-secondary/40"
+                    className="flex items-center gap-4 p-4 border border-border rounded-lg bg-secondary/40 relative"
                   >
                     <div className="p-3 bg-white rounded-md shadow-sm border border-border">
                       <FileText className="w-7 h-7 text-primary" />
                     </div>
                     <div>
-                      <div className="font-semibold text-foreground text-sm">
+                      <div className="font-semibold text-foreground text-sm flex items-center gap-2">
                         {r.vertical} Resume
+                        {r.is_stale && (
+                          <span className="bg-yellow-100 text-yellow-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase">
+                            Outdated
+                          </span>
+                        )}
                       </div>
                       {r.score != null && (
                         <div className="flex items-center gap-1.5 text-sm text-green-700 font-medium mt-1">

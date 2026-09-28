@@ -216,6 +216,7 @@ class CandidateProfileOut(ORMModel):
     certifications: list[CertificationOut] = []
     experience: list[ExperienceOut] = []
     projects: list[ProjectOut] = []
+    profile_updated_at: Optional[datetime] = None
 
 
 class CandidatePublicProfileOut(ORMModel):
@@ -252,6 +253,8 @@ class ResumeOut(ORMModel):
     gcs_path: Optional[str] = None
     pdf_path: Optional[str] = None
     is_default: bool = False
+    generated_from_profile_at: Optional[datetime] = None
+    is_stale: bool = False
     created_at: datetime
 
 

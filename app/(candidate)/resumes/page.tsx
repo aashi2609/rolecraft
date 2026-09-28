@@ -153,6 +153,19 @@ export default function ResumesPage() {
         />
       )}
 
+      {resumes.some(r => r.is_stale) && (
+        <div className="mb-8 bg-yellow-50 border border-yellow-200 rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div>
+            <h3 className="font-bold text-yellow-800 text-lg flex items-center gap-2">
+              <span className="text-xl">⚠️</span> Profile Updated
+            </h3>
+            <p className="text-yellow-700 text-sm mt-1 max-w-xl">
+              You recently updated your profile. Some of your generated resumes are now out of date. Click "Update Resume" on any outdated card below to regenerate it with your latest changes.
+            </p>
+          </div>
+        </div>
+      )}
+
       {resumes.length === 0 ? (
         <Card className="text-center py-20 border-dashed">
           <FileText className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
@@ -189,9 +202,16 @@ export default function ResumesPage() {
                   <FileText className="w-6 h-6" />
                 </div>
 
-                <h3 className="text-xl font-bold text-foreground mb-1">
-                  {resume.vertical || 'Untitled'}
-                </h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-xl font-bold text-foreground">
+                    {resume.vertical || 'Untitled'}
+                  </h3>
+                  {resume.is_stale && (
+                    <span className="bg-yellow-100 text-yellow-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase whitespace-nowrap">
+                      Outdated
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground mb-2">
                   Generated on {resume.date || 'Today'}
                   {resume.version && resume.version > 1 && (
@@ -275,8 +295,8 @@ export default function ResumesPage() {
                     {isDownloading ? 'Generating PDF…' : 'Download PDF'}
                   </Button>
                   <Button
-                    variant="outline"
-                    className="w-full justify-start gap-3"
+                    variant={resume.is_stale ? "default" : "outline"}
+                    className={`w-full justify-start gap-3 ${resume.is_stale ? "bg-yellow-600 hover:bg-yellow-700 text-white" : ""}`}
                     onClick={() => handleRegenerate(resume)}
                     disabled={isRegenerating}
                   >
@@ -285,7 +305,7 @@ export default function ResumesPage() {
                     ) : (
                       <RotateCcw className="w-4 h-4" />
                     )}
-                    {isRegenerating ? 'Regenerating…' : 'Regenerate AI'}
+                    {isRegenerating ? 'Updating…' : resume.is_stale ? 'Update Resume' : 'Regenerate AI'}
                   </Button>
 
                   {!isDefault && (

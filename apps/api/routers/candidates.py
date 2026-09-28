@@ -36,7 +36,12 @@ from schemas import (
 from services.candidate_search_service import search_candidates
 from services.embedding_service import refresh_resume_embeddings_for_candidate
 from services.pdf_service import build_resume_pdf_response, resolve_candidate_name
-from services.profile_item_service import ProfileItemService
+from services.profile_item_service import ProfileItemService, bump_profile_updated_at
+
+# Fields on CandidateProfileUpdate that are resume-relevant
+_RESUME_RELEVANT_FIELDS = {
+    "full_name", "career_level", "dob", "gender",
+}
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
 
@@ -114,6 +119,7 @@ def _to_out(profile: CandidateProfile) -> CandidateProfileOut:
         ],
         experience=[ExperienceOut.model_validate(e) for e in profile.experience],
         projects=[ProjectOut.model_validate(p) for p in profile.projects],
+        profile_updated_at=profile.profile_updated_at,
     )
 
 
@@ -166,6 +172,10 @@ async def update_me(body: CandidateProfileUpdate, user: CandidateUser, db: DbSes
     for k, v in data.items():
         setattr(profile, k, v)
     await db.flush()
+    # Bump profile_updated_at only for resume-relevant fields
+    changed_fields = set(body.model_dump(exclude_unset=True).keys())
+    if changed_fields & _RESUME_RELEVANT_FIELDS:
+        await bump_profile_updated_at(db, user.id)
     await _sync_candidate_embeddings(db, user.id)
     return _to_out(await _load_profile(db, user.id))
 
@@ -337,6 +347,8 @@ async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
         )
         linked.add(skill_id)
     await db.flush()
+    # Skills are resume-relevant
+    await bump_profile_updated_at(db, candidate_id)
     await _sync_candidate_embeddings(db, candidate_id)
     return {"skills": unique_names}
 

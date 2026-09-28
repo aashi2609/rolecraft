@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -50,9 +51,20 @@ async def fetch_embedding(text: str, *, retries: int = 3) -> list[float]:
             if len(vector) != 1536:
                 raise EmbeddingServiceError(f"Expected 1536 dims, got {len(vector)}")
             return vector
+        except httpx.HTTPStatusError as exc:
+            last_error = exc
+            logger.warning("Embedding API attempt %s failed: %s", attempt + 1, exc)
+            if exc.response.status_code == 429:
+                logger.warning("Rate limit hit, skipping retries for embedding API")
+                break
+            if attempt < retries - 1:
+                await asyncio.sleep(2 ** (attempt + 1))
         except Exception as exc:
             last_error = exc
             logger.warning("Embedding API attempt %s failed: %s", attempt + 1, exc)
+            if attempt < retries - 1:
+                # Exponential backoff: 2s, 4s
+                await asyncio.sleep(2 ** (attempt + 1))
 
     raise EmbeddingServiceError(str(last_error or "embedding request failed"))
 

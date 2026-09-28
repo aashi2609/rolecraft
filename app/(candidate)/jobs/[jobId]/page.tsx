@@ -205,7 +205,7 @@ export default function JobDetailPage() {
                 >
                   {resumes.map(r => (
                     <option key={r.id} value={r.id}>
-                      {r.vertical} resume — {r.score || r.atsScore || '—'}/100 ATS
+                      {r.vertical} resume — {r.score || r.atsScore || '—'}/100 ATS {r.is_stale ? '(Outdated)' : ''}
                     </option>
                   ))}
                 </select>
@@ -214,8 +214,23 @@ export default function JobDetailPage() {
               <p className="text-sm mb-4 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-primary" />
                 Using resume: {bestResume.vertical} ({bestResume.score || bestResume.atsScore || '—'}/100 ATS)
+                {bestResume.is_stale && <span className="bg-yellow-100 text-yellow-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase whitespace-nowrap">Outdated</span>}
               </p>
             ) : null}
+            
+            {/* Show a warning if the selected resume is stale */}
+            {(() => {
+              const selectedId = selectedResumeId || bestResume?.id;
+              const selectedResume = resumes.find(r => String(r.id) === String(selectedId));
+              if (selectedResume?.is_stale) {
+                return (
+                  <div className="mb-4 text-xs text-yellow-800 bg-yellow-50 p-2 rounded border border-yellow-200">
+                    ⚠️ This resume is missing your latest profile updates. You may want to regenerate it first from the Resumes page.
+                  </div>
+                );
+              }
+              return null;
+            })()}
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setIsApplyModalOpen(false)}>Cancel</Button>
               <Button onClick={confirmApply}>Submit Application</Button>

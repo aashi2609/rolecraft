@@ -160,6 +160,9 @@ class CandidateProfile(Base):
     weaknesses: Mapped[Optional[list]] = mapped_column(ARRAY(String), default=list)
     weblinks: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
     annual_family_income: Mapped[Optional[str]] = mapped_column(String(64))
+    profile_updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     user: Mapped["User"] = relationship(back_populates="candidate_profile")
     education: Mapped[list["Education"]] = relationship(
@@ -334,6 +337,9 @@ class Resume(Base):
     gcs_path: Mapped[Optional[str]] = mapped_column(String(1024))
     pdf_path: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    generated_from_profile_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

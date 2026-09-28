@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     embedding_api_base: str = "https://api.openai.com/v1"
     resume_max_fix_iterations: int = 3
-    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000,https://rolecraft-web.vercel.app"
     environment: str = "development"
     storage_backend: str = "local"  # local | gcs
 
