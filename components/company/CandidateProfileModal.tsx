@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { X, TrendingUp, Download, Briefcase, GraduationCap, Award, FolderGit2, Loader2 } from 'lucide-react';
+import { X, TrendingUp, Download, Briefcase, GraduationCap, Award, FolderGit2, Loader2, MessageSquare } from 'lucide-react';
 import { candidateApi } from '@/lib/api';
 
 interface CandidateProfileModalProps {
@@ -10,6 +10,7 @@ interface CandidateProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   onDownloadResume?: (candidateId: string) => void;
+  onMessage?: (candidateId: string, candidateName: string) => void;
 }
 
 function formatDate(d?: string | null) {
@@ -33,6 +34,7 @@ export function CandidateProfileModal({
   isOpen,
   onClose,
   onDownloadResume,
+  onMessage,
 }: CandidateProfileModalProps) {
   const [profile, setProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
@@ -110,6 +112,16 @@ export function CandidateProfileModal({
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {onMessage && candidate.id && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => onMessage(String(candidate.id), displayName)}
+              >
+                <MessageSquare className="w-4 h-4" />
+                Message
+              </Button>
+            )}
             {onDownloadResume && (
               <Button
                 variant="outline"

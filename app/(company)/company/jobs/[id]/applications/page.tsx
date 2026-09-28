@@ -7,6 +7,8 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { ArrowLeft, Inbox, Clock, CheckCircle2, XCircle, Users } from 'lucide-react';
 import Link from 'next/link';
+import { CandidateProfileModal } from '@/components/company/CandidateProfileModal';
+import { MessageModal } from '@/components/company/MessageModal';
 
 interface Job {
   id: string;
@@ -18,6 +20,7 @@ interface Application {
   status: string;
   applied_at: string;
   candidate_name?: string;
+  candidate_id?: string;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
@@ -69,6 +72,11 @@ export default function JobApplicationsPage() {
   const [job, setJob] = useState<Job | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [profileCandidate, setProfileCandidate] = useState<any | null>(null);
+  const [messageOpen, setMessageOpen] = useState(false);
+  const [messageCandidateId, setMessageCandidateId] = useState<string | undefined>();
+  const [messageName, setMessageName] = useState('');
 
   const loadData = useCallback(async () => {
     try {
@@ -151,14 +159,37 @@ export default function JobApplicationsPage() {
                 <Button size="sm" variant="outline" onClick={() => updateStatus(app.id, 'rejected')} className="text-red-600 hover:text-red-700">
                   Reject
                 </Button>
-                <Link href={`/company/candidates`}>
-                  <Button size="sm">View Profile</Button>
-                </Link>
+                <Button size="sm" onClick={() => {
+                  setProfileCandidate({
+                    id: app.candidate_id,
+                    name: app.candidate_name,
+                  });
+                }}>
+                  View Profile
+                </Button>
               </div>
             </Card>
           ))}
         </div>
       )}
+
+      <CandidateProfileModal
+        isOpen={!!profileCandidate}
+        onClose={() => setProfileCandidate(null)}
+        candidate={profileCandidate}
+        onMessage={(cid, cname) => {
+          setMessageCandidateId(cid);
+          setMessageName(cname);
+          setMessageOpen(true);
+        }}
+      />
+
+      <MessageModal
+        isOpen={messageOpen}
+        onClose={() => setMessageOpen(false)}
+        candidateId={messageCandidateId}
+        candidateName={messageName}
+      />
     </div>
   );
 }

@@ -1,25 +1,48 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
-import { X, Send } from 'lucide-react';
+import { X, Send, Loader2 } from 'lucide-react';
+import { messagesApi } from '@/lib/api';
 
 interface MessageModalProps {
+  candidateId?: string;
   candidateName: string;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export function MessageModal({ candidateName, isOpen, onClose }: MessageModalProps) {
+export function MessageModal({ candidateId, candidateName, isOpen, onClose }: MessageModalProps) {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<{sender: string, text: string}[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [threadId, setThreadId] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSend = () => {
-    if (!message.trim()) return;
-    setMessages([...messages, { sender: 'You', text: message }]);
-    setMessage('');
+  // If there's a way to find existing threads for this candidate, we could do that here
+  // For now we'll just start a new thread if we don't have one
+
+  const handleSend = async () => {
+    if (!message.trim() || !candidateId) return;
+    setSending(true);
+    try {
+      if (!threadId) {
+        const msg = await messagesApi.startThread(message.trim(), candidateId);
+        setThreadId(msg.thread_id);
+        setMessages([...messages, { sender: 'You', text: message }]);
+      } else {
+        await messagesApi.send(threadId, message.trim(), candidateId);
+        setMessages([...messages, { sender: 'You', text: message }]);
+      }
+      setMessage('');
+    } catch (e) {
+      console.error('Failed to send message:', e);
+      alert('Failed to send message');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -64,9 +87,10 @@ export function MessageModal({ candidateName, isOpen, onClose }: MessageModalPro
             value={message}
             onChange={e => setMessage(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
+            disabled={sending || !candidateId}
           />
-          <Button className="rounded-full px-4" onClick={handleSend} disabled={!message.trim()}>
-            <Send className="w-4 h-4" />
+          <Button className="rounded-full px-4" onClick={handleSend} disabled={!message.trim() || sending || !candidateId}>
+            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </Button>
         </div>
       </div>

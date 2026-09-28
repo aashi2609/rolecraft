@@ -85,6 +85,7 @@ export default function SearchCandidatesPage() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
   const [messageName, setMessageName] = useState('');
+  const [messageCandidateId, setMessageCandidateId] = useState<string | undefined>();
   const [menuOpenId, setMenuOpenId] = useState<string | number | null>(null);
   const [shortlisted, setShortlisted] = useState<(string | number)[]>([]);
   const [hidden, setHidden] = useState<(string | number)[]>([]);
@@ -593,6 +594,7 @@ export default function SearchCandidatesPage() {
                                       className="w-full text-left px-3 py-2 text-sm hover:bg-secondary"
                                       onClick={() => {
                                         setMessageName(c.name);
+                                        setMessageCandidateId(c.id);
                                         setMessageOpen(true);
                                         setMenuOpenId(null);
                                       }}
@@ -704,6 +706,7 @@ export default function SearchCandidatesPage() {
       <MessageModal
         isOpen={messageOpen}
         onClose={() => setMessageOpen(false)}
+        candidateId={messageCandidateId}
         candidateName={messageName}
       />
     </div>
