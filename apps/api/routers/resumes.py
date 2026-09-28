@@ -6,21 +6,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from core.dependencies import CandidateUser, DbSession, check_plan_limit
-from models import CandidateProfile, CandidateSkill, PlanTier, Resume, Subscription
+from models import CandidateProfile, CandidateSkill, Resume
 from schemas import ResumeGenerateRequest, ResumeOut
 from services.pdf_service import build_resume_pdf_response, resolve_candidate_name
 from services.resume_service import generate_resume_for_vertical, parse_resume_pdf
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
-
-# Plan tiers that include resume generation (not Job Search)
-_GENERATION_TIERS = {
-    PlanTier.resume_builder,
-    PlanTier.complete,
-    # Legacy tiers that also had resume generation
-    PlanTier.premium,
-    PlanTier.elite,
-}
 
 
 async def _profile_with_skills(db, user_id: UUID) -> CandidateProfile:
@@ -45,7 +36,11 @@ def _resume_to_out(resume: Resume, profile_updated_at=None) -> ResumeOut:
     """Convert a Resume ORM object to ResumeOut with computed is_stale."""
     is_stale = False
     if profile_updated_at and resume.generated_from_profile_at:
-        is_stale = profile_updated_at > resume.generated_from_profile_at
+        try:
+            is_stale = profile_updated_at > resume.generated_from_profile_at
+        except TypeError:
+            # Naive vs aware datetime mismatch — treat as not stale rather than 500
+            is_stale = False
     elif profile_updated_at and not resume.generated_from_profile_at:
         # Resume was created before stale tracking existed
         is_stale = False
@@ -65,17 +60,12 @@ async def _get_profile_updated_at(db, user_id: UUID):
 
 
 async def _can_generate(db, user_id: UUID) -> tuple[bool, str | None]:
-    """Check if the user's plan includes resume generation."""
-    sub = (
-        await db.execute(
-            select(Subscription).where(Subscription.user_id == user_id)
-        )
-    ).scalar_one_or_none()
-    if not sub:
-        return True, None  # No subscription = free tier, let check_plan_limit handle caps
-    if sub.plan_tier in _GENERATION_TIERS:
-        return True, None
-    return False, "Your current plan doesn't include resume generation. Upgrade to Resume Builder or Complete."
+    """Check if the user's plan includes resume generation.
+
+    Temporarily allows all candidates — matches check_plan_limit bypass until
+    payment gating is re-enabled.
+    """
+    return True, None
 
 
 @router.post("/generate", response_model=list[ResumeOut])
@@ -155,33 +145,41 @@ async def regenerate(resume_id: UUID, user: CandidateUser, db: DbSession):
         raise HTTPException(status_code=403, detail=err_msg)
 
     # Regenerating an existing vertical does not consume a free-plan slot.
-    profile = await _profile_with_skills(db, user.id)
-    skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
-    payload = await generate_resume_for_vertical(
-        profile, old.target_vertical, skill_names, user_email=user.email
-    )
+    try:
+        profile = await _profile_with_skills(db, user.id)
+        skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
+        payload = await generate_resume_for_vertical(
+            profile, old.target_vertical, skill_names, user_email=user.email
+        )
 
-    # Archive the old resume: unset default, keep it for existing applications
-    was_default = old.is_default
-    old.is_default = False
+        # Archive the old resume: unset default, keep it for existing applications
+        was_default = old.is_default
+        old.is_default = False
 
-    # Create NEW version
-    new_resume = Resume(
-        candidate_id=user.id,
-        target_vertical=old.target_vertical,
-        content=payload["content"],
-        ats_score=payload["ats_score"],
-        ats_breakdown=payload.get("ats_breakdown"),
-        generation_metadata=payload.get("generation_metadata"),
-        embedding=payload["embedding"],
-        version=(old.version or 1) + 1,
-        is_default=was_default,
-        generated_from_profile_at=profile.profile_updated_at,
-    )
-    db.add(new_resume)
-    await db.flush()
-    await db.refresh(new_resume)
-    return _resume_to_out(new_resume, profile.profile_updated_at)
+        # Create NEW version
+        new_resume = Resume(
+            candidate_id=user.id,
+            target_vertical=old.target_vertical,
+            content=payload["content"],
+            ats_score=payload["ats_score"],
+            ats_breakdown=payload.get("ats_breakdown"),
+            generation_metadata=payload.get("generation_metadata"),
+            embedding=payload["embedding"],
+            version=(old.version or 1) + 1,
+            is_default=was_default,
+            generated_from_profile_at=profile.profile_updated_at,
+        )
+        db.add(new_resume)
+        await db.flush()
+        await db.refresh(new_resume)
+        return _resume_to_out(new_resume, profile.profile_updated_at)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Resume regenerate failed: {type(exc).__name__}: {exc}",
+        ) from exc
 
 
 @router.post("/{resume_id}/mark-current", response_model=ResumeOut)

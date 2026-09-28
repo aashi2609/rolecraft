@@ -80,7 +80,7 @@ async def _generate_deterministic(
             {
                 "title": e.role or e.designation or "Role",
                 "company": e.company_name or "Company",
-                "dates": f"{e.from_date or ''} – {e.to_date or 'Present'}",
+                "dates": f"{e.from_date or ''} - {e.to_date or 'Present'}",
                 "bullets": [e.responsibilities or "Contributed to team objectives."],
             }
             for e in (profile.experience or [])[:3]
