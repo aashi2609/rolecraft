@@ -480,12 +480,12 @@ class MessageCreate(BaseModel):
 
 class MessageOut(ORMModel):
     id: UUID
-    thread_id: UUID
+    conversation_id: UUID
     sender_id: UUID
-    recipient_id: Optional[UUID] = None
     sender_role: str
     body: str
     sent_at: datetime
+    read_at: Optional[datetime] = None
 
 
 class ThreadOut(BaseModel):
@@ -494,6 +494,7 @@ class ThreadOut(BaseModel):
     last_sent_at: Optional[datetime] = None
     participant_label: Optional[str] = None
     other_user_id: Optional[UUID] = None
+    unread_count: int = 0
 
 
 class NotificationOut(ORMModel):

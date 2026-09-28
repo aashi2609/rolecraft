@@ -1,43 +1,26 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useUser } from '@/context/UserContext';
 import { Button } from '@/components/ui/Button';
 import { Send, MessageSquare } from 'lucide-react';
 import { messagesApi } from '@/lib/api';
 
-interface Message {
-  threadId?: string;
-  id: string;
-  companyName?: string;
-  participant_label?: string;
-  lastMessage?: string;
-  timestamp: string;
-  otherUserId?: string;
-}
-
-interface ChatMessageRaw {
-  id: string;
-  sender_id: string;
-  body: string;
-  sent_at: string;
-}
-
 type Thread = {
-  id: string;
-  threadId: string;
-  candidateName: string;
-  lastMessage: string;
-  timestamp: string;
-  otherUserId?: string;
+  thread_id: string;
+  participant_label: string;
+  last_body: string;
+  last_sent_at: string;
+  other_user_id: string;
+  unread_count: number;
 };
 
 type ChatMessage = {
   id: string;
-  senderId: string;
+  sender_id: string;
   body: string;
-  sentAt: string;
-  isMine: boolean;
+  sent_at: string;
+  isMine?: boolean;
 };
 
 function formatTime(iso?: string) {
@@ -55,7 +38,7 @@ function formatTime(iso?: string) {
 }
 
 export default function CompanyMessagesPage() {
-  const { messages, userId, refreshMessages } = useUser();
+  const { userId, refreshMessages } = useUser();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [activeThread, setActiveThread] = useState<string | null>(null);
   const [chat, setChat] = useState<ChatMessage[]>([]);
@@ -63,39 +46,51 @@ export default function CompanyMessagesPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
 
-  const loadThreads = useCallback(() => {
-    const threadData = (messages || []).map((m: Message) => ({
-      id: m.threadId || m.id,
-      threadId: m.threadId || m.id,
-      candidateName: m.companyName || m.participant_label || 'Candidate',
-      lastMessage: m.lastMessage || '',
-      timestamp: m.timestamp,
-      otherUserId: m.otherUserId,
-    }));
-    setThreads(threadData);
-    setLoading(false);
-  }, [messages]);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    loadThreads();
-  }, [loadThreads]);
+  const loadThreads = useCallback(async () => {
+    try {
+      const data = await messagesApi.threads();
+      setThreads(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const loadChatMessages = useCallback(async (threadId: string) => {
     try {
-      const rows: ChatMessageRaw[] = await messagesApi.getThread(threadId);
+      const rows: ChatMessage[] = await messagesApi.getThread(threadId);
       setChat(
         rows.map((m) => ({
-          id: m.id,
-          senderId: m.sender_id,
-          body: m.body,
-          sentAt: m.sent_at,
+          ...m,
           isMine: String(m.sender_id) === String(userId),
         }))
       );
+      refreshMessages();
     } catch {
       setChat([]);
     }
-  }, [userId]);
+  }, [userId, refreshMessages]);
+
+  const pollActiveThread = useCallback(async () => {
+    if (activeThread) {
+      await loadChatMessages(activeThread);
+    }
+    await loadThreads();
+  }, [activeThread, loadChatMessages, loadThreads]);
+
+  useEffect(() => {
+    loadThreads();
+    const handleFocus = () => pollActiveThread();
+    window.addEventListener('focus', handleFocus);
+    pollRef.current = setInterval(pollActiveThread, 10000);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [loadThreads, pollActiveThread]);
 
   useEffect(() => {
     if (!activeThread) {
@@ -108,27 +103,39 @@ export default function CompanyMessagesPage() {
   const handleSend = useCallback(async () => {
     if (!newMessage.trim() || !activeThread) return;
     setSending(true);
-    const active = threads.find((t) => t.threadId === activeThread);
+    
+    // Optimistic UI update
+    const tmpId = Date.now().toString();
+    const optimisticMsg: ChatMessage = {
+      id: tmpId,
+      sender_id: userId || '',
+      body: newMessage.trim(),
+      sent_at: new Date().toISOString(),
+      isMine: true,
+    };
+    setChat((prev) => [...prev, optimisticMsg]);
+    const bodyToSend = newMessage.trim();
+    setNewMessage('');
+
     try {
-      await messagesApi.send(activeThread, newMessage.trim(), active?.otherUserId);
-      setNewMessage('');
-      const rows: ChatMessageRaw[] = await messagesApi.getThread(activeThread);
+      await messagesApi.send(activeThread, bodyToSend);
+      // Wait a moment then refresh chat to get real ID
+      const rows: ChatMessage[] = await messagesApi.getThread(activeThread);
       setChat(
         rows.map((m) => ({
-          id: m.id,
-          senderId: m.sender_id,
-          body: m.body,
-          sentAt: m.sent_at,
+          ...m,
           isMine: String(m.sender_id) === String(userId),
         }))
       );
-      await refreshMessages();
+      await loadThreads();
     } catch {
-      alert('Failed to send message');
+      // Rollback
+      setChat((prev) => prev.filter((m) => m.id !== tmpId));
+      // No alert per user requirement, handled silently via rollback and error toast if we had one
     } finally {
       setSending(false);
     }
-  }, [activeThread, newMessage, refreshMessages, threads, userId]);
+  }, [activeThread, newMessage, userId, loadThreads]);
 
   if (loading) {
     return (
@@ -152,7 +159,7 @@ export default function CompanyMessagesPage() {
     );
   }
 
-  const activeThreadData = threads.find((t) => t.threadId === activeThread);
+  const activeThreadData = threads.find((t) => t.thread_id === activeThread);
 
   return (
     <div className="h-[calc(100vh-56px)] flex bg-white">
@@ -163,19 +170,26 @@ export default function CompanyMessagesPage() {
         <div className="flex-1 overflow-y-auto">
           {threads.map((thread) => (
             <div
-              key={thread.threadId}
+              key={thread.thread_id}
               className={`p-4 border-b border-border-soft cursor-pointer hover:bg-surface-soft transition-colors ${
-                activeThread === thread.threadId ? 'bg-brand-blue/10' : ''
+                activeThread === thread.thread_id ? 'bg-brand-blue/10' : ''
               }`}
-              onClick={() => setActiveThread(thread.threadId)}
+              onClick={() => setActiveThread(thread.thread_id)}
             >
               <div className="flex justify-between items-start mb-1">
-                <h3 className="font-bold text-sm text-ink">{thread.candidateName}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-sm text-ink">{thread.participant_label}</h3>
+                  {thread.unread_count > 0 && activeThread !== thread.thread_id && (
+                    <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      {thread.unread_count}
+                    </span>
+                  )}
+                </div>
                 <span className="text-xs text-ink-muted whitespace-nowrap">
-                  {formatTime(thread.timestamp)}
+                  {formatTime(thread.last_sent_at)}
                 </span>
               </div>
-              <p className="text-sm line-clamp-1 text-ink-muted">{thread.lastMessage}</p>
+              <p className="text-sm line-clamp-1 text-ink-muted">{thread.last_body || 'No messages yet'}</p>
             </div>
           ))}
         </div>
@@ -189,7 +203,7 @@ export default function CompanyMessagesPage() {
         ) : (
           <>
             <div className="p-4 border-b border-border-soft bg-white flex items-center justify-between shadow-sm z-10">
-              <h3 className="font-bold text-ink">{activeThreadData?.candidateName}</h3>
+              <h3 className="font-bold text-ink">{activeThreadData?.participant_label}</h3>
             </div>
 
             <div className="flex-1 p-6 overflow-y-auto bg-surface-soft flex flex-col gap-6">
@@ -200,7 +214,7 @@ export default function CompanyMessagesPage() {
                     msg.isMine ? 'self-end items-end' : 'self-start items-start'
                   }`}
                 >
-                  <div className="text-xs text-ink-muted mb-1 px-1">{formatTime(msg.sentAt)}</div>
+                  <div className="text-xs text-ink-muted mb-1 px-1">{formatTime(msg.sent_at)}</div>
                   <div
                     className={`px-4 py-3 rounded-2xl ${
                       msg.isMine

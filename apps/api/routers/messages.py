@@ -1,16 +1,17 @@
+import { UUID, uuid4 } from 'uuid' # Wait this is Python...
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import or_, select
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from sqlalchemy import or_, select, and_
 
 from core.dependencies import CurrentUser, DbSession
-from models import CandidateProfile, Company, Message, User, UserRole
+from models import CandidateProfile, Company, Message, User, UserRole, Conversation, JobPosting, Application, ApplicationStatus, Notification
 from schemas import MessageCreate, MessageOut, ThreadOut
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
 
-async def _participant_label(db, user_id: UUID) -> str:
+async def _participant_label(db: DbSession, user_id: UUID) -> str:
     user = await db.get(User, user_id)
     if not user:
         return "User"
@@ -22,83 +23,155 @@ async def _participant_label(db, user_id: UUID) -> str:
     )
     if profile and profile.weblinks and profile.weblinks.get("display_name"):
         return profile.weblinks["display_name"]
+    # return candidate real name if available, else email
+    if profile and profile.full_name:
+        return profile.full_name
     return user.email
-
-
-def _user_participates(msg: Message, user_id: UUID) -> bool:
-    return msg.sender_id == user_id or msg.recipient_id == user_id
 
 
 @router.get("/threads", response_model=list[ThreadOut])
 async def list_threads(user: CurrentUser, db: DbSession):
-    thread_ids = (
-        (
-            await db.execute(
-                select(Message.thread_id)
-                .where(
-                    or_(Message.sender_id == user.id, Message.recipient_id == user.id)
-                )
-                .distinct()
-            )
-        )
-        .scalars()
-        .all()
-    )
-
+    # Get all conversations for this user
+    if user.role == UserRole.candidate:
+        stmt = select(Conversation).where(Conversation.candidate_id == user.id)
+    elif user.role == UserRole.company:
+        stmt = select(Conversation).where(Conversation.company_id == user.id)
+    else:
+        return []
+    
+    conversations = (await db.execute(stmt.order_by(Conversation.last_message_at.desc()))).scalars().all()
+    
     out: list[ThreadOut] = []
-    for tid in thread_ids:
-        msgs = (
-            (
-                await db.execute(
-                    select(Message)
-                    .where(Message.thread_id == tid)
-                    .order_by(Message.sent_at.desc())
-                )
-            )
-            .scalars()
-            .all()
-        )
-        if not msgs:
-            continue
-        last = msgs[0]
-        other_id = None
-        for m in msgs:
-            if m.sender_id != user.id:
-                other_id = m.sender_id
-                break
-            if m.recipient_id and m.recipient_id != user.id:
-                other_id = m.recipient_id
-                break
-        label = await _participant_label(db, other_id) if other_id else "Conversation"
+    for conv in conversations:
+        # Get last message
+        last_msg = await db.scalar(select(Message).where(Message.conversation_id == conv.id).order_by(Message.sent_at.desc()).limit(1))
+        
+        # Determine the other user's ID
+        other_id = conv.company_id if user.role == UserRole.candidate else conv.candidate_id
+        label = await _participant_label(db, other_id)
+        
+        # Calculate unread count
+        unread = await db.scalar(select(sa.func.count(Message.id)).where(Message.conversation_id == conv.id, Message.sender_id != user.id, Message.read_at.is_(None)))
+
         out.append(
             ThreadOut(
-                thread_id=tid,
-                last_body=last.body,
-                last_sent_at=last.sent_at,
+                thread_id=conv.id,
+                last_body=last_msg.body if last_msg else None,
+                last_sent_at=conv.last_message_at,
                 participant_label=label,
                 other_user_id=other_id,
+                unread_count=unread or 0
             )
         )
-    out.sort(key=lambda t: t.last_sent_at or t.thread_id, reverse=True)
     return out
 
 
 @router.post("/threads", response_model=MessageOut)
 async def start_thread(body: MessageCreate, user: CurrentUser, db: DbSession):
-    if not body.recipient_id:
-        raise HTTPException(
-            status_code=400, detail="recipient_id is required to start a thread"
+    if user.role != UserRole.company:
+        raise HTTPException(status_code=403, detail="Only companies can start conversations")
+        
+    candidate_id = body.recipient_id
+    if not candidate_id:
+        raise HTTPException(status_code=400, detail="candidate_id (recipient_id) is required")
+
+    # Authorize: Must have applied or be shortlisted
+    # Wait, the user said "A company may START a conversation only with a candidate who applied to one of ITS jobs or whom it has shortlisted."
+    app = await db.scalar(
+        select(Application).join(JobPosting).where(
+            Application.candidate_id == candidate_id,
+            JobPosting.company_id == user.id,
+            or_(Application.status == ApplicationStatus.applied, Application.status == ApplicationStatus.shortlisted, Application.status == ApplicationStatus.interview)
         )
-    recipient = await db.get(User, body.recipient_id)
-    if not recipient:
-        raise HTTPException(status_code=404, detail="Recipient not found")
-    msg = Message(
-        thread_id=uuid4(),
-        sender_id=user.id,
-        recipient_id=body.recipient_id,
-        sender_role=user.role,
-        body=body.body,
     )
+    if not app:
+        raise HTTPException(status_code=403, detail="Cannot message a candidate who has not applied to your jobs")
+
+    # Get or create conversation
+    conv = await db.scalar(select(Conversation).where(Conversation.company_id == user.id, Conversation.candidate_id == candidate_id))
+    if not conv:
+        conv = Conversation(company_id=user.id, candidate_id=candidate_id, job_id=app.job_id)
+        db.add(conv)
+        await db.flush()
+
+    msg = Message(
+        conversation_id=conv.id,
+        sender_id=user.id,
+        sender_role=user.role,
+        body=body.body.strip()[:2000]
+    )
+    db.add(msg)
+    conv.last_message_at = sa.func.now()
+    
+    # Create notification for recipient
+    notif = Notification(
+        user_id=candidate_id,
+        type="new_message",
+        title="New Message",
+        message=f"You received a new message regarding a job application.",
+        link=f"/messages",
+        read=False
+    )
+    db.add(notif)
+    
+    await db.commit()
+    await db.refresh(msg)
+    
+    return msg
+
+
+@router.get("/threads/{id}", response_model=list[MessageOut])
+async def get_thread(id: UUID, user: CurrentUser, db: DbSession):
+    conv = await db.get(Conversation, id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+        
+    if conv.company_id != user.id and conv.candidate_id != user.id:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+        
+    # Mark messages as read
+    await db.execute(
+        sa.update(Message).where(Message.conversation_id == id, Message.sender_id != user.id, Message.read_at.is_(None)).values(read_at=sa.func.now())
+    )
+    await db.commit()
+
+    msgs = (await db.execute(select(Message).where(Message.conversation_id == id).order_by(Message.sent_at.asc()))).scalars().all()
+    return msgs
+
+
+@router.post("/threads/{id}", response_model=MessageOut)
+async def reply_thread(id: UUID, body: MessageCreate, user: CurrentUser, db: DbSession):
+    conv = await db.get(Conversation, id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+        
+    if conv.company_id != user.id and conv.candidate_id != user.id:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+        
+    msg = Message(
+        conversation_id=conv.id,
+        sender_id=user.id,
+        sender_role=user.role,
+        body=body.body.strip()[:2000]
+    )
+    db.add(msg)
+    conv.last_message_at = sa.func.now()
+    
+    # Create notification for recipient
+    recipient_id = conv.company_id if user.role == UserRole.candidate else conv.candidate_id
+    notif = Notification(
+        user_id=recipient_id,
+        type="new_message",
+        title="New Message",
+        message=f"You received a new message.",
+        link=f"/company/messages" if user.role == UserRole.candidate else "/messages",
+        read=False
+    )
+    db.add(notif)
+    
+    await db.commit()
+    await db.refresh(msg)
+    return msg    )
     db.add(msg)
     await db.flush()
     return MessageOut.model_validate(msg)

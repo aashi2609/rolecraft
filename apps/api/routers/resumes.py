@@ -226,24 +226,41 @@ async def improve(resume_id: UUID, user: CandidateUser, db: DbSession):
 
 @router.get("/{resume_id}/download")
 @router.get("/{resume_id}/pdf")
-async def download_pdf(resume_id: UUID, user: CandidateUser, db: DbSession):
+async def download_pdf(resume_id: UUID, user: CurrentUser, db: DbSession):
     row = await db.get(Resume, resume_id)
-    if not row or row.candidate_id != user.id:
+    if not row:
+        raise HTTPException(status_code=404, detail="Resume not found")
+        
+    if user.role == UserRole.company:
+        from models import Application, JobPosting
+        app = await db.scalar(
+            select(Application).join(JobPosting).where(
+                Application.resume_id == resume_id,
+                JobPosting.company_id == user.id
+            )
+        )
+        if not app:
+            raise HTTPException(status_code=403, detail="Resume not found")
+    elif row.candidate_id != user.id:
         raise HTTPException(status_code=404, detail="Resume not found")
 
     profile = (
         await db.execute(
-            select(CandidateProfile).where(CandidateProfile.user_id == user.id)
+            select(CandidateProfile).where(CandidateProfile.user_id == row.candidate_id)
         )
     ).scalar_one_or_none()
+    
+    # Need candidate user to get email
+    candidate_user = await db.get(User, row.candidate_id)
+    email = candidate_user.email if candidate_user else ""
     weblinks = (profile.weblinks or {}) if profile else {}
     filename = f"resume_{row.target_vertical.replace(' ', '_').lower()}_v{row.version or 1}.pdf"
     return build_resume_pdf_response(
         resume_content=row.content or {},
-        email=user.email,
+        email=email,
         weblinks=weblinks,
         filename=filename,
-        candidate_name=resolve_candidate_name(weblinks=weblinks, email=user.email),
+        candidate_name=resolve_candidate_name(weblinks=weblinks, email=email),
         location=(profile.preferred_locations or [None])[0] if profile else "",
     )
 

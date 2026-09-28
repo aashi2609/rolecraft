@@ -9,6 +9,7 @@ import { ArrowLeft, Inbox, Clock, CheckCircle2, XCircle, Users } from 'lucide-re
 import Link from 'next/link';
 import { CandidateProfileModal } from '@/components/company/CandidateProfileModal';
 import { MessageModal } from '@/components/company/MessageModal';
+import { resumesApi } from '@/lib/api';
 
 interface Job {
   id: string;
@@ -21,6 +22,7 @@ interface Application {
   applied_at: string;
   candidate_name?: string;
   candidate_id?: string;
+  resume_id?: string;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
@@ -163,6 +165,7 @@ export default function JobApplicationsPage() {
                   setProfileCandidate({
                     id: app.candidate_id,
                     name: app.candidate_name,
+                    resume_id: app.resume_id
                   });
                 }}>
                   View Profile
@@ -177,6 +180,7 @@ export default function JobApplicationsPage() {
         isOpen={!!profileCandidate}
         onClose={() => setProfileCandidate(null)}
         candidate={profileCandidate}
+        onDownloadResume={profileCandidate?.resume_id ? () => resumesApi.downloadPdf(profileCandidate.resume_id) : undefined}
         onMessage={(cid, cname) => {
           setMessageCandidateId(cid);
           setMessageName(cname);

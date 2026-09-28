@@ -46,10 +46,10 @@ export function NotificationsDropdown() {
   }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      loadNotifications();
-    }
-  }, [isOpen, loadNotifications]);
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [loadNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
