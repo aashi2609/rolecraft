@@ -14,6 +14,7 @@ from models import (
     User,
     UserRole,
 )
+from services.user_service import create_user_with_profile
 from services.admin_service import get_dashboard_stats
 from schemas import JobCreate, JobUpdate
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -243,14 +244,13 @@ async def create_user(
     db: DbSession,
     current_admin: User = Depends(get_current_admin),
 ) -> Any:
-    hashed_pwd = hash_password(create_data.password)
-    user = User(
+    user = await create_user_with_profile(
+        db=db,
         email=create_data.email,
-        password_hash=hashed_pwd,
-        role=create_data.role,
+        password=create_data.password,
+        role=UserRole(create_data.role),
         is_active=create_data.is_active,
     )
-    db.add(user)
     await db.commit()
     await db.refresh(user)
     return {"ok": True, "id": str(user.id)}

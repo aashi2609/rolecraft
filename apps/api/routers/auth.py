@@ -7,14 +7,10 @@ from sqlalchemy.orm import selectinload
 from core.dependencies import CurrentUser, DbSession
 from core.security import create_access_token, hash_password, verify_password
 from models import (
-    CandidateProfile,
-    Company,
-    PlanTier,
-    Subscription,
-    SubscriptionStatus,
     User,
     UserRole,
 )
+from services.user_service import create_user_with_profile, parse_plan
 from schemas import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
@@ -26,18 +22,6 @@ from schemas import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _parse_plan(plan: str | None, role: UserRole) -> PlanTier:
-    raw = (plan or ("complete" if role == UserRole.candidate else "corporate_annual")).lower()
-    if raw in ("free", "basic", "premium", "elite"):
-        raw = "complete"
-    elif raw in ("starter", "growth", "scale"):
-        raw = "corporate_annual"
-    try:
-        return PlanTier(raw)
-    except ValueError:
-        return PlanTier.complete if role == UserRole.candidate else PlanTier.corporate_annual
-
-
 @router.post("/signup", response_model=TokenResponse)
 async def signup(body: SignupRequest, db: DbSession):
     # Password complexity + role Literal already enforced by SignupRequest
@@ -46,29 +30,16 @@ async def signup(body: SignupRequest, db: DbSession):
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    user = User(
-        email=body.email.lower(), password_hash=hash_password(body.password), role=role
-    )
-    db.add(user)
-    await db.flush()
-
-    plan = _parse_plan(body.plan, role)
-    sub = Subscription(
-        user_id=user.id,
+    user = await create_user_with_profile(
+        db=db,
+        email=body.email,
+        password=body.password,
         role=role,
-        plan_tier=plan,
-        status=SubscriptionStatus.active,
-        renews_at=datetime.now(timezone.utc) + timedelta(days=30),
+        name=body.name,
+        industry=body.industry,
+        plan=body.plan,
     )
-    db.add(sub)
-
-    if role == UserRole.candidate:
-        weblinks = {"display_name": body.name} if body.name else {}
-        db.add(CandidateProfile(user_id=user.id, weblinks=weblinks))
-    else:
-        db.add(Company(user_id=user.id, name=body.name or "", industry=body.industry))
-
-    await db.flush()
+    plan = parse_plan(body.plan, role)
     token = create_access_token(user_id=user.id, role=user.role.value)
     return TokenResponse(
         access_token=token,

@@ -55,6 +55,7 @@ export default function AdminUsersPage() {
       await adminApi.createUser(formData);
       setIsCreateOpen(false);
       fetchUsers();
+      alert(`User created successfully.\n\nPlease share the temporary password with the user so they can log in, and instruct them to change it in their Settings.`);
       setFormData({ email: "", password: "", role: "candidate", is_active: true });
     } catch (err) {
       console.error(err);
