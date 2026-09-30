@@ -5,8 +5,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from core.dependencies import CandidateUser, DbSession, check_plan_limit
-from models import CandidateProfile, CandidateSkill, Resume
+from core.dependencies import CandidateUser, CurrentUser, DbSession, check_plan_limit
+from models import CandidateProfile, CandidateSkill, Resume, User, UserRole
 from schemas import ResumeGenerateRequest, ResumeOut
 from services.pdf_service import build_resume_pdf_response, resolve_candidate_name
 from services.resume_service import generate_resume_for_vertical, parse_resume_pdf

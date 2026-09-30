@@ -29,8 +29,8 @@ export function MessageModal({ candidateId, candidateName, isOpen, onClose }: Me
     setSending(true);
     try {
       if (!threadId) {
-        const msg = await messagesApi.startThread(message.trim(), candidateId);
-        setThreadId(msg.thread_id);
+        const msg = await messagesApi.start(message.trim(), candidateId);
+        setThreadId(msg.conversation_id || msg.thread_id);
         setMessages([...messages, { sender: 'You', text: message }]);
       } else {
         await messagesApi.send(threadId, message.trim(), candidateId);

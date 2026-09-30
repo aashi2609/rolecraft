@@ -1,7 +1,7 @@
-import { UUID, uuid4 } from 'uuid' # Wait this is Python...
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
+import sqlalchemy as sa
 from sqlalchemy import or_, select, and_
 
 from core.dependencies import CurrentUser, DbSession
@@ -171,69 +171,4 @@ async def reply_thread(id: UUID, body: MessageCreate, user: CurrentUser, db: DbS
     
     await db.commit()
     await db.refresh(msg)
-    return msg    )
-    db.add(msg)
-    await db.flush()
-    return MessageOut.model_validate(msg)
-
-
-@router.get("/threads/{thread_id}", response_model=list[MessageOut])
-async def get_thread(thread_id: UUID, user: CurrentUser, db: DbSession):
-    msgs = (
-        (
-            await db.execute(
-                select(Message)
-                .where(Message.thread_id == thread_id)
-                .order_by(Message.sent_at.asc())
-            )
-        )
-        .scalars()
-        .all()
-    )
-    if not msgs:
-        raise HTTPException(status_code=404, detail="Thread not found")
-    if not any(_user_participates(m, user.id) for m in msgs):
-        raise HTTPException(status_code=403, detail="Not a participant in this thread")
-    return [MessageOut.model_validate(m) for m in msgs]
-
-
-@router.post("/threads/{thread_id}", response_model=MessageOut)
-async def send_message(
-    thread_id: UUID, body: MessageCreate, user: CurrentUser, db: DbSession
-):
-    existing = (
-        await db.execute(select(Message).where(Message.thread_id == thread_id).limit(1))
-    ).scalar_one_or_none()
-    if not existing:
-        raise HTTPException(status_code=404, detail="Thread not found")
-    if not _user_participates(existing, user.id):
-        raise HTTPException(status_code=403, detail="Not a participant in this thread")
-
-    recipient_id = body.recipient_id
-    if not recipient_id:
-        first = (
-            (
-                await db.execute(
-                    select(Message)
-                    .where(Message.thread_id == thread_id)
-                    .order_by(Message.sent_at.asc())
-                )
-            )
-            .scalars()
-            .first()
-        )
-        if first:
-            recipient_id = (
-                first.recipient_id if first.sender_id == user.id else first.sender_id
-            )
-
-    msg = Message(
-        thread_id=thread_id,
-        sender_id=user.id,
-        recipient_id=recipient_id,
-        sender_role=user.role,
-        body=body.body,
-    )
-    db.add(msg)
-    await db.flush()
     return MessageOut.model_validate(msg)

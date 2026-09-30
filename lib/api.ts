@@ -515,7 +515,7 @@ export const messagesApi = {
       body: JSON.stringify({ body, recipient_id: recipientId }),
     }),
   start: (body: string, recipientId: string) =>
-    api('/messages/threads', {
+    api<any>('/messages/threads', {
       method: 'POST',
       body: JSON.stringify({ body, recipient_id: recipientId }),
     }),
