@@ -107,10 +107,9 @@ async def start_thread(body: MessageCreate, user: CurrentUser, db: DbSession):
     notif = Notification(
         user_id=candidate_id,
         type="new_message",
-        title="New Message",
-        message=f"You received a new message regarding a job application.",
-        link=f"/messages",
-        read=False
+        body="You received a new message regarding a job application.",
+        related_id=str(conv.id),
+        is_read=False
     )
     db.add(notif)
     
@@ -162,10 +161,9 @@ async def reply_thread(id: UUID, body: MessageCreate, user: CurrentUser, db: DbS
     notif = Notification(
         user_id=recipient_id,
         type="new_message",
-        title="New Message",
-        message=f"You received a new message.",
-        link=f"/company/messages" if user.role == UserRole.candidate else "/messages",
-        read=False
+        body="You received a new message.",
+        related_id=str(conv.id),
+        is_read=False
     )
     db.add(notif)
     

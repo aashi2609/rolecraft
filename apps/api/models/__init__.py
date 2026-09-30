@@ -559,12 +559,6 @@ class Message(Base):
     sender_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
-    recipient_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        index=True,
-        nullable=True,
-    )
     sender_role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, name="user_role", create_constraint=False)
     )
