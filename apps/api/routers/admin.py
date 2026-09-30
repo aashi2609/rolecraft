@@ -15,7 +15,7 @@ from models import (
     UserRole,
 )
 from services.admin_service import get_dashboard_stats
-
+from schemas import JobCreate, JobUpdate
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
@@ -64,6 +64,24 @@ class AdminJobOut(BaseModel):
     employment_type: Optional[str] = None
     created_at: str
     application_count: int = 0
+    department: Optional[str] = None
+    job_role: Optional[str] = None
+    job_level: Optional[str] = None
+    experience_range: Optional[str] = None
+    min_salary: Optional[int] = None
+    max_salary: Optional[int] = None
+    salary_unit: Optional[str] = None
+    country: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    job_type: Optional[str] = None
+    required_skills: Optional[list[str]] = None
+    num_openings: Optional[int] = 1
+    application_deadline: Optional[str] = None
+    description: Optional[str] = None
+    responsibilities: Optional[str] = None
+    requirements: Optional[str] = None
+    benefits: Optional[str] = None
 
 
 class DashboardStats(BaseModel):
@@ -103,21 +121,6 @@ class SubCreate(BaseModel):
     role: str
     plan_tier: str
     status: str = "active"
-
-
-class JobAdminUpdate(BaseModel):
-    title: Optional[str] = None
-    status: Optional[str] = None
-    location: Optional[str] = None
-    employment_type: Optional[str] = None
-
-
-class JobCreate(BaseModel):
-    company_id: str
-    title: str
-    status: str = "draft"
-    location: Optional[str] = None
-    employment_type: Optional[str] = None
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -442,6 +445,24 @@ async def get_all_jobs(
                 employment_type=j.employment_type,
                 created_at=j.created_at.isoformat(),
                 application_count=app_count,
+                department=j.department,
+                job_role=j.job_role,
+                job_level=j.job_level,
+                experience_range=j.experience_range,
+                min_salary=j.min_salary,
+                max_salary=j.max_salary,
+                salary_unit=j.salary_unit,
+                country=j.country,
+                state=j.state,
+                city=j.city,
+                job_type=str(j.job_type.value) if hasattr(j.job_type, "value") else j.job_type,
+                required_skills=j.required_skills,
+                num_openings=j.num_openings,
+                application_deadline=j.application_deadline.isoformat() if j.application_deadline else None,
+                description=j.description,
+                responsibilities=j.responsibilities,
+                requirements=j.requirements,
+                benefits=j.benefits,
             )
         )
     return out
@@ -450,21 +471,18 @@ async def get_all_jobs(
 @router.patch("/jobs/{job_id}")
 async def update_job_status(
     job_id: str,
-    update_data: JobAdminUpdate,
+    update_data: JobUpdate,
     db: DbSession,
     current_admin: User = Depends(get_current_admin),
 ) -> Any:
     job = await db.get(JobPosting, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    if update_data.title is not None:
-        job.title = update_data.title
-    if update_data.status is not None:
-        job.status = update_data.status
-    if update_data.location is not None:
-        job.location = update_data.location
-    if update_data.employment_type is not None:
-        job.employment_type = update_data.employment_type
+    
+    update_dict = update_data.model_dump(exclude_unset=True)
+    for key, value in update_dict.items():
+        setattr(job, key, value)
+        
     await db.commit()
     await db.refresh(job)
     return {"ok": True}
@@ -476,13 +494,8 @@ async def create_job(
     db: DbSession,
     current_admin: User = Depends(get_current_admin),
 ) -> Any:
-    job = JobPosting(
-        company_id=create_data.company_id,
-        title=create_data.title,
-        status=create_data.status,
-        location=create_data.location,
-        employment_type=create_data.employment_type,
-    )
+    create_dict = create_data.model_dump(exclude_unset=True)
+    job = JobPosting(**create_dict)
     db.add(job)
     await db.commit()
     await db.refresh(job)
