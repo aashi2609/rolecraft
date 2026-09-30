@@ -24,8 +24,7 @@ export default function AdminJobsPage() {
   
   const [selectedJob, setSelectedJob] = useState<any>(null);
   
-  // Form states
-  const [formData, setFormData] = useState({
+  const initialFormData = {
     title: "",
     company_id: "",
     department: "",
@@ -49,7 +48,9 @@ export default function AdminJobsPage() {
     requirements: "",
     benefits: "",
     status: "draft"
-  });
+  };
+
+  const [formData, setFormData] = useState(initialFormData);
 
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [companyError, setCompanyError] = useState<string | null>(null);
@@ -130,9 +131,7 @@ export default function AdminJobsPage() {
       });
       setIsCreateOpen(false);
       fetchJobs();
-      setFormData({
-        title: "", company_id: "", department: "", role: "", level: "", employment_type: "", experience: "", min_salary: "", max_salary: "", salary_unit: "Per annum", country: "", state: "", city: "", location: "", job_type: "On-site", skills: [], num_openings: 1, application_deadline: "", description: "", responsibilities: "", requirements: "", benefits: "", status: "draft"
-      });
+      setFormData(initialFormData);
     } catch (err) {
       console.error(err);
       alert("Failed to create job");
@@ -195,7 +194,14 @@ export default function AdminJobsPage() {
           <p className="text-muted-foreground">View and moderate job postings across the platform.</p>
         </div>
 
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <Dialog open={isCreateOpen} onOpenChange={(open) => {
+          if (!open) {
+            setFormData(initialFormData);
+            setCompanyName(null);
+            setCompanyError(null);
+          }
+          setIsCreateOpen(open);
+        }}>
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="h-4 w-4" /> Create Job
