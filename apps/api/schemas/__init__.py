@@ -495,6 +495,9 @@ class ThreadOut(BaseModel):
     participant_label: Optional[str] = None
     other_user_id: Optional[UUID] = None
     unread_count: int = 0
+    avatar_url: Optional[str] = None
+    job_title: Optional[str] = None
+    subtitle: Optional[str] = None
 
 
 class NotificationOut(ORMModel):

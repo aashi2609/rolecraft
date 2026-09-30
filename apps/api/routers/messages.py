@@ -53,6 +53,34 @@ async def list_threads(user: CurrentUser, db: DbSession):
         # Calculate unread count
         unread = await db.scalar(select(sa.func.count(Message.id)).where(Message.conversation_id == conv.id, Message.sender_id != user.id, Message.read_at.is_(None)))
 
+        # Avatar URL and subtitle
+        avatar_url = None
+        subtitle = None
+        if user.role == UserRole.candidate:
+            # Other side is company — get logo
+            company = await db.scalar(select(Company).where(Company.user_id == other_id))
+            if company:
+                avatar_url = company.logo_url
+                subtitle = company.industry
+        else:
+            # Other side is candidate — get photo
+            profile = await db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == other_id))
+            if profile:
+                avatar_url = profile.photo_url
+                # Try to get latest job title from experience
+                from models import Experience
+                exp = await db.scalar(
+                    select(Experience).where(Experience.candidate_id == other_id).order_by(Experience.from_date.desc().nullslast()).limit(1)
+                )
+                subtitle = exp.designation if exp and exp.designation else None
+
+        # Job title from conversation's linked job
+        job_title = None
+        if conv.job_id:
+            job = await db.scalar(select(JobPosting).where(JobPosting.id == conv.job_id))
+            if job:
+                job_title = job.title or job.job_role
+
         out.append(
             ThreadOut(
                 thread_id=conv.id,
@@ -60,7 +88,10 @@ async def list_threads(user: CurrentUser, db: DbSession):
                 last_sent_at=conv.last_message_at,
                 participant_label=label,
                 other_user_id=other_id,
-                unread_count=unread or 0
+                unread_count=unread or 0,
+                avatar_url=avatar_url,
+                job_title=job_title,
+                subtitle=subtitle,
             )
         )
     return out
