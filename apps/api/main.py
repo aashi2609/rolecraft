@@ -1,11 +1,10 @@
-﻿from pathlib import Path
+from pathlib import Path
 import logging
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from core.config import get_settings
@@ -16,6 +15,7 @@ from routers import (
     auth,
     candidates,
     companies,
+    files,
     jobs,
     messages,
     resumes,
@@ -74,10 +74,14 @@ app.include_router(router_notifications)
 app.include_router(router_subscriptions)
 app.include_router(router_uploads)
 app.include_router(admin.router)
+app.include_router(files.router)
 
+# Ensure local uploads directory exists (used by local storage backend).
 uploads_dir = Path(__file__).parent / "uploads"
 uploads_dir.mkdir(exist_ok=True)
-app.mount("/static", StaticFiles(directory=str(uploads_dir)), name="static")
+# NOTE: No StaticFiles mount — files are served only through the
+# authenticated GET /files/{file_id} endpoint. Company logos use the
+# unauthenticated GET /files/logo/{file_id} endpoint.
 
 
 @app.get("/health")

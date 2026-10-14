@@ -65,41 +65,44 @@ def _content_length(request: Request) -> int | None:
 
 @router_uploads.post("/photo", response_model=UploadOut)
 async def upload_photo(
-    request: Request, user: CurrentUser, file: UploadFile = File(...)
+    request: Request, user: CurrentUser, db: DbSession, file: UploadFile = File(...)
 ):
-    url, path = await upload_file(
+    url, path, _ = await upload_file(
         file,
         prefix=f"photos/{user.id}",
         owner_id=str(user.id),
         category="photo",
         content_length=_content_length(request),
+        db=db,
     )
     return UploadOut(url=url, path=path)
 
 
 @router_uploads.post("/document", response_model=UploadOut)
 async def upload_document(
-    request: Request, user: CurrentUser, file: UploadFile = File(...)
+    request: Request, user: CurrentUser, db: DbSession, file: UploadFile = File(...)
 ):
-    url, path = await upload_file(
+    url, path, _ = await upload_file(
         file,
         prefix=f"documents/{user.id}",
         owner_id=str(user.id),
         category="document",
         content_length=_content_length(request),
+        db=db,
     )
     return UploadOut(url=url, path=path)
 
 
 @router_uploads.post("/logo", response_model=UploadOut)
 async def upload_logo(
-    request: Request, user: CurrentUser, file: UploadFile = File(...)
+    request: Request, user: CurrentUser, db: DbSession, file: UploadFile = File(...)
 ):
-    url, path = await upload_file(
+    url, path, _ = await upload_file(
         file,
-        prefix=f"photos/{user.id}",
+        prefix=f"logos/{user.id}",
         owner_id=str(user.id),
         category="photo",
         content_length=_content_length(request),
+        db=db,
     )
     return UploadOut(url=url, path=path)

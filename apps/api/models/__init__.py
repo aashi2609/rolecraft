@@ -591,3 +591,33 @@ class Notification(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="notifications")
+
+
+class FileCategory(str, enum.Enum):
+    photo = "photo"
+    document = "document"
+    logo = "logo"
+
+
+class FileRecord(Base):
+    """Tracks every uploaded file for authenticated serving and access control."""
+
+    __tablename__ = "file_records"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    category: Mapped[FileCategory] = mapped_column(
+        Enum(FileCategory, name="file_category"), nullable=False
+    )
+    storage_path: Mapped[str] = mapped_column(String(1024), nullable=False)
+    original_filename: Mapped[Optional[str]] = mapped_column(String(512))
+    mime_type: Mapped[Optional[str]] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    owner: Mapped["User"] = relationship()

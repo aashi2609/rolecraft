@@ -550,4 +550,20 @@ export const uploadsApi = {
     fd.append('file', file);
     return api<{ url: string; path: string }>('/uploads/document', { method: 'POST', formData: fd });
   },
+  logo: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api<{ url: string; path: string }>('/uploads/logo', { method: 'POST', formData: fd });
+  },
+  getFileBlob: async (fileUrl: string) => {
+    const headers = new Headers();
+    const token = getToken();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    const fullUrl = fileUrl.startsWith('http') ? fileUrl : `${API_URL}${fileUrl}`;
+    const res = await fetch(fullUrl, { headers });
+    if (!res.ok) {
+      throw new ApiError(res.status, res.statusText);
+    }
+    return await res.blob();
+  },
 };
