@@ -7,16 +7,18 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import selectinload
 
-from core.dependencies import CandidateUser, CompanyUser, DbSession
+from core.dependencies import CandidateUser, CompanyUser, CurrentUser, DbSession
 from models import (
     CandidateProfile,
     CandidateSkill,
     Certification,
     Education,
     Experience,
+    PlanTier,
     Project,
     Resume,
     Skill,
+    UserRole,
 )
 from schemas import (
     CandidateProfileOut,
@@ -37,6 +39,7 @@ from services.candidate_search_service import search_candidates
 from services.embedding_service import refresh_resume_embeddings_for_candidate
 from services.pdf_service import build_resume_pdf_response, resolve_candidate_name
 from services.profile_item_service import ProfileItemService, bump_profile_updated_at
+from services.subscription_service import get_active_subscription
 
 # Fields on CandidateProfileUpdate that are resume-relevant
 _RESUME_RELEVANT_FIELDS = {
@@ -353,11 +356,18 @@ async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
     return {"skills": unique_names}
 
 
-# ── Public Candidate Search ─────────────────────────────────────────────────────
+# Allowed company subscription plan tiers for candidate search entitlement
+_ALLOWED_SEARCH_COMPANY_PLANS = {
+    PlanTier.corporate_annual,
+    PlanTier.corporate_lifetime,
+    PlanTier.growth,
+    PlanTier.scale,
+}
 
 
 @router.get("/search", response_model=list[CandidateSearchOut])
 async def search_candidates_endpoint(
+    user: CurrentUser,
     db: DbSession,
     q: Optional[str] = Query(None),
     location: Optional[str] = Query(None),
@@ -372,9 +382,23 @@ async def search_candidates_endpoint(
     page_size: int = Query(20, ge=1, le=100),
 ):
     """
-    Public candidate search endpoint with advanced filtering and pagination.
-    This replaces the frontend SEED_CANDIDATES mock data.
+    Authenticated candidate search endpoint with advanced filtering and pagination.
+    Restricted to admin and paid company subscribers with candidate search entitlement.
     """
+    if user.role not in (UserRole.company, UserRole.admin):
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: Candidate search is restricted to employers and administrators.",
+        )
+
+    if user.role == UserRole.company:
+        sub = await get_active_subscription(db, user.id)
+        if not sub or sub.plan_tier not in _ALLOWED_SEARCH_COMPANY_PLANS:
+            raise HTTPException(
+                status_code=403,
+                detail="Active company subscription required for candidate search. Please upgrade your plan.",
+            )
+
     candidates, _ = await search_candidates(
         db=db,
         q=q,

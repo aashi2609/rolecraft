@@ -276,7 +276,7 @@ def transform_profile_to_search_out(
         location=(
             profile.preferred_locations[0]
             if profile.preferred_locations
-            else profile.present_address
+            else None
         ),
         skills=skill_names[:10],  # Limit to top 10 skills
         match_percent=round(match_score, 1),

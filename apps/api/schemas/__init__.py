@@ -38,7 +38,7 @@ class SignupRequest(BaseModel):
     role: Literal["candidate", "company"]
     name: Optional[str] = None
     industry: Optional[str] = None
-    plan: Optional[str] = "complete"
+    plan: Optional[str] = None
 
     @field_validator("password")
     @classmethod

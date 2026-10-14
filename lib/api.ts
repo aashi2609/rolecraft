@@ -269,7 +269,7 @@ export const candidateApi = {
       });
     }
     const qs = q.toString();
-    return api<any[]>(`/candidates/search${qs ? `?${qs}` : ''}`, { auth: false });
+    return api<any[]>(`/candidates/search${qs ? `?${qs}` : ''}`);
   },
 };
 
