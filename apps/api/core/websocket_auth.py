@@ -7,11 +7,24 @@ import logging
 from uuid import UUID
 
 from fastapi import WebSocket, WebSocketDisconnect
+from sqlalchemy import select
 
+from core.database import AsyncSessionLocal
 from core.security import decode_access_token
 from core.ws_manager import ws_manager
+from models import User
 
 logger = logging.getLogger(__name__)
+
+
+async def _verify_user_active(user_id: UUID) -> bool:
+    """Check the database to verify the user exists and is active."""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(User.is_active).where(User.id == user_id)
+        )
+        is_active = result.scalar_one_or_none()
+        return is_active is True
 
 
 async def authenticate_websocket_connection(
@@ -47,10 +60,16 @@ async def authenticate_websocket_connection(
     try:
         payload = decode_access_token(token)
         user_id = UUID(payload["sub"])
-        return user_id
     except (ValueError, KeyError):
         await websocket.close(code=4003, reason="Invalid token")
         return None
+
+    # ── Check that the user still exists and is active in the DB ──
+    if not await _verify_user_active(user_id):
+        await websocket.close(code=4004, reason="Account deactivated")
+        return None
+
+    return user_id
 
 
 async def handle_websocket_lifecycle(
@@ -80,3 +99,4 @@ async def handle_websocket_lifecycle(
         logger.warning("WS error for user=%s: %s", user_id, exc)
     finally:
         await ws_manager.disconnect(user_id, websocket)
+

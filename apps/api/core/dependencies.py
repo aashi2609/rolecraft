@@ -42,9 +42,9 @@ async def get_current_user(
         select(User).options(selectinload(User.subscription)).where(User.id == user_id)
     )
     user = result.scalar_one_or_none()
-    if not user:
+    if not user or not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
         )
     return user
 
@@ -64,7 +64,10 @@ async def get_optional_current_user(
     result = await db.execute(
         select(User).options(selectinload(User.subscription)).where(User.id == user_id)
     )
-    return result.scalar_one_or_none()
+    user = result.scalar_one_or_none()
+    if user and not user.is_active:
+        return None  # Treat deactivated user as unauthenticated
+    return user
 
 
 def require_role(*roles: UserRole) -> Callable:

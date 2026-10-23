@@ -61,6 +61,12 @@ async def signin(body: SigninRequest, db: DbSession):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
         )
+    # Deactivated users cannot sign in — use the same generic message
+    # to prevent account-state enumeration.
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
+        )
 
     plan = user.subscription.plan_tier.value if user.subscription else None
     token = create_access_token(user_id=user.id, role=user.role.value)
