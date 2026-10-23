@@ -19,4 +19,6 @@ Jinja2==3.1.6
 fpdf2==2.8.3
 weasyprint==68.0
 pypdf==6.15.0
+slowapi==0.1.9
+limits>=3.0,<4
 

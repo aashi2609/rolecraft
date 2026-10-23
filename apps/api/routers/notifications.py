@@ -1,9 +1,10 @@
 from uuid import UUID
 
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
 from sqlalchemy import select
 
 from core.dependencies import CurrentUser, DbSession
+from core.rate_limit import RATE_LIMITS, get_user_key, limiter
 from models import Notification
 from schemas import NotificationOut, SubscriptionCreate, SubscriptionOut, UploadOut
 from services.storage_service import upload_file
@@ -64,8 +65,13 @@ def _content_length(request: Request) -> int | None:
 
 
 @router_uploads.post("/photo", response_model=UploadOut)
+@limiter.limit(RATE_LIMITS["uploads_user"], key_func=get_user_key)
 async def upload_photo(
-    request: Request, user: CurrentUser, db: DbSession, file: UploadFile = File(...)
+    request: Request,
+    response: Response,
+    user: CurrentUser,
+    db: DbSession,
+    file: UploadFile = File(...),
 ):
     url, path, _ = await upload_file(
         file,
@@ -79,8 +85,13 @@ async def upload_photo(
 
 
 @router_uploads.post("/document", response_model=UploadOut)
+@limiter.limit(RATE_LIMITS["uploads_user"], key_func=get_user_key)
 async def upload_document(
-    request: Request, user: CurrentUser, db: DbSession, file: UploadFile = File(...)
+    request: Request,
+    response: Response,
+    user: CurrentUser,
+    db: DbSession,
+    file: UploadFile = File(...),
 ):
     url, path, _ = await upload_file(
         file,
@@ -94,8 +105,13 @@ async def upload_document(
 
 
 @router_uploads.post("/logo", response_model=UploadOut)
+@limiter.limit(RATE_LIMITS["uploads_user"], key_func=get_user_key)
 async def upload_logo(
-    request: Request, user: CurrentUser, db: DbSession, file: UploadFile = File(...)
+    request: Request,
+    response: Response,
+    user: CurrentUser,
+    db: DbSession,
+    file: UploadFile = File(...),
 ):
     url, path, _ = await upload_file(
         file,

@@ -1,13 +1,15 @@
-from pathlib import Path
+﻿from pathlib import Path
 import logging
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from core.config import get_settings
+from core.rate_limit import RateLimited, limiter, rate_limit_exceeded_handler
 from routers import (
     admin,
     analytics,
@@ -31,6 +33,11 @@ settings = get_settings()
 
 app = FastAPI(title="RoleCraft API", version="1.0.0", docs_url="/docs")
 
+# slowapi: same Limiter instance used by @limiter.limit route decorators
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimited, rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -51,6 +58,8 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, (RateLimitExceeded, RateLimited)):
+        return rate_limit_exceeded_handler(request, exc)
     if isinstance(exc, StarletteHTTPException):
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
     if isinstance(exc, RequestValidationError):
@@ -90,4 +99,7 @@ async def health():
         "status": "ok",
         "environment": settings.environment,
         "force_deterministic_resumes": settings.force_deterministic_resumes,
+        "rate_limit_enabled": settings.rate_limit_enabled,
+        "rate_limit_storage": settings.rate_limit_storage_uri.split("://", 1)[0],
+        "trusted_proxy": settings.trusted_proxy,
     }

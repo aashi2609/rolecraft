@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     environment: str = "development"
     storage_backend: str = "local"  # local | gcs
 
+    # ── Rate limiting (see core/rate_limit.py for limit values) ────────────
+    rate_limit_enabled: bool = True
+    # memory:// = single process only; redis://host:6379/0 for multi-worker
+    rate_limit_storage_uri: str = "memory://"
+    # When true, client IP is taken from X-Forwarded-For (set only behind a known proxy)
+    trusted_proxy: bool = False
+
     @property
     def cors_origin_list(self) -> List[str]:
         return [o.strip(' "\'') for o in self.cors_origins.split(",") if o.strip(' "\'')]

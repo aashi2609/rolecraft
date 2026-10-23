@@ -1,9 +1,10 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile
 from sqlalchemy import select
 
 from core.dependencies import CandidateUser, CompanyUser, DbSession, check_plan_limit, get_optional_current_user
+from core.rate_limit import RATE_LIMITS, get_user_key, limiter
 from models import HiddenJob, JobPosting, JobStatus, JobType, User, UserRole
 from schemas import (
     FitmentCandidateOut,
@@ -34,7 +35,13 @@ def _job_type(raw: str | None) -> JobType | None:
 
 
 @router.post("/parse-jd", response_model=JobParsedJDOut)
-async def parse_jd(user: CompanyUser, file: UploadFile = File(...)):
+@limiter.limit(RATE_LIMITS["groq_burst_user"], key_func=get_user_key)
+async def parse_jd(
+    request: Request,
+    response: Response,
+    user: CompanyUser,
+    file: UploadFile = File(...),
+):
     """Upload a JD (PDF or TXT) and extract fields for the post-job form."""
     from core.upload_limits import validate_upload
 

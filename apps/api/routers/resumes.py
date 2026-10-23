@@ -1,11 +1,12 @@
 from uuid import UUID
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from core.dependencies import CandidateUser, CurrentUser, DbSession, check_plan_limit
+from core.rate_limit import RATE_LIMITS, get_user_key, limiter
 from models import CandidateProfile, CandidateSkill, Resume, User, UserRole
 from schemas import ResumeGenerateRequest, ResumeOut
 from services.pdf_service import build_resume_pdf_response, resolve_candidate_name
@@ -69,7 +70,14 @@ async def _can_generate(db, user_id: UUID) -> tuple[bool, str | None]:
 
 
 @router.post("/generate", response_model=list[ResumeOut])
-async def generate(body: ResumeGenerateRequest, user: CandidateUser, db: DbSession):
+@limiter.limit(RATE_LIMITS["groq_burst_user"], key_func=get_user_key)
+async def generate(
+    request: Request,
+    response: Response,
+    body: ResumeGenerateRequest,
+    user: CandidateUser,
+    db: DbSession,
+):
     if not body.target_verticals:
         raise HTTPException(
             status_code=400, detail="Select at least one target vertical"
@@ -134,7 +142,14 @@ async def get_resume(resume_id: UUID, user: CandidateUser, db: DbSession):
 
 
 @router.post("/{resume_id}/regenerate", response_model=ResumeOut)
-async def regenerate(resume_id: UUID, user: CandidateUser, db: DbSession):
+@limiter.limit(RATE_LIMITS["groq_burst_user"], key_func=get_user_key)
+async def regenerate(
+    request: Request,
+    response: Response,
+    resume_id: UUID,
+    user: CandidateUser,
+    db: DbSession,
+):
     old = await db.get(Resume, resume_id)
     if not old or old.candidate_id != user.id:
         raise HTTPException(status_code=404, detail="Not found")
@@ -200,7 +215,14 @@ async def mark_current(resume_id: UUID, user: CandidateUser, db: DbSession):
 
 
 @router.post("/{resume_id}/improve", response_model=ResumeOut)
-async def improve(resume_id: UUID, user: CandidateUser, db: DbSession):
+@limiter.limit(RATE_LIMITS["groq_burst_user"], key_func=get_user_key)
+async def improve(
+    request: Request,
+    response: Response,
+    resume_id: UUID,
+    user: CandidateUser,
+    db: DbSession,
+):
     """Trigger another auto-fix iteration on an existing resume."""
     row = await db.get(Resume, resume_id)
     if not row or row.candidate_id != user.id:
@@ -270,8 +292,13 @@ class TailoredResumeRequest(BaseModel):
 
 
 @router.post("/download-tailored")
+@limiter.limit(RATE_LIMITS["groq_burst_user"], key_func=get_user_key)
 async def download_tailored_resume(
-    body: TailoredResumeRequest, user: CandidateUser, db: DbSession
+    request: Request,
+    response: Response,
+    body: TailoredResumeRequest,
+    user: CandidateUser,
+    db: DbSession,
 ):
     """Generate and return a PDF tailored to a role without saving it."""
     await check_plan_limit(user, db, "resume_verticals", extra=1)
@@ -294,8 +321,13 @@ async def download_tailored_resume(
 
 
 @router.post("/parse")
+@limiter.limit(RATE_LIMITS["groq_burst_user"], key_func=get_user_key)
 async def parse_resume(
-    user: CandidateUser, db: DbSession, file: UploadFile = File(...)
+    request: Request,
+    response: Response,
+    user: CandidateUser,
+    db: DbSession,
+    file: UploadFile = File(...),
 ):
     await check_plan_limit(user, db, "resume_verticals", extra=1)
 

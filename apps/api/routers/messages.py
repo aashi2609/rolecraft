@@ -1,10 +1,11 @@
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request, Response
 import sqlalchemy as sa
 from sqlalchemy import or_, select, and_
 
 from core.dependencies import CurrentUser, DbSession
+from core.rate_limit import RATE_LIMITS, get_user_key, limiter
 from models import CandidateProfile, Company, Message, User, UserRole, Conversation, JobPosting, Application, ApplicationStatus, Notification
 from schemas import MessageCreate, MessageOut, ThreadOut
 
@@ -98,7 +99,14 @@ async def list_threads(user: CurrentUser, db: DbSession):
 
 
 @router.post("/threads", response_model=MessageOut)
-async def start_thread(body: MessageCreate, user: CurrentUser, db: DbSession):
+@limiter.limit(RATE_LIMITS["messages_user"], key_func=get_user_key)
+async def start_thread(
+    request: Request,
+    response: Response,
+    body: MessageCreate,
+    user: CurrentUser,
+    db: DbSession,
+):
     if user.role != UserRole.company:
         raise HTTPException(status_code=403, detail="Only companies can start conversations")
         
@@ -170,7 +178,15 @@ async def get_thread(id: UUID, user: CurrentUser, db: DbSession):
 
 
 @router.post("/threads/{id}", response_model=MessageOut)
-async def reply_thread(id: UUID, body: MessageCreate, user: CurrentUser, db: DbSession):
+@limiter.limit(RATE_LIMITS["messages_user"], key_func=get_user_key)
+async def reply_thread(
+    request: Request,
+    response: Response,
+    id: UUID,
+    body: MessageCreate,
+    user: CurrentUser,
+    db: DbSession,
+):
     conv = await db.get(Conversation, id)
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found")

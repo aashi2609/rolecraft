@@ -53,3 +53,10 @@ next-env.d.ts
 
 sample_job_description.txt
 sample_job_description.pdf
+
+README.md
+
+# local pytest run logs (not for commit)
+pytest-baseline*.txt
+pytest-after*.txt
+pytest-*-2a.txt
