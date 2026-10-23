@@ -473,8 +473,8 @@ def build_resume_pdf_response(
     except Exception as exc:
         from fastapi import HTTPException
 
-        logger.exception("PDF generation failed")
+        logger.exception("PDF generation failed: %s", exc)
         raise HTTPException(
-            status_code=500, detail=f"PDF generation failed: {exc}"
+            status_code=500, detail="PDF generation failed"
         ) from exc
     return create_pdf_response(pdf_bytes, filename)

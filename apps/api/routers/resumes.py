@@ -191,9 +191,10 @@ async def regenerate(
     except HTTPException:
         raise
     except Exception as exc:
+        logger.error("Resume regenerate failed: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Resume regenerate failed: {type(exc).__name__}: {exc}",
+            detail="Resume regenerate failed",
         ) from exc
 
 

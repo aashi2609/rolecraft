@@ -693,8 +693,9 @@ async def parse_resume_pdf(
         for page in reader.pages:
             text += (page.extract_text() or "") + "\n"
     except Exception as exc:
+        logger.warning("Failed to read PDF: %s", exc)
         raise HTTPException(
-            status_code=400, detail=f"Failed to read PDF: {exc}"
+            status_code=400, detail="Failed to read PDF: invalid or corrupted file"
         ) from exc
 
     prompt = _PARSE_PROMPT.format(text=text[:15000])
@@ -706,12 +707,16 @@ async def parse_resume_pdf(
             response_mime_type="application/json",
         )
     except AIServiceError as exc:
-        from fastapi import HTTPException as HTTPExc
-
-        raise HTTPExc(status_code=502, detail=f"Groq AI unavailable: {exc}") from exc
-    except Exception as exc:
+        logger.error("AI service error during resume parse: %s", exc)
         from fastapi import HTTPException as HTTPExc
 
         raise HTTPExc(
-            status_code=500, detail=f"Failed to parse resume with AI: {exc}"
+            status_code=502, detail="AI service is currently unavailable. Please try again later."
+        ) from exc
+    except Exception as exc:
+        logger.error("Failed to parse resume with AI: %s", exc)
+        from fastapi import HTTPException as HTTPExc
+
+        raise HTTPExc(
+            status_code=500, detail="Failed to parse resume with AI"
         ) from exc

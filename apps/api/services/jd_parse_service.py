@@ -71,8 +71,9 @@ def extract_text_from_upload(file_data: bytes, filename: str = "") -> str:
                 parts.append(page.extract_text() or "")
             text = "\n".join(parts).strip()
         except Exception as exc:
+            logger.warning("Failed to read PDF: %s", exc)
             raise HTTPException(
-                status_code=400, detail=f"Failed to read PDF: {exc}"
+                status_code=400, detail="Failed to read PDF: invalid or corrupted file"
             ) from exc
         if not text:
             raise HTTPException(
@@ -86,8 +87,9 @@ def extract_text_from_upload(file_data: bytes, filename: str = "") -> str:
         try:
             return file_data.decode("latin-1")
         except Exception as exc:
+            logger.warning("Unsupported file encoding: %s", exc)
             raise HTTPException(
-                status_code=400, detail=f"Unsupported file encoding: {exc}"
+                status_code=400, detail="Unsupported file encoding"
             ) from exc
 
 
@@ -297,5 +299,5 @@ async def parse_job_description(
         logger.warning("JD LLM parse failed, heuristic fallback: %s", exc)
         result = _normalize_parsed(_heuristic_parse(text))
         result["parse_source"] = "heuristic_fallback"
-        result["parse_warning"] = str(exc)
+        result["parse_warning"] = "AI parse unavailable; used heuristic fallback"
         return result
