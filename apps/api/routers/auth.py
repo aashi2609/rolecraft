@@ -9,18 +9,27 @@ from core.rate_limit import (
     get_user_key,
     limiter,
 )
-from core.security import create_access_token, hash_password, verify_password
+from core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
+    hash_password,
+    verify_password,
+)
 from models import (
     User,
     UserRole,
 )
 from schemas import (
     ChangePasswordRequest,
+    DeleteAccountRequest,
     ForgotPasswordRequest,
+    RefreshTokenRequest,
     SigninRequest,
     SignupRequest,
     TokenResponse,
 )
+from services.account_deletion_service import delete_user_account
 from services.user_service import create_user_with_profile, parse_plan
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -47,9 +56,15 @@ async def signup(
         plan=body.plan,
     )
     plan = parse_plan(body.plan, role)
-    token = create_access_token(user_id=user.id, role=user.role.value)
+    token = create_access_token(
+        user_id=user.id, role=user.role.value, token_version=user.token_version
+    )
+    refresh_token = create_refresh_token(
+        user_id=user.id, token_version=user.token_version
+    )
     return TokenResponse(
         access_token=token,
+        refresh_token=refresh_token,
         user_id=user.id,
         role=user.role.value,
         plan=plan.value,
@@ -83,10 +98,75 @@ async def signin(
         )
 
     plan = user.subscription.plan_tier.value if user.subscription else None
-    token = create_access_token(user_id=user.id, role=user.role.value)
-    return TokenResponse(
-        access_token=token, user_id=user.id, role=user.role.value, plan=plan
+    token = create_access_token(
+        user_id=user.id, role=user.role.value, token_version=user.token_version
     )
+    refresh_token = create_refresh_token(
+        user_id=user.id, token_version=user.token_version
+    )
+    return TokenResponse(
+        access_token=token,
+        refresh_token=refresh_token,
+        user_id=user.id,
+        role=user.role.value,
+        plan=plan,
+    )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_access_token(
+    body: RefreshTokenRequest, db: DbSession
+):
+    """Rotate access token and refresh token using a valid refresh token."""
+    try:
+        payload = decode_refresh_token(body.refresh_token)
+        from uuid import UUID
+        user_id = UUID(payload["sub"])
+    except (ValueError, KeyError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token"
+        )
+
+    token_version = payload.get("token_version")
+    result = await db.execute(
+        select(User).options(selectinload(User.subscription)).where(User.id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User account is inactive or deleted"
+        )
+
+    if token_version is not None and user.token_version != token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token has been revoked"
+        )
+
+    # Issue new access and rotated refresh token
+    plan = user.subscription.plan_tier.value if user.subscription else None
+    new_token = create_access_token(
+        user_id=user.id, role=user.role.value, token_version=user.token_version
+    )
+    new_refresh = create_refresh_token(
+        user_id=user.id, token_version=user.token_version
+    )
+    return TokenResponse(
+        access_token=new_token,
+        refresh_token=new_refresh,
+        user_id=user.id,
+        role=user.role.value,
+        plan=plan,
+    )
+
+
+@router.post("/logout")
+async def logout(user: CurrentUser, db: DbSession):
+    """Log out everywhere: increment token_version to invalidate all existing tokens server-side."""
+    row = await db.get(User, user.id)
+    if row:
+        row.token_version += 1
+        await db.commit()
+    return {"message": "Successfully logged out everywhere"}
 
 
 @router.post("/forgot-password")
@@ -100,12 +180,6 @@ async def forgot_password(
     return {
         "message": "If an account exists for that email, password reset instructions have been sent."
     }
-
-
-# Future: POST /auth/reset-password should use:
-#   @limiter.limit(RATE_LIMITS["reset_password_ip"])
-#   enforce_limit("reset_password_email", email)
-# via enforce_reset_password_limits() in core.rate_limit
 
 
 @router.post("/change-password")
@@ -125,6 +199,8 @@ async def change_password(
             detail="Current password is incorrect",
         )
     row.password_hash = hash_password(body.new_password)
+    # Increment token_version so all existing sessions/tokens die immediately
+    row.token_version += 1
     await db.flush()
     return {"message": "Password updated successfully"}
 
@@ -132,7 +208,11 @@ async def change_password(
 @router.delete("/me")
 @limiter.limit(RATE_LIMITS["delete_account_user"], key_func=get_user_key)
 async def delete_account(
-    request: Request, response: Response, user: CurrentUser, db: DbSession
+    request: Request,
+    response: Response,
+    body: DeleteAccountRequest,
+    user: CurrentUser,
+    db: DbSession,
 ):
     # Fetch the user from the database
     row = await db.get(User, user.id)
@@ -142,8 +222,21 @@ async def delete_account(
             detail="User not found",
         )
 
-    # Due to ON DELETE CASCADE at the database level, deleting the user
-    # will cleanly remove all associated records (profiles, resumes, jobs, etc.)
-    await db.delete(row)
+    # 1. Verify current password
+    if not verify_password(body.current_password, row.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+
+    # 2. Verify explicit confirmation string
+    if body.confirmation != "DELETE":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Confirmation text must be 'DELETE'",
+        )
+
+    # 3. Clean up all stored files and cascade delete user record
+    await delete_user_account(db, user.id)
     await db.commit()
     return {"message": "Account successfully deleted"}

@@ -38,6 +38,8 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         )
 
+    token_version = payload.get("token_version")
+
     result = await db.execute(
         select(User).options(selectinload(User.subscription)).where(User.id == user_id)
     )
@@ -45,6 +47,11 @@ async def get_current_user(
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        )
+    # Check token_version revocation: if token_version claim doesn't match DB, token was revoked
+    if token_version is not None and user.token_version != token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked"
         )
     return user
 
@@ -61,12 +68,16 @@ async def get_optional_current_user(
     except (ValueError, KeyError):
         return None
 
+    token_version = payload.get("token_version")
+
     result = await db.execute(
         select(User).options(selectinload(User.subscription)).where(User.id == user_id)
     )
     user = result.scalar_one_or_none()
-    if user and not user.is_active:
-        return None  # Treat deactivated user as unauthenticated
+    if not user or not user.is_active:
+        return None
+    if token_version is not None and user.token_version != token_version:
+        return None
     return user
 
 

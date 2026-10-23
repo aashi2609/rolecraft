@@ -65,12 +65,23 @@ class ChangePasswordRequest(BaseModel):
         return _validate_password_strength(v)
 
 
+class DeleteAccountRequest(BaseModel):
+    current_password: str
+    confirmation: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: Optional[str] = None
+    expires_in: int = 1800  # 30 minutes in seconds
     token_type: str = "bearer"
     user_id: UUID
     role: Literal["candidate", "company", "admin"]
     plan: Optional[str] = None
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
 
 
 class UserOut(ORMModel):

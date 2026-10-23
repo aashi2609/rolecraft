@@ -17,32 +17,28 @@ from models import User
 logger = logging.getLogger(__name__)
 
 
-async def _verify_user_active(user_id: UUID) -> bool:
-    """Check the database to verify the user exists and is active."""
+async def _verify_user_active_and_version(user_id: UUID, token_version: int | None) -> bool:
+    """Check the database to verify the user exists, is active, and token_version matches."""
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            select(User.is_active).where(User.id == user_id)
+            select(User.is_active, User.token_version).where(User.id == user_id)
         )
-        is_active = result.scalar_one_or_none()
-        return is_active is True
+        row = result.first()
+        if not row:
+            return False
+        is_active, db_version = row
+        if not is_active:
+            return False
+        if token_version is not None and db_version != token_version:
+            return False
+        return True
 
 
 async def authenticate_websocket_connection(
     websocket: WebSocket,
     timeout: float = 10.0,
 ) -> UUID | None:
-    """Authenticate a WebSocket connection using JWT token.
-
-    The client must send a JSON message with {"token": "<jwt>"} immediately
-    after connecting. Returns the user_id if authentication succeeds, None otherwise.
-
-    Args:
-        websocket: The WebSocket connection to authenticate
-        timeout: Maximum time to wait for auth token (default 10 seconds)
-
-    Returns:
-        The authenticated user's UUID, or None if authentication fails
-    """
+    """Authenticate a WebSocket connection using JWT token."""
     await websocket.accept()
 
     # Wait for the client to send their auth token
@@ -64,9 +60,11 @@ async def authenticate_websocket_connection(
         await websocket.close(code=4003, reason="Invalid token")
         return None
 
-    # ── Check that the user still exists and is active in the DB ──
-    if not await _verify_user_active(user_id):
-        await websocket.close(code=4004, reason="Account deactivated")
+    token_version = payload.get("token_version")
+
+    # ── Check that the user still exists, is active, and token_version matches ──
+    if not await _verify_user_active_and_version(user_id, token_version):
+        await websocket.close(code=4004, reason="Account deactivated or token revoked")
         return None
 
     return user_id

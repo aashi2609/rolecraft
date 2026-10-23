@@ -144,3 +144,29 @@ def generate_signed_url(storage_path: str, expiration_seconds: int = 300) -> str
         expiration=expiration_seconds,
         method="GET",
     )
+
+
+def delete_stored_file(storage_path: str) -> bool:
+    """Delete a stored file from either local disk or GCS."""
+    if not storage_path:
+        return False
+    if settings.storage_backend == "gcs":
+        try:
+            from google.cloud import storage
+            client = storage.Client(project=settings.gcs_project_id or None)
+            bucket = client.bucket(settings.gcs_bucket_name)
+            blob = bucket.blob(storage_path)
+            blob.delete()
+            return True
+        except Exception:
+            return False
+    else:
+        try:
+            dest = (LOCAL_ROOT / storage_path).resolve()
+            root = LOCAL_ROOT.resolve()
+            if str(dest).startswith(str(root)) and dest.exists() and dest.is_file():
+                dest.unlink()
+                return True
+        except Exception:
+            return False
+    return False

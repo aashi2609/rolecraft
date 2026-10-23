@@ -87,6 +87,7 @@ class User(Base):
         Enum(UserRole, name="user_role"), nullable=False
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    token_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

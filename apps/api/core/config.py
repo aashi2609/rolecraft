@@ -37,7 +37,8 @@ class Settings(BaseSettings):
     database_url: str = ""
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60 * 24 * 7
+    access_token_expire_minutes: int = 30  # 30 minutes
+    refresh_token_expire_days: int = 14     # 14 days
     gcs_bucket_name: str = "rolecraft-uploads"
     gcs_project_id: str = ""
     groq_api_key: str = ""

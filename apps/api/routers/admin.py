@@ -1,4 +1,5 @@
 from typing import Any, List, Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -225,6 +226,8 @@ async def update_user(
         user.role = update_data.role
     if update_data.is_active is not None:
         user.is_active = update_data.is_active
+        # Revoke all tokens immediately on status change
+        user.token_version += 1
     if update_data.email is not None:
         user.email = update_data.email
     await db.commit()
@@ -262,10 +265,11 @@ async def delete_user(
     db: DbSession,
     current_admin: User = Depends(get_current_admin),
 ) -> Any:
-    user = await db.get(User, user_id)
-    if not user:
+    from services.account_deletion_service import delete_user_account
+
+    deleted = await delete_user_account(db, UUID(user_id) if isinstance(user_id, str) else user_id)
+    if not deleted:
         raise HTTPException(status_code=404, detail="User not found")
-    await db.delete(user)
     await db.commit()
     return {"ok": True}
 
