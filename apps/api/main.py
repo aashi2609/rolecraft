@@ -52,22 +52,43 @@ app.add_exception_handler(RateLimited, rate_limit_exceeded_handler)
 # Request ID middleware
 app.add_middleware(RequestIdMiddleware)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origin_list,
-    # Local/LAN frontends (Next "Network" URL like http://192.168.x.x:3000)
-    allow_origin_regex=r"https?://("
-    r"localhost|"
-    r"127\.0\.0\.1|"
-    r"\[::1\]|"
-    r"192\.168\.\d{1,3}\.\d{1,3}|"
-    r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|"
-    r"172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}"
-    r")(:\d+)?$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
+
+# CORS configuration:
+# In production: strict explicit allow_origins only from env, no regex, no wildcards, no cookies (allow_credentials=False).
+# In development: allows localhost / LAN origins for convenient local testing.
+if settings.is_production:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origin_list,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origin_list or ["http://localhost:3000"],
+        allow_origin_regex=r"https?://("
+        r"localhost|"
+        r"127\.0\.0\.1|"
+        r"\[::1\]|"
+        r"192\.168\.\d{1,3}\.\d{1,3}|"
+        r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|"
+        r"172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}"
+        r")(:\d+)?$",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 def _get_request_id(request: Request) -> str:

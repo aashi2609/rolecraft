@@ -43,12 +43,13 @@ async def parse_jd(
     file: UploadFile = File(...),
 ):
     """Upload a JD (PDF or TXT) and extract fields for the post-job form."""
-    from core.upload_limits import validate_upload
+    from core.upload_limits import sanitize_filename, validate_upload
 
-    filename = file.filename or "jd.pdf"
-    lower = filename.lower()
+    raw_filename = file.filename or "jd.pdf"
+    safe_filename = sanitize_filename(raw_filename)
+    lower = safe_filename.lower()
     if lower.endswith(".txt"):
-        data = await file.read()
+        data = await file.read(2 * 1024 * 1024 + 1)
         if len(data) > 2 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File too large (max 2MB)")
     else:
@@ -58,7 +59,7 @@ async def parse_jd(
                 status_code=400, detail="Upload a PDF or TXT job description"
             )
 
-    parsed = await parse_job_description(data, filename=filename)
+    parsed = await parse_job_description(data, filename=safe_filename)
     return JobParsedJDOut.model_validate(parsed)
 
 
