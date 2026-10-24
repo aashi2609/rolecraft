@@ -16,7 +16,31 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 settings = get_settings()
-_db_url, _connect_args = asyncpg_engine_kwargs(settings.database_url)
+
+import os
+from sqlalchemy.engine.url import make_url
+
+# ── 3A Safety Guard: Prevent running migration tests against primary DB ──
+_is_test_migration = os.getenv("TEST_MIGRATIONS", "").lower() in ("1", "true", "yes")
+_test_db_url = os.getenv("TEST_DATABASE_URL", "").strip()
+
+if _is_test_migration:
+    if not _test_db_url:
+        raise RuntimeError(
+            "FATAL: TEST_MIGRATIONS is enabled but TEST_DATABASE_URL is not set. "
+            "Refusing to execute migrations against default database."
+        )
+    _primary_url = make_url(settings.database_url)
+    _target_url = make_url(_test_db_url)
+    if (_primary_url.host and _target_url.host and _primary_url.host.lower() == _target_url.host.lower() and _primary_url.database == _target_url.database) or settings.database_url.strip() == _test_db_url:
+        raise RuntimeError(
+            f"FATAL: TEST_DATABASE_URL matches primary database host/db ({_primary_url.host}/{_primary_url.database}). "
+            "Refusing to run migration testing against the primary database."
+        )
+    _db_url, _connect_args = asyncpg_engine_kwargs(_test_db_url)
+else:
+    _db_url, _connect_args = asyncpg_engine_kwargs(settings.database_url)
+
 # escape % for ConfigParser interpolation
 config.set_main_option("sqlalchemy.url", _db_url.replace("%", "%%"))
 
