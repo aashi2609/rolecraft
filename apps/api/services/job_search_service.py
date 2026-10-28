@@ -228,6 +228,7 @@ async def search_jobs(
     mine: bool = False,
     salary_min: Optional[int] = None,
     salary_max: Optional[int] = None,
+    exclude_ids: Optional[list] = None,
 ) -> list[JobOut]:
     """
     Search jobs with advanced filtering.
@@ -254,6 +255,8 @@ async def search_jobs(
     query = apply_exclude_country_filter(query, exclude_country)
     query = apply_exclude_state_filter(query, exclude_state)
     query = apply_exclude_city_filter(query, exclude_city)
+    if exclude_ids:
+        query = query.where(~JobPosting.id.in_(exclude_ids))
 
     # Order by creation date
     query = query.order_by(JobPosting.created_at.desc())

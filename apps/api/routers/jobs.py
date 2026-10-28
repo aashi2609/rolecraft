@@ -151,8 +151,19 @@ async def list_jobs(
     mine: bool = False,
     salary_min: int | None = Query(None),
     salary_max: int | None = Query(None),
+    user: User | None = Depends(get_optional_current_user),
+    exclude_hidden: bool = True,
 ):
-    """Public browse endpoint (no auth). Company 'my jobs' is GET /jobs/mine."""
+    """Public browse endpoint (no auth required). Company 'my jobs' is GET /jobs/mine.
+    If authenticated as candidate and exclude_hidden is True, hidden jobs are excluded.
+    """
+    exclude_ids: list[UUID] | None = None
+    if user and user.role == UserRole.candidate and exclude_hidden:
+        hidden_ids = await db.scalars(
+            select(HiddenJob.job_id).where(HiddenJob.candidate_id == user.id)
+        )
+        exclude_ids = list(hidden_ids.all())
+
     return await search_jobs(
         db=db,
         title=title,
@@ -173,6 +184,7 @@ async def list_jobs(
         mine=mine,
         salary_min=salary_min,
         salary_max=salary_max,
+        exclude_ids=exclude_ids,
     )
 
 
@@ -192,7 +204,15 @@ async def my_jobs(user: CompanyUser, db: DbSession):
     return [await enrich_job(db, j) for j in jobs]
 
 
-@router.get("/{job_id}", response_model=JobOut)
+@router.get("/hidden")
+async def list_hidden_jobs(user: CandidateUser, db: DbSession):
+    hidden = await db.scalars(
+        select(HiddenJob.job_id).where(HiddenJob.candidate_id == user.id)
+    )
+    return {"job_ids": [str(j) for j in hidden.all()]}
+
+
+@router.get("/{job_id:uuid}", response_model=JobOut)
 async def get_job(
     job_id: UUID, db: DbSession, user: User | None = Depends(get_optional_current_user)
 ):
@@ -210,7 +230,7 @@ async def get_job(
     return await enrich_job(db, job)
 
 
-@router.put("/{job_id}", response_model=JobOut)
+@router.put("/{job_id:uuid}", response_model=JobOut)
 async def update_job(job_id: UUID, body: JobUpdate, user: CompanyUser, db: DbSession):
     job = await db.get(JobPosting, job_id)
     if not job or job.company_id != user.id:
@@ -225,7 +245,7 @@ async def update_job(job_id: UUID, body: JobUpdate, user: CompanyUser, db: DbSes
     return await enrich_job(db, job)
 
 
-@router.patch("/{job_id}/status", response_model=JobOut)
+@router.patch("/{job_id:uuid}/status", response_model=JobOut)
 async def patch_status(
     job_id: UUID, body: JobStatusUpdate, user: CompanyUser, db: DbSession
 ):
@@ -240,7 +260,7 @@ async def patch_status(
     return await enrich_job(db, job)
 
 
-@router.get("/{job_id}/candidates", response_model=list[FitmentCandidateOut])
+@router.get("/{job_id:uuid}/candidates", response_model=list[FitmentCandidateOut])
 async def ranked_candidates(job_id: UUID, user: CompanyUser, db: DbSession):
     job = await db.get(JobPosting, job_id)
     if not job or job.company_id != user.id:
@@ -248,16 +268,7 @@ async def ranked_candidates(job_id: UUID, user: CompanyUser, db: DbSession):
     return await ranked_candidates_for_job(db, job)
 
 
-@router.get("/hidden")
-async def list_hidden_jobs(user: CandidateUser, db: DbSession):
-    hidden = await db.scalars(
-        select(HiddenJob.job_id).where(HiddenJob.candidate_id == user.id)
-    )
-    return {"job_ids": [str(j) for j in hidden.all()]}
-
-
-
-@router.post("/{job_id}/hide")
+@router.post("/{job_id:uuid}/hide")
 async def hide_job(job_id: UUID, user: CandidateUser, db: DbSession):
     job = await db.get(JobPosting, job_id)
     if not job:
@@ -274,7 +285,7 @@ async def hide_job(job_id: UUID, user: CandidateUser, db: DbSession):
     return {"status": "ok"}
 
 
-@router.delete("/{job_id}/hide")
+@router.delete("/{job_id:uuid}/hide")
 async def unhide_job(job_id: UUID, user: CandidateUser, db: DbSession):
     hidden = await db.scalar(
         select(HiddenJob).where(
