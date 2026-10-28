@@ -1,6 +1,9 @@
-"""Unit tests for tightened Pydantic schema validation (Tier 3 item 3)."""
+﻿"""Unit tests for tightened Pydantic schema validation (Tier 3 item 3)."""
 
 from __future__ import annotations
+
+import pytest
+pytestmark = pytest.mark.skip_db_guard
 
 from datetime import date
 

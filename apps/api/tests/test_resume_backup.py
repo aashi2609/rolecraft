@@ -1,4 +1,4 @@
-"""Unit tests for resume API-key backup paths (deterministic force + mark-current)."""
+﻿"""Unit tests for resume API-key backup paths (deterministic force + mark-current)."""
 
 from __future__ import annotations
 
@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+
+pytestmark = pytest.mark.skip_db_guard
 
 from routers import resumes as resumes_router
 from services import resume_service

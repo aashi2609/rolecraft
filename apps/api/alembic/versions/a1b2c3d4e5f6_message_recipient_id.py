@@ -35,6 +35,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    import os
+    if os.getenv("ALLOW_DESTRUCTIVE_DOWNGRADE", "").lower() not in ("1", "true", "yes"):
+        raise RuntimeError(
+            "Refusing to execute destructive downgrade: dropping recipient_id column from messages "
+            "will permanently destroy cross-user thread addressing data. If this is intentional in a "
+            "local test, set ALLOW_DESTRUCTIVE_DOWNGRADE=1. In production, rollback must be performed "
+            "via database snapshot restore."
+        )
     op.drop_constraint("fk_messages_recipient_id_users", "messages", type_="foreignkey")
     op.drop_index("ix_messages_recipient_id", table_name="messages")
     op.drop_column("messages", "recipient_id")

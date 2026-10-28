@@ -16,14 +16,14 @@ rolecraft/                          # Next.js 16 frontend (App Router)
     ├── services/                   # Business logic
     ├── core/                       # Auth, DB, uploads, websockets
     ├── models/ schemas/ alembic/
-    ├── tests/                      # pytest (Python 3.13)
+    ├── tests/                      # pytest (Python 3.11.9 — deploy pin)
     └── scripts/                    # make_admin, groq_audit, enable_pgvector
 ```
 
 | Layer | Stack |
 |--------|--------|
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS v4, `UserContext` |
-| Backend | FastAPI, **Python 3.13**, async SQLAlchemy 2.0 |
+| Backend | FastAPI, **Python 3.11.9** (Render/`runtime.txt`), async SQLAlchemy 2.0 |
 | DB | Neon Postgres + pgvector |
 | Auth | JWT (python-jose, bcrypt); roles: candidate / company / admin |
 | AI | **Groq** for resume generate / ATS / PDF parse; deterministic fallbacks without key |
@@ -130,7 +130,7 @@ rolecraft/                          # Next.js 16 frontend (App Router)
 3. Invoices (optional PDF).
 
 ### Phase C — Production
-1. ~~Staging CI~~ — GitHub Actions runs pytest (3.13) + frontend lint/build; staging env deploy TBD.
+1. Staging CI — GitHub Actions (`api-ci.yml`) runs alembic + pytest on Python 3.11.9 + pgvector; staging env deploy TBD.
 2. Monitoring, rate limits, secret rotation.
 3. Load-test search/fitment under concurrency.
 
@@ -147,7 +147,7 @@ rolecraft/                          # Next.js 16 frontend (App Router)
 - Ownership checks return **404** (not 403) for IDOR-sensitive resources
 - Uploads: size + MIME + magic bytes (`core/upload_limits.py`)
 - Do not skip failing security tests on 500 — fix root cause
-- Python tests: **3.13 only** (`apps/api/.venv313`)
+- Python tests: **3.11.9** to match Render/`runtime.txt` (local venv may be 3.10+ for unit-only)
 
 Known deferred dependency CVEs: see root README security section (`python-jose` / transitive pins).
 
@@ -156,9 +156,9 @@ Known deferred dependency CVEs: see root README security section (`python-jose` 
 ## 8. How to verify locally
 
 ```bash
-# API (Python 3.13)
+# API (Python 3.11.9 — deploy pin)
 cd apps/api
-.\.venv313\Scripts\activate   # Windows
+.\venv\Scripts\activate   # Windows
 $env:PYTHONPATH="."
 python -m pytest tests/security tests/test_schema_validation.py tests/test_fitment_rationale_service.py tests/test_embedding_service.py tests/test_analytics_service.py -v
 

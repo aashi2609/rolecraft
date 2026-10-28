@@ -295,6 +295,15 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    import os
+    if os.getenv("ALLOW_DESTRUCTIVE_DOWNGRADE", "").lower() not in ("1", "true", "yes"):
+        raise RuntimeError(
+            "Refusing to execute destructive downgrade: reverting conversation model will drop "
+            "conversations table and revert to thread_id-based messaging. This is a major schema "
+            "change even though quarantined messages are restored. If this is intentional in a local "
+            "test, set ALLOW_DESTRUCTIVE_DOWNGRADE=1. In production, rollback must be performed via "
+            "database snapshot restore."
+        )
     # 1. Remove FK and index on conversation_id
     op.drop_constraint("fk_messages_conversation_id", "messages", type_="foreignkey")
     op.drop_index(op.f("ix_messages_conversation_id"), table_name="messages")

@@ -20,6 +20,8 @@ def asyncpg_engine_kwargs(database_url: str) -> tuple[str, dict[str, Any]]:
     ``sslmode=`` query param). Prefer Neon's pooled host (``*-pooler.*``).
     """
     url = make_url(database_url)
+    if url.drivername in ("postgresql", "postgres"):
+        url = url.set(drivername="postgresql+asyncpg")
     query = dict(url.query)
     connect_args: dict[str, Any] = {}
 

@@ -18,31 +18,34 @@ target_metadata = Base.metadata
 settings = get_settings()
 
 import os
-from sqlalchemy.engine.url import make_url
+from core.db_guard import enforce_isolated_test_database
 
-# ── 3A Safety Guard: Prevent running migration tests against primary DB ──
-_is_test_migration = os.getenv("TEST_MIGRATIONS", "").lower() in ("1", "true", "yes")
+# ── 3A/3B Safety Guard: Prevent running migrations against primary DB without explicit opt-in ──
 _test_db_url = os.getenv("TEST_DATABASE_URL", "").strip()
+_allow_primary = os.getenv("ALLOW_PRIMARY_MIGRATIONS", "").lower() in ("1", "true", "yes")
 
-if _is_test_migration:
-    if not _test_db_url:
-        raise RuntimeError(
-            "FATAL: TEST_MIGRATIONS is enabled but TEST_DATABASE_URL is not set. "
-            "Refusing to execute migrations against default database."
-        )
-    _primary_url = make_url(settings.database_url)
-    _target_url = make_url(_test_db_url)
-    if (_primary_url.host and _target_url.host and _primary_url.host.lower() == _target_url.host.lower() and _primary_url.database == _target_url.database) or settings.database_url.strip() == _test_db_url:
-        raise RuntimeError(
-            f"FATAL: TEST_DATABASE_URL matches primary database host/db ({_primary_url.host}/{_primary_url.database}). "
-            "Refusing to run migration testing against the primary database."
-        )
+if _test_db_url:
+    _primary_snapshot = os.getenv("PRIMARY_DATABASE_URL", "").strip() or None
+    enforce_isolated_test_database(_test_db_url, _primary_snapshot)
     _db_url, _connect_args = asyncpg_engine_kwargs(_test_db_url)
-else:
+elif _allow_primary:
     _db_url, _connect_args = asyncpg_engine_kwargs(settings.database_url)
+else:
+    raise RuntimeError(
+        "FATAL: Safety guard blocked migration execution! "
+        "Neither TEST_DATABASE_URL (for isolated testing) nor ALLOW_PRIMARY_MIGRATIONS=1 was provided. "
+        "Refusing to run migrations against the primary database."
+    )
 
 # escape % for ConfigParser interpolation
 config.set_main_option("sqlalchemy.url", _db_url.replace("%", "%%"))
+
+
+def include_object(object, name, type_, reflected, compare_to):
+    # messages_quarantine is a data-preservation table (keep-and-review). Never auto-drop it.
+    if type_ == "table" and name == "messages_quarantine":
+        return False
+    return True
 
 
 def run_migrations_offline() -> None:
@@ -52,13 +55,18 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        include_object=include_object,
+    )
     with context.begin_transaction():
         context.run_migrations()
 

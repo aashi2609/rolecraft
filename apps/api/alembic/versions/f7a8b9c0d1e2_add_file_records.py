@@ -41,6 +41,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    import os
+    if os.getenv("ALLOW_DESTRUCTIVE_DOWNGRADE", "").lower() not in ("1", "true", "yes"):
+        raise RuntimeError(
+            "Refusing to execute destructive downgrade: dropping file_records table will permanently "
+            "destroy access control for all uploaded files. This table is required for authenticated "
+            "file serving. If this is intentional in a local test, set ALLOW_DESTRUCTIVE_DOWNGRADE=1. "
+            "In production, rollback must be performed via database snapshot restore."
+        )
     op.drop_index(op.f('ix_file_records_owner_id'), table_name='file_records')
     op.drop_table('file_records')
     op.execute("DROP TYPE IF EXISTS file_category")

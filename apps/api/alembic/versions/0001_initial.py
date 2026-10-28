@@ -405,6 +405,15 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    import os
+    if os.getenv("ALLOW_DESTRUCTIVE_DOWNGRADE", "").lower() not in ("1", "true", "yes"):
+        raise RuntimeError(
+            "Refusing to execute catastrophic downgrade: dropping all database tables will "
+            "permanently destroy all persistent data. If this is intentional in a local test, "
+            "set ALLOW_DESTRUCTIVE_DOWNGRADE=1. In production, rollback must be performed via "
+            "database snapshot restore."
+        )
+
     for table in [
         "notifications",
         "messages",

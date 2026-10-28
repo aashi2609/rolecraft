@@ -61,12 +61,20 @@ async def _get_profile_updated_at(db, user_id: UUID):
 
 
 async def _can_generate(db, user_id: UUID) -> tuple[bool, str | None]:
-    """Check if the user's plan includes resume generation.
-
-    Temporarily allows all candidates — matches check_plan_limit bypass until
-    payment gating is re-enabled.
-    """
-    return True, None
+    """Check if the user's plan includes resume generation."""
+    sub = (
+        await db.execute(
+            select(Subscription).where(
+                Subscription.user_id == user_id,
+                Subscription.status == SubscriptionStatus.active,
+            )
+        )
+    ).scalar_one_or_none()
+    if not sub:
+        return True, None  # Free tier (no active subscription): allow generation within check_plan_limit caps
+    if sub.plan_tier in _GENERATION_TIERS:
+        return True, None
+    return False, "Your current plan doesn't include resume generation. Upgrade to Resume Builder or Complete."
 
 
 @router.post("/generate", response_model=list[ResumeOut])

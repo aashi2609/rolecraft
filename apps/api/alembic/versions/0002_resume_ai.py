@@ -34,6 +34,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    import os
+    if os.getenv("ALLOW_DESTRUCTIVE_DOWNGRADE", "").lower() not in ("1", "true", "yes"):
+        raise RuntimeError(
+            "Refusing to execute destructive downgrade: dropping columns from resumes table "
+            "will permanently destroy ATS breakdown data, generation metadata, and version history. "
+            "If this is intentional in a local test, set ALLOW_DESTRUCTIVE_DOWNGRADE=1. "
+            "In production, rollback must be performed via database snapshot restore."
+        )
     op.drop_column("resumes", "pdf_path")
     op.drop_column("resumes", "version")
     op.drop_column("resumes", "generation_metadata")

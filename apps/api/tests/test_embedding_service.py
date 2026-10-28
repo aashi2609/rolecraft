@@ -1,6 +1,9 @@
-"""Unit tests for embedding_service and embedding_client."""
+﻿"""Unit tests for embedding_service and embedding_client."""
 
 from __future__ import annotations
+
+import pytest
+pytestmark = pytest.mark.skip_db_guard
 
 import asyncio
 from unittest.mock import AsyncMock, patch

@@ -58,6 +58,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    import os
+    if os.getenv("ALLOW_DESTRUCTIVE_DOWNGRADE", "").lower() not in ("1", "true", "yes"):
+        raise RuntimeError(
+            "Refusing to execute destructive downgrade: dropping hidden_jobs table and job location "
+            "columns will permanently destroy user job-hiding preferences and job posting location data. "
+            "If this is intentional in a local test, set ALLOW_DESTRUCTIVE_DOWNGRADE=1. "
+            "In production, rollback must be performed via database snapshot restore."
+        )
     op.drop_column("job_postings", "job_level")
     op.drop_column("job_postings", "job_role")
     op.drop_column("job_postings", "city")

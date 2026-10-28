@@ -1,6 +1,9 @@
-"""Unit tests for fitment rationale (template + LLM flag fallback)."""
+﻿"""Unit tests for fitment rationale (template + LLM flag fallback)."""
 
 from __future__ import annotations
+
+import pytest
+pytestmark = pytest.mark.skip_db_guard
 
 import asyncio
 

@@ -1,5 +1,6 @@
 # Cloud Run builds from source — declare Python runtime
 # Used when deploying with: gcloud run deploy --source .
-runtime: python312
+# Pin to Render / runtime.txt deploy target (3.11.9). Do not drift to 3.12/3.13.
+runtime: python311
 
 # Optional buildpacks entry — uvicorn is started via Procfile
