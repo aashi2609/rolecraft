@@ -42,6 +42,7 @@ function mapJobFromApi(j: any) {
 export default function JobDetailPage() {
   const { jobId } = useParams();
   const { jobs, savedJobs, toggleSavedJob, applications, applyToJob, resumes } = useUser();
+  const { showToast } = useToast();
   const router = useRouter();
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);

@@ -114,6 +114,7 @@ function PostJobContent() {
   const searchParams = useSearchParams();
   const editId = searchParams.get('edit');
   const { jobs, addJob, updateJob, plan } = useUser();
+  const { showToast } = useToast();
   const [step, setStep] = useState<1 | 2>(1);
   const [draft, setDraft] = useState<JobDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
