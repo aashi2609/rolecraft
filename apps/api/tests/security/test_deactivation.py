@@ -31,15 +31,7 @@ from main import app
 _ADMIN_ID = uuid.UUID("b55c77e8-1a01-4f9c-a1ff-4568879121c7")
 
 
-@pytest.fixture
-def client():
-    with TestClient(app) as c:
-        yield c
-    loop = asyncio.new_event_loop()
-    try:
-        loop.run_until_complete(engine.dispose())
-    finally:
-        loop.close()
+# (client fixture is provided by conftest.py)
 
 
 @pytest.fixture

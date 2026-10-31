@@ -12,15 +12,14 @@ from models import (
 )
 
 def parse_plan(plan: str | None, role: UserRole) -> PlanTier:
-    raw = (plan or ("complete" if role == UserRole.candidate else "corporate_annual")).lower()
-    if raw in ("free", "basic", "premium", "elite"):
-        raw = "complete"
-    elif raw in ("starter", "growth", "scale"):
-        raw = "corporate_annual"
+    default_tier = PlanTier.free if role == UserRole.candidate else PlanTier.corporate_annual
+    if not plan:
+        return default_tier
+    raw = plan.strip().lower()
     try:
         return PlanTier(raw)
     except ValueError:
-        return PlanTier.complete if role == UserRole.candidate else PlanTier.corporate_annual
+        return default_tier
 
 async def create_user_with_profile(
     db: AsyncSession,

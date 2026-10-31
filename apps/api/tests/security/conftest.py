@@ -15,8 +15,3 @@ from main import app
 def client():
     with TestClient(app) as c:
         yield c
-    loop = asyncio.new_event_loop()
-    try:
-        loop.run_until_complete(engine.dispose())
-    finally:
-        loop.close()

@@ -36,19 +36,34 @@ def asyncpg_engine_kwargs(database_url: str) -> tuple[str, dict[str, Any]]:
         # asyncpg: True / SSLContext / "require" — prefer explicit require for Neon.
         connect_args["ssl"] = "require"
 
+    # PgBouncer / Neon pooler and dynamic migrations require disabling prepared statement cache
+    if "-pooler." in host or "pytest" in sys.modules or os.getenv("TEST_DATABASE_URL"):
+        connect_args["statement_cache_size"] = 0
+        connect_args["prepared_statement_cache_size"] = 0
+
     clean_url = url.set(query=query)
     return clean_url.render_as_string(hide_password=False), connect_args
 
 
+import os
+import sys
+from sqlalchemy.pool import NullPool
+
+_is_test = bool(os.getenv("TEST_DATABASE_URL")) or "pytest" in sys.modules
+
 _db_url, _connect_args = asyncpg_engine_kwargs(settings.database_url)
 
-engine = create_async_engine(
-    _db_url,
-    echo=False,
+_engine_kwargs: dict[str, Any] = {
+    "echo": False,
+    "connect_args": _connect_args,
+}
+if _is_test:
+    _engine_kwargs["poolclass"] = NullPool
+else:
     # Neon scale-to-zero can drop idle connections; ping before checkout.
-    pool_pre_ping=True,
-    connect_args=_connect_args,
-)
+    _engine_kwargs["pool_pre_ping"] = True
+
+engine = create_async_engine(_db_url, **_engine_kwargs)
 AsyncSessionLocal = async_sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
 )

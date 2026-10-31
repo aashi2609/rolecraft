@@ -103,6 +103,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         e = dict(err)
         # Never echo back the raw submitted values (such as passwords, tokens, or PII)
         e.pop("input", None)
+        if "ctx" in e and isinstance(e["ctx"], dict):
+            e["ctx"] = {
+                k: str(v) if isinstance(v, Exception) else v
+                for k, v in e["ctx"].items()
+            }
         clean_errors.append(e)
 
     req_id = _get_request_id(request)

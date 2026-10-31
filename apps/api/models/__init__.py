@@ -60,6 +60,13 @@ class JobType(str, enum.Enum):
     hybrid = "hybrid"
 
 
+class EmploymentType(str, enum.Enum):
+    full_time = "Full-time"
+    part_time = "Part-time"
+    contract = "Contract"
+    internship = "Internship"
+
+
 class JobStatus(str, enum.Enum):
     draft = "draft"
     live = "live"

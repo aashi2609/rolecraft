@@ -6,6 +6,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from core.enum_utils import coerce_enum
+from models import ApplicationStatus, EmploymentType, JobStatus, JobType
+
 
 class ORMModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -329,10 +332,7 @@ class JobCreate(BaseModel):
     title: str
     company_id: Optional[UUID] = None
     department: Optional[str] = None
-    # Match frontend EMPLOYMENT_TYPES (lib/constants.ts)
-    employment_type: Optional[
-        Literal["Full-time", "Part-time", "Contract", "Internship"]
-    ] = None
+    employment_type: Optional[EmploymentType] = None
     experience_range: Optional[str] = None
     min_salary: Optional[int] = Field(default=None, ge=0)
     max_salary: Optional[int] = Field(default=None, ge=0)
@@ -343,7 +343,7 @@ class JobCreate(BaseModel):
     city: Optional[str] = None
     job_role: Optional[str] = None
     job_level: Optional[str] = None
-    job_type: Optional[Literal["onsite", "remote", "hybrid"]] = None
+    job_type: Optional[JobType] = None
     required_skills: list[str] = []
     num_openings: int = 1
     application_deadline: Optional[date] = None
@@ -351,7 +351,23 @@ class JobCreate(BaseModel):
     responsibilities: Optional[str] = None
     requirements: Optional[str] = None
     benefits: Optional[str] = None
-    status: Literal["draft", "live", "closed"] = "draft"
+    status: JobStatus = JobStatus.draft
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def validate_status(cls, v: Any) -> JobStatus:
+        res = coerce_enum(JobStatus, v, "status")
+        return res if res is not None else JobStatus.draft
+
+    @field_validator("job_type", mode="before")
+    @classmethod
+    def validate_job_type(cls, v: Any) -> Optional[JobType]:
+        return coerce_enum(JobType, v, "job_type")
+
+    @field_validator("employment_type", mode="before")
+    @classmethod
+    def validate_employment_type(cls, v: Any) -> Optional[EmploymentType]:
+        return coerce_enum(EmploymentType, v, "employment_type")
 
     @field_validator("max_salary")
     @classmethod
@@ -365,9 +381,7 @@ class JobCreate(BaseModel):
 class JobUpdate(BaseModel):
     title: Optional[str] = None
     department: Optional[str] = None
-    employment_type: Optional[
-        Literal["Full-time", "Part-time", "Contract", "Internship"]
-    ] = None
+    employment_type: Optional[EmploymentType] = None
     experience_range: Optional[str] = None
     min_salary: Optional[int] = Field(default=None, ge=0)
     max_salary: Optional[int] = Field(default=None, ge=0)
@@ -378,7 +392,7 @@ class JobUpdate(BaseModel):
     city: Optional[str] = None
     job_role: Optional[str] = None
     job_level: Optional[str] = None
-    job_type: Optional[Literal["onsite", "remote", "hybrid"]] = None
+    job_type: Optional[JobType] = None
     required_skills: Optional[list[str]] = None
     num_openings: Optional[int] = None
     application_deadline: Optional[date] = None
@@ -386,6 +400,22 @@ class JobUpdate(BaseModel):
     responsibilities: Optional[str] = None
     requirements: Optional[str] = None
     benefits: Optional[str] = None
+    status: Optional[JobStatus] = None
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def validate_status(cls, v: Any) -> Optional[JobStatus]:
+        return coerce_enum(JobStatus, v, "status")
+
+    @field_validator("job_type", mode="before")
+    @classmethod
+    def validate_job_type(cls, v: Any) -> Optional[JobType]:
+        return coerce_enum(JobType, v, "job_type")
+
+    @field_validator("employment_type", mode="before")
+    @classmethod
+    def validate_employment_type(cls, v: Any) -> Optional[EmploymentType]:
+        return coerce_enum(EmploymentType, v, "employment_type")
 
     @field_validator("max_salary")
     @classmethod
@@ -397,7 +427,12 @@ class JobUpdate(BaseModel):
 
 
 class JobStatusUpdate(BaseModel):
-    status: Literal["draft", "live", "closed"]
+    status: JobStatus
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def validate_status(cls, v: Any) -> JobStatus:
+        return coerce_enum(JobStatus, v, "status", allow_none=False)
 
 
 class JobOut(ORMModel):
@@ -461,7 +496,12 @@ class ApplicationCreate(BaseModel):
 
 
 class ApplicationStatusUpdate(BaseModel):
-    status: Literal["applied", "shortlisted", "rejected", "interview"]
+    status: ApplicationStatus
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def validate_status(cls, v: Any) -> ApplicationStatus:
+        return coerce_enum(ApplicationStatus, v, "status", allow_none=False)
 
 
 class ApplicationOut(ORMModel):

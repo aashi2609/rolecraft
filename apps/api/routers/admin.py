@@ -2,16 +2,22 @@ from typing import Any, List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from core.dependencies import DbSession, get_current_user
+from core.enum_utils import coerce_enum
 from core.security import hash_password
 from models import (
     Application,
+    EmploymentType,
     JobPosting,
+    JobStatus,
+    JobType,
+    PlanTier,
     Subscription,
+    SubscriptionStatus,
     User,
     UserRole,
 )
@@ -101,28 +107,70 @@ class DashboardStats(BaseModel):
 
 class UserStatusUpdate(BaseModel):
     email: Optional[str] = None
-    role: Optional[str] = None
+    role: Optional[UserRole] = None
     is_active: Optional[bool] = None
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def validate_role(cls, v: Any) -> Optional[UserRole]:
+        return coerce_enum(UserRole, v, "role")
 
 
 class UserCreate(BaseModel):
     email: str
     password: str
-    role: str = "candidate"
+    role: UserRole = UserRole.candidate
     is_active: bool = True
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def validate_role(cls, v: Any) -> UserRole:
+        res = coerce_enum(UserRole, v, "role")
+        return res if res is not None else UserRole.candidate
 
 
 class SubStatusUpdate(BaseModel):
-    plan_tier: Optional[str] = None
-    status: Optional[str] = None
-    role: Optional[str] = None
+    plan_tier: Optional[PlanTier] = None
+    status: Optional[SubscriptionStatus] = None
+    role: Optional[UserRole] = None
+
+    @field_validator("plan_tier", mode="before")
+    @classmethod
+    def validate_plan_tier(cls, v: Any) -> Optional[PlanTier]:
+        return coerce_enum(PlanTier, v, "plan_tier")
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def validate_status(cls, v: Any) -> Optional[SubscriptionStatus]:
+        return coerce_enum(SubscriptionStatus, v, "status")
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def validate_role(cls, v: Any) -> Optional[UserRole]:
+        return coerce_enum(UserRole, v, "role")
 
 
 class SubCreate(BaseModel):
     user_id: str
-    role: str
-    plan_tier: str
-    status: str = "active"
+    role: UserRole
+    plan_tier: PlanTier
+    status: SubscriptionStatus = SubscriptionStatus.active
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def validate_role(cls, v: Any) -> UserRole:
+        return coerce_enum(UserRole, v, "role", allow_none=False)
+
+    @field_validator("plan_tier", mode="before")
+    @classmethod
+    def validate_plan_tier(cls, v: Any) -> PlanTier:
+        return coerce_enum(PlanTier, v, "plan_tier", allow_none=False)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def validate_status(cls, v: Any) -> SubscriptionStatus:
+        res = coerce_enum(SubscriptionStatus, v, "status")
+        return res if res is not None else SubscriptionStatus.active
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -223,11 +271,9 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if update_data.role is not None:
-        user.role = update_data.role
+        user.role = coerce_enum(UserRole, update_data.role, "role", allow_none=False)
     if update_data.is_active is not None:
         user.is_active = update_data.is_active
-        # Revoke all tokens immediately on status change
-        user.token_version += 1
     if update_data.email is not None:
         user.email = update_data.email
     await db.commit()
@@ -247,11 +293,12 @@ async def create_user(
     db: DbSession,
     current_admin: User = Depends(get_current_admin),
 ) -> Any:
+    role = coerce_enum(UserRole, create_data.role, "role", allow_none=False)
     user = await create_user_with_profile(
         db=db,
         email=create_data.email,
         password=create_data.password,
-        role=UserRole(create_data.role),
+        role=role,
         is_active=create_data.is_active,
     )
     await db.commit()
@@ -360,11 +407,11 @@ async def update_subscription(
     if not sub:
         raise HTTPException(status_code=404, detail="Subscription not found")
     if update_data.plan_tier is not None:
-        sub.plan_tier = update_data.plan_tier
+        sub.plan_tier = coerce_enum(PlanTier, update_data.plan_tier, "plan_tier", allow_none=False)
     if update_data.status is not None:
-        sub.status = update_data.status
+        sub.status = coerce_enum(SubscriptionStatus, update_data.status, "status", allow_none=False)
     if update_data.role is not None:
-        sub.role = update_data.role
+        sub.role = coerce_enum(UserRole, update_data.role, "role", allow_none=False)
     await db.commit()
     await db.refresh(sub)
     return {"ok": True}
@@ -378,9 +425,9 @@ async def create_subscription(
 ) -> Any:
     sub = Subscription(
         user_id=create_data.user_id,
-        role=create_data.role,
-        plan_tier=create_data.plan_tier,
-        status=create_data.status,
+        role=coerce_enum(UserRole, create_data.role, "role", allow_none=False),
+        plan_tier=coerce_enum(PlanTier, create_data.plan_tier, "plan_tier", allow_none=False),
+        status=coerce_enum(SubscriptionStatus, create_data.status, "status", allow_none=False),
     )
     db.add(sub)
     await db.commit()
@@ -473,6 +520,7 @@ async def get_all_jobs(
 
 
 @router.patch("/jobs/{job_id}")
+@router.put("/jobs/{job_id}")
 async def update_job_status(
     job_id: str,
     update_data: JobUpdate,
@@ -485,7 +533,15 @@ async def update_job_status(
     
     update_dict = update_data.model_dump(exclude_unset=True)
     for key, value in update_dict.items():
-        setattr(job, key, value)
+        if key == "status":
+            job.status = coerce_enum(JobStatus, value, "status", allow_none=False)
+        elif key == "job_type":
+            job.job_type = coerce_enum(JobType, value, "job_type")
+        elif key == "employment_type":
+            emp = coerce_enum(EmploymentType, value, "employment_type")
+            job.employment_type = emp.value if emp else None
+        else:
+            setattr(job, key, value)
         
     await db.commit()
     await db.refresh(job)
@@ -499,6 +555,14 @@ async def create_job(
     current_admin: User = Depends(get_current_admin),
 ) -> Any:
     create_dict = create_data.model_dump(exclude_unset=True)
+    if "status" in create_dict:
+        create_dict["status"] = coerce_enum(JobStatus, create_dict["status"], "status", allow_none=False)
+    if "job_type" in create_dict:
+        create_dict["job_type"] = coerce_enum(JobType, create_dict["job_type"], "job_type")
+    if "employment_type" in create_dict:
+        emp = coerce_enum(EmploymentType, create_dict["employment_type"], "employment_type")
+        create_dict["employment_type"] = emp.value if emp else None
+
     job = JobPosting(**create_dict)
     db.add(job)
     await db.commit()

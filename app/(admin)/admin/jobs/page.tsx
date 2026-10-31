@@ -262,7 +262,7 @@ export default function AdminJobsPage() {
     country: formData.country,
     state: formData.state,
     city: formData.city,
-    job_type: formData.job_type?.toLowerCase(),
+    job_type: formData.job_type === "On-site" ? "onsite" : formData.job_type?.toLowerCase(),
     required_skills: formData.skills,
     num_openings: Number(formData.num_openings) || 1,
     application_deadline: formData.application_deadline || undefined,

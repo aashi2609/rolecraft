@@ -68,6 +68,76 @@ def pytest_sessionstart(session: pytest.Session) -> None:
         )
 
 
+    from core.config import get_settings
+    settings = get_settings()
+    settings.storage_backend = "local"
+    settings.rate_limit_enabled = False
+    from core.rate_limit import reset_rate_limit_backends, limiter
+    reset_rate_limit_backends()
+    limiter.enabled = False
+
+    # Reconfigure engine with NullPool so connections do not leak across event loops
+    from core import database
+    from sqlalchemy.pool import NullPool
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+
+    db_url, connect_args = database.asyncpg_engine_kwargs(os.environ["DATABASE_URL"])
+    database.engine = create_async_engine(
+        db_url,
+        echo=False,
+        poolclass=NullPool,
+        connect_args=connect_args,
+    )
+    database.AsyncSessionLocal = async_sessionmaker(
+        database.engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    # Seed required static test users (admin and cancelled company)
+    import asyncio
+    from sqlalchemy import text
+
+    async def _seed_test_users():
+        async with database.engine.begin() as conn:
+            await conn.execute(text("""
+                INSERT INTO users (id, email, password_hash, role, is_active, token_version)
+                VALUES ('b55c77e8-1a01-4f9c-a1ff-4568879121c7', 'admin@acme.com', '$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6', 'admin', true, 1)
+                ON CONFLICT (id) DO UPDATE SET token_version = 1, is_active = true, role = 'admin';
+            """))
+            await conn.execute(text("""
+                INSERT INTO users (id, email, password_hash, role, is_active, token_version)
+                VALUES ('5f7f4c5d-6fb3-41e1-8b12-5bb7d1670de1', 'kauraashi26@gmail.com', '$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6', 'company', true, 1)
+                ON CONFLICT (id) DO UPDATE SET token_version = 1, is_active = true, role = 'company';
+            """))
+            await conn.execute(text("""
+                INSERT INTO companies (user_id, name)
+                VALUES ('5f7f4c5d-6fb3-41e1-8b12-5bb7d1670de1', 'Aashi Corp')
+                ON CONFLICT (user_id) DO NOTHING;
+            """))
+            await conn.execute(text("""
+                INSERT INTO subscriptions (id, user_id, role, plan_tier, status)
+                VALUES ('5f7f4c5d-6fb3-41e1-8b12-5bb7d1670de2', '5f7f4c5d-6fb3-41e1-8b12-5bb7d1670de1', 'company', 'starter', 'cancelled')
+                ON CONFLICT (id) DO UPDATE SET status = 'cancelled';
+            """))
+            await conn.execute(text("""
+                INSERT INTO users (id, email, password_hash, role, is_active, token_version)
+                VALUES ('85e85c0d-327c-40ad-be00-e794354224c5', 'kauraashi8777@gmail.com', '$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6', 'candidate', true, 1)
+                ON CONFLICT (id) DO UPDATE SET token_version = 1, is_active = true, role = 'candidate';
+            """))
+            await conn.execute(
+                text("""
+                    INSERT INTO candidate_profiles (user_id, weblinks)
+                    VALUES ('85e85c0d-327c-40ad-be00-e794354224c5', CAST(:weblinks AS jsonb))
+                    ON CONFLICT (user_id) DO NOTHING;
+                """),
+                {"weblinks": '{"full_name": "Aashi Candidate"}'},
+            )
+
+    try:
+        asyncio.run(_seed_test_users())
+    except Exception as exc:
+        print(f"Warning: seeding static test users failed: {exc}")
+
+
 @pytest.fixture(autouse=True)
 def _enforce_test_database_guard(request) -> None:
     # Skip guard for db_guard unit tests (they test the guard logic itself)
@@ -81,6 +151,15 @@ def _enforce_test_database_guard(request) -> None:
     # Pass pre-override snapshot so we don't compare test URL to itself after rewrite.
     # Denylist remains the authoritative primary check.
     enforce_isolated_test_database(test_db_url, _PRIMARY_URL_SNAPSHOT or None)
+
+
+@pytest.fixture(autouse=True)
+def _ensure_test_config(monkeypatch) -> None:
+    from core.config import get_settings
+    monkeypatch.setattr(get_settings(), "storage_backend", "local")
+    monkeypatch.setattr(get_settings(), "rate_limit_enabled", False)
+    from core.rate_limit import limiter
+    limiter.enabled = False
 
 
 import pytest_asyncio

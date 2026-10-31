@@ -7,10 +7,28 @@ from sqlalchemy.orm import selectinload
 
 from core.dependencies import CandidateUser, CurrentUser, DbSession, check_plan_limit
 from core.rate_limit import RATE_LIMITS, get_user_key, limiter
-from models import CandidateProfile, CandidateSkill, Resume, User, UserRole
+from models import (
+    CandidateProfile,
+    CandidateSkill,
+    PlanTier,
+    Resume,
+    Subscription,
+    SubscriptionStatus,
+    User,
+    UserRole,
+)
 from schemas import ResumeGenerateRequest, ResumeOut
 from services.pdf_service import build_resume_pdf_response, resolve_candidate_name
 from services.resume_service import generate_resume_for_vertical, parse_resume_pdf
+
+_GENERATION_TIERS = {
+    PlanTier.free,
+    PlanTier.basic,
+    PlanTier.resume_builder,
+    PlanTier.complete,
+    PlanTier.premium,
+    PlanTier.elite,
+}
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
 

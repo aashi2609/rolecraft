@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Res
 from sqlalchemy import select
 
 from core.dependencies import CandidateUser, CompanyUser, DbSession, check_plan_limit, get_optional_current_user
+from core.enum_utils import coerce_enum
 from core.rate_limit import RATE_LIMITS, get_user_key, limiter
-from models import HiddenJob, JobPosting, JobStatus, JobType, User, UserRole
+from models import EmploymentType, HiddenJob, JobPosting, JobStatus, JobType, User, UserRole
 from schemas import (
     FitmentCandidateOut,
     JobCreate,
@@ -23,15 +24,7 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 def _job_type(raw: str | None) -> JobType | None:
-    if not raw:
-        return None
-    key = raw.lower().replace("-", "").replace(" ", "")
-    mapping = {
-        "onsite": JobType.onsite,
-        "remote": JobType.remote,
-        "hybrid": JobType.hybrid,
-    }
-    return mapping.get(key)
+    return coerce_enum(JobType, raw, "job_type")
 
 
 @router.post("/parse-jd", response_model=JobParsedJDOut)
@@ -72,11 +65,8 @@ async def create_job(
     user: Annotated[User, Depends(require_role(UserRole.company, UserRole.admin))], 
     db: DbSession
 ):
-    # Convert string status to enum
-    if body.status and body.status in JobStatus.__members__:
-        status = JobStatus(body.status)
-    else:
-        status = JobStatus.draft
+    # Convert status to enum
+    status = coerce_enum(JobStatus, body.status, "status") or JobStatus.draft
 
     if user.role == UserRole.admin:
         if not body.company_id:
@@ -97,7 +87,7 @@ async def create_job(
         company_id=company_id,
         title=body.title,
         department=body.department,
-        employment_type=body.employment_type,
+        employment_type=(coerce_enum(EmploymentType, body.employment_type, "employment_type").value if body.employment_type else None),
         experience_range=body.experience_range,
         min_salary=body.min_salary,
         max_salary=body.max_salary,
@@ -231,15 +221,22 @@ async def get_job(
 
 
 @router.put("/{job_id:uuid}", response_model=JobOut)
+@router.patch("/{job_id:uuid}", response_model=JobOut)
 async def update_job(job_id: UUID, body: JobUpdate, user: CompanyUser, db: DbSession):
     job = await db.get(JobPosting, job_id)
     if not job or job.company_id != user.id:
         raise HTTPException(status_code=404, detail="Not found")
     data = body.model_dump(exclude_unset=True)
-    if "job_type" in data:
-        data["job_type"] = _job_type(data["job_type"])
     for k, v in data.items():
-        setattr(job, k, v)
+        if k == "job_type":
+            job.job_type = coerce_enum(JobType, v, "job_type")
+        elif k == "status":
+            job.status = coerce_enum(JobStatus, v, "status", allow_none=False)
+        elif k == "employment_type":
+            emp = coerce_enum(EmploymentType, v, "employment_type")
+            job.employment_type = emp.value if emp else None
+        else:
+            setattr(job, k, v)
     await db.flush()
     await refresh_job_embedding(db, job)
     return await enrich_job(db, job)
@@ -252,10 +249,7 @@ async def patch_status(
     job = await db.get(JobPosting, job_id)
     if not job or job.company_id != user.id:
         raise HTTPException(status_code=404, detail="Not found")
-    try:
-        job.status = JobStatus(body.status)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Invalid status") from exc
+    job.status = coerce_enum(JobStatus, body.status, "status", allow_none=False)
     await db.flush()
     return await enrich_job(db, job)
 

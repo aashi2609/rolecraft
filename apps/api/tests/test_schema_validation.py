@@ -1,4 +1,4 @@
-﻿"""Unit tests for tightened Pydantic schema validation (Tier 3 item 3)."""
+"""Unit tests for tightened Pydantic schema validation (Tier 3 item 3)."""
 
 from __future__ import annotations
 
@@ -112,3 +112,27 @@ def test_job_out_accepts_orm_status_enum() -> None:
 
     out = JobOut.model_validate(_Row())
     assert out.status == "draft"
+
+
+def test_validation_error_never_leaks_password() -> None:
+    """FastAPI validation error responses must strip the submitted password from response body."""
+    from fastapi.testclient import TestClient
+    from main import app
+
+    client = TestClient(app)
+    secret_password = "SuperSecretPassword123!Sensitive"
+    # Send invalid inputs to trigger RequestValidationError
+    r = client.post(
+        "/auth/signup",
+        json={
+            "email": "invalid-email-format",
+            "password": secret_password,
+            "role": "not_a_valid_role",
+            "name": "Test User",
+        },
+    )
+    assert r.status_code == 422
+    assert secret_password not in r.text
+    for err in r.json().get("detail", []):
+        assert "input" not in err
+

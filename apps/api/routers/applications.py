@@ -14,6 +14,7 @@ from core.websocket_auth import (
     authenticate_websocket_connection,
     handle_websocket_lifecycle,
 )
+from core.enum_utils import coerce_enum
 from core.ws_manager import ws_manager
 from models import (
     Application,
@@ -192,10 +193,7 @@ async def update_status(
     job = await db.get(JobPosting, app.job_id)
     if not job or job.company_id != user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
-    try:
-        app.status = ApplicationStatus(body.status)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Invalid status") from exc
+    app.status = coerce_enum(ApplicationStatus, body.status, "status", allow_none=False)
     await db.flush()
 
     result = await _app_out(db, app)
