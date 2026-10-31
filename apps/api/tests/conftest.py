@@ -264,7 +264,7 @@ async def other_company_user(db_session):
 @pytest_asyncio.fixture
 async def candidate_client(candidate_user):
     """Authenticated AsyncClient for candidate user."""
-    token = create_access_token({"sub": str(candidate_user.id)})
+    token = create_access_token(user_id=candidate_user.id, role="candidate")
     async with AsyncClient(app=app, base_url="http://test") as client:
         client.headers["Authorization"] = f"Bearer {token}"
         yield client
@@ -273,7 +273,7 @@ async def candidate_client(candidate_user):
 @pytest_asyncio.fixture
 async def company_client(company_user):
     """Authenticated AsyncClient for company user."""
-    token = create_access_token({"sub": str(company_user.id)})
+    token = create_access_token(user_id=company_user.id, role="company")
     async with AsyncClient(app=app, base_url="http://test") as client:
         client.headers["Authorization"] = f"Bearer {token}"
         yield client
@@ -282,7 +282,7 @@ async def company_client(company_user):
 @pytest_asyncio.fixture
 async def other_company_client(other_company_user):
     """Authenticated AsyncClient for other company user."""
-    token = create_access_token({"sub": str(other_company_user.id)})
+    token = create_access_token(user_id=other_company_user.id, role="company")
     async with AsyncClient(app=app, base_url="http://test") as client:
         client.headers["Authorization"] = f"Bearer {token}"
         yield client

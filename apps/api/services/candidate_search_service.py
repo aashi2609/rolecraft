@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from models import CandidateProfile, CandidateSkill, Education, Experience, Skill, User
 from schemas import CandidateSearchOut
-from services.fitment_rationale_service import template_rationale
+from services.experience_calculator import total_experience_years
 
 
 def apply_keyword_filter(query, q: Optional[str]):
@@ -285,17 +285,20 @@ def transform_profile_to_search_out(
     
     NOTE: Salary filtering is now done in SQL WHERE clause (Step 5D).
     salary_min/salary_max parameters ignored (kept for compatibility).
+    
+    Experience calculation uses total_experience_years with interval merging (Step 5E).
     """
-    exp_years = calculate_experience_years(profile.experience)
+    # Calculate experience with proper interval merging
+    exp_years, internship_years = total_experience_years(profile.experience, include_internships=True)
+    
     skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
     job_title = get_job_title(profile.experience)
     education_level = get_education_level(profile.education)
     expected_salary = parse_expected_salary(profile.experience)
 
     # Salary filtering is now done in SQL, not here
-    # (candidates reaching here already passed the WHERE clause)
 
-    match_score = calculate_match_score(skill_names, exp_years)
+    match_score = calculate_match_score(skill_names, int(exp_years))
     rationale = template_rationale(skill_names, skill_names)
 
     links = profile.weblinks or {}

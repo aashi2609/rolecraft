@@ -12,7 +12,7 @@ from typing import Any
 from uuid import UUID
 
 from core.config import get_settings
-from models import CandidateProfile, CandidateSkill, Resume, ATSScoreStatus
+from models import CandidateProfile, CandidateSkill, Resume, ATSScoreStatus, EmbeddingStatus
 from services.ai_client import AIServiceError, generate_content
 from services.ats_scorer import ATSResult, score_resume
 from services.data_cleaner import CleanedProfile, clean_profile
