@@ -353,12 +353,14 @@ class Resume(Base):
     content: Mapped[dict] = mapped_column(JSONB, default=dict)
     ats_score: Mapped[Optional[int]] = mapped_column(Integer)
     ats_status: Mapped[str] = mapped_column(
-        Enum(ATSScoreStatus), default=ATSScoreStatus.unavailable.value
+        Enum(ATSScoreStatus, name="ats_score_status", create_constraint=False), 
+        default=ATSScoreStatus.unavailable.value
     )
     ats_breakdown: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     embedding = mapped_column(Vector(512), nullable=True)  # OpenAI text-embedding-3-small: 512 dims
     embedding_status: Mapped[str] = mapped_column(
-        Enum(EmbeddingStatus), default=EmbeddingStatus.pending.value
+        Enum(EmbeddingStatus, name="embedding_status", create_constraint=False), 
+        default=EmbeddingStatus.pending.value
     )
     embedding_model: Mapped[str] = mapped_column(String(64), default="text-embedding-3-small")
     generation_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
@@ -433,7 +435,8 @@ class JobPosting(Base):
     )
     embedding = mapped_column(Vector(512), nullable=True)  # OpenAI text-embedding-3-small: 512 dims
     embedding_status: Mapped[str] = mapped_column(
-        Enum(EmbeddingStatus), default=EmbeddingStatus.pending.value
+        Enum(EmbeddingStatus, name="embedding_status", create_constraint=False), 
+        default=EmbeddingStatus.pending.value
     )
     embedding_model: Mapped[str] = mapped_column(String(64), default="text-embedding-3-small")
     created_at: Mapped[datetime] = mapped_column(
