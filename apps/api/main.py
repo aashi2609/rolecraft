@@ -160,22 +160,59 @@ async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError):
 
 @app.exception_handler(AIServiceError)
 async def ai_service_error_handler(request: Request, exc: AIServiceError):
-    """Upstream AI / Groq failure: clean 502/503 response without provider bodies or API keys."""
+    """Upstream AI / Groq failure: structured error response with error code and retry guidance."""
     req_id = _get_request_id(request)
+    
+    # Map error codes to HTTP status codes
+    status_code_map = {
+        "ai_unavailable": 502,      # Bad Gateway - provider down
+        "ai_rate_limited": 429,     # Too Many Requests
+        "ai_timeout": 504,          # Gateway Timeout
+        "ai_auth_failed": 502,      # Bad Gateway - don't expose auth details
+        "ai_bad_output": 502,       # Bad Gateway - malformed response
+    }
+    
+    # Map error codes to user-friendly messages
+    message_map = {
+        "ai_unavailable": "AI service is temporarily unavailable. Please try again later.",
+        "ai_rate_limited": "AI service rate limit reached. Please retry after the specified time.",
+        "ai_timeout": "AI service request timed out. Please try again with a simpler request.",
+        "ai_auth_failed": "AI service configuration error. Please contact support.",
+        "ai_bad_output": "AI service returned invalid response. Please try again.",
+    }
+    
+    error_code = getattr(exc, "error_code", "ai_unavailable")
+    retry_after = getattr(exc, "retry_after", None)
+    
+    status_code = status_code_map.get(error_code, 502)
+    detail = message_map.get(error_code, "AI service is currently unavailable. Please try again later.")
+    
     logger.warning(
-        "Upstream AI service failure [request_id=%s] on %s %s: %s",
+        "Upstream AI service failure [request_id=%s] on %s %s: %s (code=%s)",
         req_id,
         request.method,
         request.url.path,
         exc,
+        error_code
     )
+    
+    response_content = {
+        "detail": detail,
+        "error_code": error_code,
+        "request_id": req_id,
+    }
+    
+    if retry_after:
+        response_content["retry_after_seconds"] = retry_after
+    
+    headers = {"X-Request-ID": req_id}
+    if retry_after and status_code == 429:
+        headers["Retry-After"] = str(retry_after)
+    
     return JSONResponse(
-        status_code=502,
-        content={
-            "detail": "AI service is currently unavailable. Please try again later.",
-            "request_id": req_id,
-        },
-        headers={"X-Request-ID": req_id},
+        status_code=status_code,
+        content=response_content,
+        headers=headers,
     )
 
 

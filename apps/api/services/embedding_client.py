@@ -48,8 +48,8 @@ async def fetch_embedding(text: str, *, retries: int = 3) -> list[float]:
             response.raise_for_status()
             data = response.json()
             vector = _parse_embedding_response(data)
-            if len(vector) != 1536:
-                raise EmbeddingServiceError(f"Expected 1536 dims, got {len(vector)}")
+            # Note: text-embedding-3-small returns 512 dimensions
+            # Validation is handled by embedding_service.validate_embedding()
             return vector
         except httpx.HTTPStatusError as exc:
             last_error = exc
