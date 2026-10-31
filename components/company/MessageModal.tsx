@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
-import { X, Send, Loader2 } from 'lucide-react';
-import { messagesApi } from '@/lib/api';
+import { X, Send, Loader2, AlertCircle } from 'lucide-react';
+import { messagesApi, ApiError } from '@/lib/api';
 
 interface MessageModalProps {
   candidateId?: string;
@@ -18,15 +18,14 @@ export function MessageModal({ candidateId, candidateName, isOpen, onClose }: Me
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
-
-  // If there's a way to find existing threads for this candidate, we could do that here
-  // For now we'll just start a new thread if we don't have one
 
   const handleSend = async () => {
     if (!message.trim() || !candidateId) return;
     setSending(true);
+    setError(null);
     try {
       if (!threadId) {
         const msg = await messagesApi.start(message.trim(), candidateId);
@@ -38,8 +37,10 @@ export function MessageModal({ candidateId, candidateName, isOpen, onClose }: Me
       }
       setMessage('');
     } catch (e) {
+      const err = e as ApiError;
+      const userMessage = err.detail || 'Failed to send message. Please try again.';
+      setError(userMessage);
       console.error('Failed to send message:', e);
-      alert('Failed to send message');
     } finally {
       setSending(false);
     }
@@ -59,6 +60,19 @@ export function MessageModal({ candidateId, candidateName, isOpen, onClose }: Me
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Error Banner */}
+        {error && (
+          <div className="px-6 py-3 bg-red-50 border-b border-red-200 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+            <button onClick={() => setError(null)} className="text-red-600 hover:text-red-700">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Chat Area */}
         <div className="flex-1 p-6 overflow-y-auto bg-white flex flex-col gap-4">

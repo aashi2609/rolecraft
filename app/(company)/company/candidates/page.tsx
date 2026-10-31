@@ -685,6 +685,11 @@ export default function SearchCandidatesPage() {
         isOpen={profileOpen}
         onClose={() => setProfileOpen(false)}
         onDownloadResume={downloadCandidateResume}
+        onMessage={(cid, cname) => {
+          setMessageCandidateId(cid);
+          setMessageName(cname);
+          setMessageOpen(true);
+        }}
         candidate={
           selectedCandidate
             ? {

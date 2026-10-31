@@ -6,6 +6,7 @@ from sqlalchemy import or_, select, and_
 
 from core.dependencies import CurrentUser, DbSession
 from core.rate_limit import RATE_LIMITS, get_user_key, limiter
+from core.messaging_auth import can_company_message_candidate, get_conversation_permission
 from models import CandidateProfile, Company, Message, User, UserRole, Conversation, JobPosting, Application, ApplicationStatus, Notification
 from schemas import MessageCreate, MessageOut, ThreadOut
 
@@ -114,8 +115,12 @@ async def start_thread(
     if not candidate_id:
         raise HTTPException(status_code=400, detail="candidate_id (recipient_id) is required")
 
-    # Authorize: Must have applied or be shortlisted
-    # Wait, the user said "A company may START a conversation only with a candidate who applied to one of ITS jobs or whom it has shortlisted."
+    # Use centralized authorization
+    allowed, reason = await can_company_message_candidate(user.id, candidate_id, db)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=reason)
+
+    # Get the application to find the job_id
     app = await db.scalar(
         select(Application).join(JobPosting).where(
             Application.candidate_id == candidate_id,
@@ -123,13 +128,11 @@ async def start_thread(
             or_(Application.status == ApplicationStatus.applied, Application.status == ApplicationStatus.shortlisted, Application.status == ApplicationStatus.interview)
         )
     )
-    if not app:
-        raise HTTPException(status_code=403, detail="Cannot message a candidate who has not applied to your jobs")
 
     # Get or create conversation
     conv = await db.scalar(select(Conversation).where(Conversation.company_id == user.id, Conversation.candidate_id == candidate_id))
     if not conv:
-        conv = Conversation(company_id=user.id, candidate_id=candidate_id, job_id=app.job_id)
+        conv = Conversation(company_id=user.id, candidate_id=candidate_id, job_id=app.job_id if app else None)
         db.add(conv)
         await db.flush()
 
@@ -160,12 +163,9 @@ async def start_thread(
 
 @router.get("/threads/{id}", response_model=list[MessageOut])
 async def get_thread(id: UUID, user: CurrentUser, db: DbSession):
-    conv = await db.get(Conversation, id)
-    if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-        
-    if conv.company_id != user.id and conv.candidate_id != user.id:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+    allowed, reason = await get_conversation_permission(user.id, user.role, id, db)
+    if not allowed:
+        raise HTTPException(status_code=404, detail=reason)
         
     # Mark messages as read
     await db.execute(
@@ -187,13 +187,11 @@ async def reply_thread(
     user: CurrentUser,
     db: DbSession,
 ):
+    allowed, reason = await get_conversation_permission(user.id, user.role, id, db)
+    if not allowed:
+        raise HTTPException(status_code=404, detail=reason)
+
     conv = await db.get(Conversation, id)
-    if not conv:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-        
-    if conv.company_id != user.id and conv.candidate_id != user.id:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-        
     msg = Message(
         conversation_id=conv.id,
         sender_id=user.id,

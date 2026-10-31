@@ -23,7 +23,7 @@ async def test_messaging_flow(
     # 2. Company cannot message candidate who hasn't applied
     resp = await company_client.post("/messages/threads", json={"recipient_id": str(candidate_user.id), "body": "Hi there"})
     assert resp.status_code == 403
-    assert "Cannot message a candidate" in resp.json()["detail"]
+    assert "You can message candidates who have applied to your jobs or whom you have shortlisted" in resp.json()["detail"]
 
     # Let's create an application
     job = JobPosting(id=uuid.uuid4(), company_id=company_user.id, title="Test Job", description="Desc")
@@ -80,3 +80,117 @@ async def test_messaging_flow(
     # 10. Third user cannot post to thread
     resp = await other_company_client.post(f"/messages/threads/{conv_id}", json={"body": "Intruder"})
     assert resp.status_code == 404
+
+
+async def test_company_cannot_message_unrelated_candidate(
+    company_client: AsyncClient,
+    candidate_client: AsyncClient,
+    db_session,
+    company_user,
+    candidate_user,
+):
+    """Candidate hasn't applied to this company's jobs; company cannot message."""
+    resp = await company_client.post(
+        "/messages/threads",
+        json={"recipient_id": str(candidate_user.id), "body": "Random message"}
+    )
+    assert resp.status_code == 403
+    assert "You can message candidates who have applied to your jobs or whom you have shortlisted" in resp.json()["detail"]
+
+
+async def test_company_can_message_shortlisted_candidate(
+    company_client: AsyncClient,
+    db_session,
+    company_user,
+    candidate_user,
+):
+    """Company can message a candidate they shortlisted."""
+    job = JobPosting(id=uuid.uuid4(), company_id=company_user.id, title="Test Job", description="Desc")
+    db_session.add(job)
+    app = Application(
+        id=uuid.uuid4(),
+        job_id=job.id,
+        candidate_id=candidate_user.id,
+        status=ApplicationStatus.shortlisted,  # shortlisted, not just applied
+    )
+    db_session.add(app)
+    await db_session.commit()
+
+    resp = await company_client.post(
+        "/messages/threads",
+        json={"recipient_id": str(candidate_user.id), "body": "You're shortlisted!"}
+    )
+    assert resp.status_code == 200
+
+
+async def test_company_cannot_message_rejected_candidate(
+    company_client: AsyncClient,
+    db_session,
+    company_user,
+    candidate_user,
+):
+    """Company cannot message candidate with rejected application."""
+    job = JobPosting(id=uuid.uuid4(), company_id=company_user.id, title="Test Job", description="Desc")
+    db_session.add(job)
+    app = Application(
+        id=uuid.uuid4(),
+        job_id=job.id,
+        candidate_id=candidate_user.id,
+        status=ApplicationStatus.rejected,
+    )
+    db_session.add(app)
+    await db_session.commit()
+
+    resp = await company_client.post(
+        "/messages/threads",
+        json={"recipient_id": str(candidate_user.id), "body": "Sorry, rejected"}
+    )
+    assert resp.status_code == 403
+    assert "You can message candidates who have applied to your jobs or whom you have shortlisted" in resp.json()["detail"]
+
+
+async def test_one_conversation_per_company_candidate_pair(
+    company_client: AsyncClient,
+    candidate_client: AsyncClient,
+    db_session,
+    company_user,
+    candidate_user,
+):
+    """Multiple messages between same pair should use one conversation, not create duplicates."""
+    job = JobPosting(id=uuid.uuid4(), company_id=company_user.id, title="Test Job", description="Desc")
+    db_session.add(job)
+    app = Application(id=uuid.uuid4(), job_id=job.id, candidate_id=candidate_user.id, status=ApplicationStatus.applied)
+    db_session.add(app)
+    await db_session.commit()
+
+    # First message
+    resp1 = await company_client.post(
+        "/messages/threads",
+        json={"recipient_id": str(candidate_user.id), "body": "First message"}
+    )
+    assert resp1.status_code == 200
+    conv_id_1 = resp1.json()["conversation_id"]
+
+    # Second message should reuse the same conversation
+    resp2 = await company_client.post(
+        "/messages/threads",
+        json={"recipient_id": str(candidate_user.id), "body": "Second message"}
+    )
+    assert resp2.status_code == 200
+    conv_id_2 = resp2.json()["conversation_id"]
+
+    assert conv_id_1 == conv_id_2, "Should reuse existing conversation, not create new one"
+
+    # Candidate should see only 1 thread with both messages
+    resp = await candidate_client.get("/messages/threads")
+    assert len(resp.json()) == 1
+    threads = resp.json()
+    assert threads[0]["thread_id"] == conv_id_1
+
+    # Get the thread and verify both messages are there
+    resp = await candidate_client.get(f"/messages/threads/{conv_id_1}")
+    messages = resp.json()
+    assert len(messages) == 2
+    assert messages[0]["body"] == "First message"
+    assert messages[1]["body"] == "Second message"
+
