@@ -23,6 +23,7 @@ from routers import (
     files,
     jobs,
     messages,
+    payments,
     resumes,
 )
 from routers.notifications import (
@@ -268,6 +269,7 @@ app.include_router(analytics.router)
 app.include_router(router_notifications)
 app.include_router(router_subscriptions)
 app.include_router(router_uploads)
+app.include_router(payments.router)
 app.include_router(admin.router)
 app.include_router(files.router)
 

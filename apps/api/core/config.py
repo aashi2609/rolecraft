@@ -67,6 +67,12 @@ class Settings(BaseSettings):
     # "any_candidate_with_plan": Company can message any candidate if they have active plan (requires active subscription)
     messaging_policy: str = "applicants_only"  # applicants_only | any_candidate_with_plan
 
+    # ── Razorpay Payment Configuration (Step 6D) ────────────────────────────
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+    razorpay_webhook_secret: str = ""
+    payments_mode: str = "disabled"  # disabled | test | live
+
     @property
     def cors_origin_list(self) -> List[str]:
         return [o.strip(' "\'') for o in self.cors_origins.split(",") if o.strip(' "\'')]

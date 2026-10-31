@@ -1,5 +1,6 @@
 from typing import Any, List, Optional
 from uuid import UUID
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, field_validator
@@ -23,6 +24,7 @@ from models import (
 )
 from services.user_service import create_user_with_profile
 from services.admin_service import get_dashboard_stats
+from services.subscription_service import log_subscription_change
 from schemas import JobCreate, JobUpdate
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -171,6 +173,20 @@ class SubCreate(BaseModel):
     def validate_status(cls, v: Any) -> SubscriptionStatus:
         res = coerce_enum(SubscriptionStatus, v, "status")
         return res if res is not None else SubscriptionStatus.pending  # Default to pending
+
+
+class SubscriptionGrant(BaseModel):
+    """Step 6C: Manual admin grant of subscription (payment mode disabled only)."""
+    user_id: str
+    plan_tier: PlanTier
+    reason: str  # Required: why admin is granting this
+    started_at: Optional[datetime] = None  # Default: now
+    ends_at: Optional[datetime] = None  # Default: 30 days from now
+
+    @field_validator("plan_tier", mode="before")
+    @classmethod
+    def validate_plan_tier(cls, v: Any) -> PlanTier:
+        return coerce_enum(PlanTier, v, "plan_tier", allow_none=False)
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -471,8 +487,6 @@ async def create_subscription(
     - Always creates with status=pending (default in SubCreate)
     - Must transition to active via payment gateway webhook only
     """
-    from services.subscription_service import log_subscription_change
-    
     sub = Subscription(
         user_id=UUID(create_data.user_id),
         role=coerce_enum(UserRole, create_data.role, "role", allow_none=False),
@@ -497,6 +511,77 @@ async def create_subscription(
     await db.commit()
     await db.refresh(sub)
     return {"ok": True, "id": str(sub.id)}
+
+
+@router.post("/subscriptions/grant")
+async def grant_subscription(
+    grant_data: SubscriptionGrant,
+    db: DbSession,
+    current_admin: User = Depends(get_current_admin),
+) -> Any:
+    """Step 6C: Admin grant of active subscription (manual override, payments disabled mode).
+    
+    This endpoint activates a subscription immediately without payment verification.
+    Use cases:
+    - Manual grants during disabled payment mode
+    - Special promotions or trial grants
+    - Administrative overrides
+    
+    The subscription is created with status=active and audit-logged with admin_id.
+    """
+    # Get user
+    user = await db.get(User, grant_data.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Validate plan tier matches user role
+    from services.subscription_service import validate_plan_tier
+    plan_tier = await validate_plan_tier(grant_data.plan_tier.value, user.role)
+    
+    # Cancel any existing active subscriptions
+    from services.subscription_service import cancel_active_subscriptions
+    await cancel_active_subscriptions(db, user.id, admin_id=current_admin.id)
+    
+    # Set default dates
+    started_at = grant_data.started_at or datetime.now(timezone.utc)
+    ends_at = grant_data.ends_at or (started_at + timedelta(days=30))
+    
+    # Create active subscription directly (grant bypasses payment)
+    sub = Subscription(
+        user_id=user.id,
+        role=user.role,
+        plan_tier=plan_tier,
+        status=SubscriptionStatus.active,  # Step 6C: Granted subscriptions are immediately active
+        started_at=started_at,
+        renews_at=ends_at,
+    )
+    db.add(sub)
+    await db.flush()
+    
+    # Log the grant with admin_id
+    await log_subscription_change(
+        db,
+        subscription_id=sub.id,
+        user_id=user.id,
+        admin_id=current_admin.id,
+        action="grant",  # Special action type
+        new_plan_tier=plan_tier.value,
+        new_status=SubscriptionStatus.active.value,
+        reason=grant_data.reason,  # Admin-provided reason
+    )
+    
+    await db.commit()
+    await db.refresh(sub)
+    
+    return {
+        "ok": True,
+        "id": str(sub.id),
+        "user_id": str(sub.user_id),
+        "plan_tier": sub.plan_tier.value,
+        "status": sub.status.value,
+        "started_at": sub.started_at.isoformat(),
+        "renews_at": sub.renews_at.isoformat() if sub.renews_at else None,
+    }
 
 
 @router.delete("/subscriptions/{sub_id}")

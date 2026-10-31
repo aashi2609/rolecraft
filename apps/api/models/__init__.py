@@ -140,6 +140,9 @@ class User(Base):
     notifications: Mapped[list["Notification"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", passive_deletes=True
     )
+    payment_transactions: Mapped[list["PaymentTransaction"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class Subscription(Base):
@@ -744,3 +747,134 @@ class FileRecord(Base):
     )
 
     owner: Mapped["User"] = relationship()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 6D: Payment Models
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class PaymentStatus(str, enum.Enum):
+    """Payment transaction status."""
+    pending = "pending"           # Order created, awaiting payment
+    completed = "completed"       # Payment verified and subscription activated
+    failed = "failed"             # Payment failed or declined
+    cancelled = "cancelled"       # User cancelled or admin override
+    refunded = "refunded"         # Payment refunded
+
+
+class BillingPeriod(str, enum.Enum):
+    """Billing period for subscription pricing."""
+    monthly = "monthly"
+    quarterly = "quarterly"
+    annual = "annual"
+    lifetime = "lifetime"
+
+
+class PricePoint(Base):
+    """Step 6D: Pricing table (plan_tier + period → INR paise).
+    
+    Master table defining all pricing combinations.
+    One entry per (plan_tier, billing_period) combination.
+    """
+    
+    __tablename__ = "price_points"
+    __table_args__ = (UniqueConstraint("plan_tier", "billing_period", name="uq_plan_period"),)
+    
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    plan_tier: Mapped[PlanTier] = mapped_column(
+        Enum(PlanTier, name="plan_tier"), nullable=False, index=True
+    )
+    billing_period: Mapped[BillingPeriod] = mapped_column(
+        Enum(BillingPeriod, name="billing_period"), nullable=False, index=True
+    )
+    amount_paise: Mapped[int] = mapped_column(Integer, nullable=False)  # in paise (₹0.01)
+    currency: Mapped[str] = mapped_column(String(3), default="INR", nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    
+    # Audit trail
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    
+    @property
+    def amount_rupees(self) -> float:
+        """Convert paise to rupees."""
+        return self.amount_paise / 100.0
+
+
+class PaymentTransaction(Base):
+    """Step 6D: Payment transactions with full audit trail.
+    
+    Records every payment attempt including:
+    - Razorpay order ID, payment ID, signature verification
+    - Status transitions (pending → completed/failed)
+    - Full webhook data for audit
+    - Subscription activation link
+    """
+    
+    __tablename__ = "payment_transactions"
+    
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    
+    # User and subscription
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    subscription_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("subscriptions.id", ondelete="SET NULL"), nullable=True
+    )
+    
+    # Pricing
+    price_point_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("price_points.id", ondelete="RESTRICT"), nullable=False
+    )
+    amount_paise: Mapped[int] = mapped_column(Integer, nullable=False)  # Snapshot at transaction time
+    
+    # Razorpay integration
+    razorpay_order_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    razorpay_payment_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True, index=True)
+    razorpay_signature: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    
+    # Status and audit
+    status: Mapped[PaymentStatus] = mapped_column(
+        Enum(PaymentStatus, name="payment_status"), default=PaymentStatus.pending, nullable=False, index=True
+    )
+    failure_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Error details if failed
+    
+    # Webhook data (stored for audit/debugging)
+    webhook_data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    webhook_received_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Idempotency and replay protection
+    idempotency_key: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True, unique=True, index=True
+    )  # Client-provided for replay protection
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    
+    # Relationships
+    user: Mapped["User"] = relationship(back_populates="payment_transactions")
+    subscription: Mapped[Optional["Subscription"]] = relationship()
+    price_point: Mapped["PricePoint"] = relationship()
+    
+    @property
+    def amount_rupees(self) -> float:
+        """Convert paise to rupees."""
+        return self.amount_paise / 100.0
