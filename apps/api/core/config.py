@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     razorpay_webhook_secret: str = ""
     payments_mode: str = "disabled"  # disabled | test | live
 
+    # ── Timeouts (Step 7D) ─────────────────────────────────────────────────
+    request_timeout_seconds: int = 30
+    database_timeout_seconds: int = 15
+
     @property
     def cors_origin_list(self) -> List[str]:
         return [o.strip(' "\'') for o in self.cors_origins.split(",") if o.strip(' "\'')]

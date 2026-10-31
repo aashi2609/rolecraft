@@ -11,6 +11,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from core.config import get_settings
 from core.rate_limit import RateLimited, limiter, rate_limit_exceeded_handler
 from core.request_id import RequestIdMiddleware
+from core.timeout_middleware import TimeoutMiddleware
 from services.ai_client import AIServiceError
 from sqlalchemy.exc import DBAPIError, IntegrityError, SQLAlchemyError
 from routers import (
@@ -49,6 +50,9 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 app.add_exception_handler(RateLimited, rate_limit_exceeded_handler)
+
+# Timeout middleware (Step 7D)
+app.add_middleware(TimeoutMiddleware)
 
 # Query Profiler middleware (test/debug mode only)
 if not settings.is_production:

@@ -1,11 +1,15 @@
+import os
+import sys
 from collections.abc import AsyncGenerator
 from typing import Any
 
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 from core.config import get_settings
+from core.pool_config import PoolSettings
 
 settings = get_settings()
 
@@ -45,13 +49,12 @@ def asyncpg_engine_kwargs(database_url: str) -> tuple[str, dict[str, Any]]:
     return clean_url.render_as_string(hide_password=False), connect_args
 
 
-import os
-import sys
-from sqlalchemy.pool import NullPool
-
 _is_test = bool(os.getenv("TEST_DATABASE_URL")) or "pytest" in sys.modules
 
 _db_url, _connect_args = asyncpg_engine_kwargs(settings.database_url)
+
+# Get pool settings based on environment
+_pool_settings = PoolSettings.for_environment()
 
 _engine_kwargs: dict[str, Any] = {
     "echo": False,
@@ -60,8 +63,12 @@ _engine_kwargs: dict[str, Any] = {
 if _is_test:
     _engine_kwargs["poolclass"] = NullPool
 else:
-    # Neon scale-to-zero can drop idle connections; ping before checkout.
-    _engine_kwargs["pool_pre_ping"] = True
+    # Apply pool settings from environment
+    _engine_kwargs["pool_size"] = _pool_settings.pool_size
+    _engine_kwargs["max_overflow"] = _pool_settings.max_overflow
+    _engine_kwargs["pool_timeout"] = _pool_settings.pool_timeout
+    _engine_kwargs["pool_recycle"] = _pool_settings.pool_recycle
+    _engine_kwargs["pool_pre_ping"] = _pool_settings.pool_pre_ping
 
 engine = create_async_engine(_db_url, **_engine_kwargs)
 AsyncSessionLocal = async_sessionmaker(

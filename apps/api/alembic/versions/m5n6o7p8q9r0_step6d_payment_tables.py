@@ -17,7 +17,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create PaymentStatus enum (if not exists)
+    # Enums that must be created first (if not exist)
     payment_status_enum = postgresql.ENUM(
         "pending",
         "completed",
@@ -25,22 +25,24 @@ def upgrade() -> None:
         "cancelled",
         "refunded",
         name="payment_status",
-        create_type=False,  # Don't fail if exists
+        create_type=True,
     )
     payment_status_enum.create(op.get_bind(), checkfirst=True)
 
-    # Create BillingPeriod enum (if not exists)
     billing_period_enum = postgresql.ENUM(
         "monthly",
         "quarterly",
         "annual",
         "lifetime",
         name="billing_period",
-        create_type=False,  # Don't fail if exists
+        create_type=True,
     )
     billing_period_enum.create(op.get_bind(), checkfirst=True)
 
-    # Create price_points table
+    # plan_tier enum already exists from previous migration, so reference it
+    # Don't try to create it again
+
+    # Create price_points table (plan_tier column uses existing enum)
     op.create_table(
         "price_points",
         sa.Column(
@@ -50,7 +52,7 @@ def upgrade() -> None:
         ),
         sa.Column(
             "plan_tier",
-            sa.Enum(
+            postgresql.ENUM(
                 "basic",
                 "free",
                 "premium",
@@ -64,7 +66,7 @@ def upgrade() -> None:
                 "corporate_annual",
                 "corporate_lifetime",
                 name="plan_tier",
-                create_type=False,  # Don't fail if exists
+                create_type=False,  # Don't create, it already exists
             ),
             nullable=False,
         ),
@@ -204,7 +206,7 @@ def downgrade() -> None:
     # Drop price_points table
     op.drop_table("price_points")
 
-    # Drop enums (if they exist and are not used elsewhere)
+    # Drop enums only if we created them
     try:
         op.execute("DROP TYPE IF EXISTS payment_status CASCADE")
     except Exception:
@@ -214,3 +216,4 @@ def downgrade() -> None:
         op.execute("DROP TYPE IF EXISTS billing_period CASCADE")
     except Exception:
         pass
+
