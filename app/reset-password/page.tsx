@@ -9,6 +9,8 @@ import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api';
 
+export const dynamic = 'force-dynamic';
+
 export default function ResetPasswordPage() {
   const [token, setToken] = useState('');
   const [password, setPassword] = useState('');
