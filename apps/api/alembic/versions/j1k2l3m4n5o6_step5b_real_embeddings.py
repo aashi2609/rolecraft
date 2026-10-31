@@ -24,12 +24,12 @@ depends_on = None
 
 def upgrade() -> None:
     # Create the embedding_status enum type
-    embedding_status_enum = postgresql.ENUM(
-        'pending', 'scored', 'failed',
-        name='embedding_status',
-        create_type=True
-    )
-    embedding_status_enum.create(op.get_bind(), checkfirst=True)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE embedding_status AS ENUM ('pending', 'scored', 'failed');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$;
+    """)
     
     # ──── RESUMES TABLE ────
     
@@ -45,7 +45,7 @@ def upgrade() -> None:
         'resumes',
         sa.Column(
             'embedding_status',
-            embedding_status_enum,
+            sa.Enum('pending', 'scored', 'failed', name='embedding_status'),
             nullable=False,
             server_default='pending'
         )
@@ -78,7 +78,7 @@ def upgrade() -> None:
         'job_postings',
         sa.Column(
             'embedding_status',
-            embedding_status_enum,
+            sa.Enum('pending', 'scored', 'failed', name='embedding_status'),
             nullable=False,
             server_default='pending'
         )
@@ -120,4 +120,4 @@ def downgrade() -> None:
     op.execute('ALTER TABLE job_postings ALTER COLUMN embedding TYPE vector(1536) USING NULL')
     
     # Drop the enum type
-    op.execute('DROP TYPE IF EXISTS embedding_status')
+    op.execute('DROP TYPE IF EXISTS embedding_status CASCADE')

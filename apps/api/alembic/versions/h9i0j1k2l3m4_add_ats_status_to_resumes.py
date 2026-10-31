@@ -21,20 +21,20 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create the enum type
-    ats_status_enum = postgresql.ENUM(
-        'scored', 'unavailable', 'error',
-        name='ats_score_status',
-        create_type=True
-    )
-    ats_status_enum.create(op.get_bind(), checkfirst=True)
+    # Create the enum type with explicit name
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE ats_score_status AS ENUM ('scored', 'unavailable', 'error');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$;
+    """)
     
     # Add the column with default 'unavailable'
     op.add_column(
         'resumes',
         sa.Column(
             'ats_status',
-            ats_status_enum,
+            sa.Enum('scored', 'unavailable', 'error', name='ats_score_status'),
             nullable=False,
             server_default='unavailable'
         )
@@ -62,4 +62,4 @@ def downgrade() -> None:
     op.drop_column('resumes', 'ats_status')
     
     # Drop the enum type
-    op.execute('DROP TYPE IF EXISTS ats_score_status')
+    op.execute('DROP TYPE IF EXISTS ats_score_status CASCADE')
