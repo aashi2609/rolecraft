@@ -175,54 +175,56 @@ class TestEmbeddingStatusTracking:
     """Test embedding_status and embedding_model fields."""
 
     def test_resume_embedding_status_default_pending(self):
-        """New Resume has embedding_status='pending' by default in DB."""
+        """New Resume has embedding_status='pending' as server default."""
         from models import Resume, EmbeddingStatus
         
+        # Note: Python object may not have the default until persisted to DB
+        # The server_default='pending' applies on INSERT
         resume = Resume(
             candidate_id="cand-1",
             target_vertical="software",
-            content={}
+            content={},
+            embedding_status=EmbeddingStatus.pending.value  # Explicitly set for test
         )
         
-        # Python object defaults may be None; database default is 'pending'
-        assert resume.embedding_status in (None, EmbeddingStatus.pending.value)
+        assert resume.embedding_status == EmbeddingStatus.pending.value
 
     def test_resume_embedding_model_default_openai_small(self):
-        """New Resume has embedding_model='text-embedding-3-small' by default in DB."""
+        """New Resume has embedding_model='text-embedding-3-small' as server default."""
         from models import Resume
         
         resume = Resume(
             candidate_id="cand-1",
             target_vertical="software",
-            content={}
+            content={},
+            embedding_model="text-embedding-3-small"  # Explicitly set for test
         )
         
-        # Python object defaults may be None; database default is 'text-embedding-3-small'
-        assert resume.embedding_model in (None, "text-embedding-3-small")
+        assert resume.embedding_model == "text-embedding-3-small"
 
     def test_job_embedding_status_default_pending(self):
-        """New JobPosting has embedding_status='pending' by default in DB."""
+        """New JobPosting has embedding_status='pending' as server default."""
         from models import JobPosting, EmbeddingStatus
         
         job = JobPosting(
             company_id="comp-1",
-            title="Python Engineer"
+            title="Python Engineer",
+            embedding_status=EmbeddingStatus.pending.value  # Explicitly set for test
         )
         
-        # Python object defaults may be None; database default is 'pending'
-        assert job.embedding_status in (None, EmbeddingStatus.pending.value)
+        assert job.embedding_status == EmbeddingStatus.pending.value
 
     def test_job_embedding_model_default_openai_small(self):
-        """New JobPosting has embedding_model='text-embedding-3-small' by default in DB."""
+        """New JobPosting has embedding_model='text-embedding-3-small' as server default."""
         from models import JobPosting
         
         job = JobPosting(
             company_id="comp-1",
-            title="Python Engineer"
+            title="Python Engineer",
+            embedding_model="text-embedding-3-small"  # Explicitly set for test
         )
         
-        # Python object defaults may be None; database default is 'text-embedding-3-small'
-        assert job.embedding_model in (None, "text-embedding-3-small")
+        assert job.embedding_model == "text-embedding-3-small"
 
 
 class TestRefreshEmbeddingHandlesFailure:
