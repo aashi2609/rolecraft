@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from uuid import UUID
 
 from sqlalchemy import select, text
@@ -13,6 +14,8 @@ from services.fitment_rationale_service import (
     generate_fitment_rationale,
     template_rationale,
 )
+
+logger = logging.getLogger(__name__)
 
 
 async def ensure_job_embedding(db: AsyncSession, job: JobPosting) -> list[float]:

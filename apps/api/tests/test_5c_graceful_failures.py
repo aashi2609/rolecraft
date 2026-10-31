@@ -234,9 +234,10 @@ class TestRequestDeadline:
             mock_settings.groq_api_key = "test-key"
             mock_settings.groq_model = "test-model"
             
-            # Simulate time passing
+            # Simulate time passing - provide enough values for all time.time() calls
             start_time = 1000.0
-            mock_time.side_effect = [start_time, start_time + 5, start_time + 301]  # Exceeds 300s deadline
+            times = [start_time] + [start_time + 301] * 20  # First call + enough for retries
+            mock_time.side_effect = times
             
             mock_client.return_value.__aenter__.return_value.post.side_effect = httpx.TimeoutException("Timeout")
             

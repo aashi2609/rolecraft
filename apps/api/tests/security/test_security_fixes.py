@@ -158,7 +158,7 @@ def test_plan_limit_before_groq(client: TestClient) -> None:
                 mock_resume.return_value = {
                     "content": {"summary": "x"},
                     "ats_score": 80,
-                    "embedding": [0.0] * 1536,
+                    "embedding": [0.0] * 512,  # Step 5B: 512 dims
                     "generation_metadata": {},
                 }
                 mock_parse.return_value = {"ok": True}

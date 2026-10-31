@@ -110,16 +110,23 @@ async def _generate_deterministic(
             for c in (profile.certifications or [])[:5]
         ],
     }
-    score = _score_for(vertical, skill_names)
+    # No fake ATS score - Step 5A
     embedding_text = (
         f"{vertical} {' '.join(highlighted)} {content['summary']} {mapping_notes}"
     )
-    embedding = await embed_text(embedding_text)
+    try:
+        embedding = await embed_text(embedding_text)
+        embedding_status = EmbeddingStatus.scored.value
+    except Exception:
+        embedding = None
+        embedding_status = EmbeddingStatus.failed.value
+    
     return {
         "content": content,
-        "ats_score": score,
+        "ats_score": None,  # No fake score
         "ats_breakdown": None,
         "embedding": embedding,
+        "embedding_status": embedding_status,
         "generation_metadata": {"method": "deterministic", "model": None},
     }
 

@@ -122,7 +122,7 @@ async def test_candidate_free_resume_limit_enforced(db_session: AsyncSession):
         candidate_id=user.id,
         target_vertical="Engineering",
         content={"summary": "test"},
-        embedding=[0.0] * 1536,
+        embedding=[0.0] * 512,  # Step 5B: 512 dims
     )
     db_session.add(resume)
     await db_session.flush()
@@ -166,7 +166,7 @@ async def test_paid_candidate_unlimited_resumes(db_session: AsyncSession):
             candidate_id=user.id,
             target_vertical=f"Vertical {i}",
             content={"summary": "test"},
-            embedding=[0.0] * 1536,
+            embedding=[0.0] * 512,  # Step 5B: 512 dims
         )
         db_session.add(r)
     await db_session.flush()

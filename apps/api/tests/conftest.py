@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+import uuid  # Added for fixtures
 from pathlib import Path
 
 # Ensure apps/api root is in sys.path
@@ -180,3 +181,125 @@ async def db_session():
         yield session
         await session.rollback()
     await engine.dispose()
+
+
+# ── User and Client Fixtures ──────────────────────────────────────────────────
+
+from httpx import AsyncClient
+from models import User, UserRole, CandidateProfile, Company, PlanTier, Subscription, SubscriptionStatus
+from main import app
+import uuid
+from core.auth import create_access_token
+
+
+@pytest_asyncio.fixture
+async def candidate_user(db_session):
+    """Create a candidate user for testing."""
+    user = User(
+        id=uuid.uuid4(),
+        email=f"candidate_{uuid.uuid4().hex[:8]}@test.com",
+        password_hash="$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6",  # "password"
+        role=UserRole.candidate,
+        is_active=True,
+        token_version=1
+    )
+    db_session.add(user)
+    
+    profile = CandidateProfile(
+        user_id=user.id,
+        weblinks={"full_name": "Test Candidate"}
+    )
+    db_session.add(profile)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def company_user(db_session):
+    """Create a company user for testing."""
+    user = User(
+        id=uuid.uuid4(),
+        email=f"company_{uuid.uuid4().hex[:8]}@test.com",
+        password_hash="$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6",  # "password"
+        role=UserRole.company,
+        is_active=True,
+        token_version=1
+    )
+    db_session.add(user)
+    
+    company = Company(
+        user_id=user.id,
+        name="Test Company"
+    )
+    db_session.add(company)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def other_company_user(db_session):
+    """Create another company user for testing isolation."""
+    user = User(
+        id=uuid.uuid4(),
+        email=f"other_company_{uuid.uuid4().hex[:8]}@test.com",
+        password_hash="$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6",  # "password"
+        role=UserRole.company,
+        is_active=True,
+        token_version=1
+    )
+    db_session.add(user)
+    
+    company = Company(
+        user_id=user.id,
+        name="Other Test Company"
+    )
+    db_session.add(company)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def candidate_client(candidate_user):
+    """Authenticated AsyncClient for candidate user."""
+    token = create_access_token({"sub": str(candidate_user.id)})
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        client.headers["Authorization"] = f"Bearer {token}"
+        yield client
+
+
+@pytest_asyncio.fixture
+async def company_client(company_user):
+    """Authenticated AsyncClient for company user."""
+    token = create_access_token({"sub": str(company_user.id)})
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        client.headers["Authorization"] = f"Bearer {token}"
+        yield client
+
+
+@pytest_asyncio.fixture
+async def other_company_client(other_company_user):
+    """Authenticated AsyncClient for other company user."""
+    token = create_access_token({"sub": str(other_company_user.id)})
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        client.headers["Authorization"] = f"Bearer {token}"
+        yield client
+
+
+@pytest_asyncio.fixture
+async def add_plan(db_session):
+    """Helper fixture to add subscription plans to users."""
+    async def _add_plan(user_id: uuid.UUID, plan_tier: PlanTier):
+        subscription = Subscription(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            role=UserRole.candidate,
+            plan_tier=plan_tier,
+            status=SubscriptionStatus.active
+        )
+        db_session.add(subscription)
+        await db_session.commit()
+        return subscription
+    return _add_plan
