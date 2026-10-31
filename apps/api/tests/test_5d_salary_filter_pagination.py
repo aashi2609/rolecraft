@@ -17,7 +17,7 @@ class TestSalaryFilterBeforePagination:
         for i in range(30):
             user = User(
                 id=uuid4(),
-                email=f"candidate_{i}@test.com",
+                email=f"ps_{i}_{uuid4().hex[:4]}@test.com",  # Unique
                 password_hash="hash",
                 role=UserRole.candidate,
                 is_active=True,

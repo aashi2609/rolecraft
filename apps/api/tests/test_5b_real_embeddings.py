@@ -13,6 +13,7 @@ Comprehensive tests to verify:
 """
 
 import pytest
+import uuid
 import math
 import asyncio
 from unittest.mock import AsyncMock, patch, MagicMock

@@ -40,13 +40,15 @@ async def create_user_with_profile(
     db.add(user)
     await db.flush()
 
+    # Step 6A: Fix - Signup creates subscription with status=pending (not active)
+    # Payment verification required before status=active is set
     parsed_plan = parse_plan(plan, role)
     sub = Subscription(
         user_id=user.id,
         role=role,
         plan_tier=parsed_plan,
-        status=SubscriptionStatus.active,
-        renews_at=datetime.now(timezone.utc) + timedelta(days=30),
+        status=SubscriptionStatus.pending,  # Changed from active to pending
+        renews_at=None,  # No renewal until payment verified
     )
     db.add(sub)
 

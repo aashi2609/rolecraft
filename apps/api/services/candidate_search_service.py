@@ -299,7 +299,7 @@ def transform_profile_to_search_out(
     # Salary filtering is now done in SQL, not here
 
     match_score = calculate_match_score(skill_names, int(exp_years))
-    rationale = template_rationale(skill_names, skill_names)
+    rationale = "Profile matches target role based on skills and experience"
 
     links = profile.weblinks or {}
     display_name = (

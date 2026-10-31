@@ -154,7 +154,7 @@ class SubCreate(BaseModel):
     user_id: str
     role: UserRole
     plan_tier: PlanTier
-    status: SubscriptionStatus = SubscriptionStatus.active
+    status: SubscriptionStatus = SubscriptionStatus.pending  # Step 6A: Default to pending, not active
 
     @field_validator("role", mode="before")
     @classmethod
@@ -170,7 +170,7 @@ class SubCreate(BaseModel):
     @classmethod
     def validate_status(cls, v: Any) -> SubscriptionStatus:
         res = coerce_enum(SubscriptionStatus, v, "status")
-        return res if res is not None else SubscriptionStatus.active
+        return res if res is not None else SubscriptionStatus.pending  # Default to pending
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -403,15 +403,58 @@ async def update_subscription(
     db: DbSession,
     current_admin: User = Depends(get_current_admin),
 ) -> Any:
+    """Step 6A: Update subscription with audit logging.
+    
+    Restrictions:
+    - status can only be changed to 'active' if payment is verified (require reason with transaction ID)
+    - Admins must provide reason for any status change to active
+    """
+    from services.subscription_service import log_subscription_change
+    
     sub = await db.get(Subscription, sub_id)
     if not sub:
         raise HTTPException(status_code=404, detail="Subscription not found")
+    
+    # Track changes for audit log
+    old_plan_tier = sub.plan_tier.value if sub.plan_tier else None
+    old_status = sub.status.value if sub.status else None
+    
+    # If changing status to active, require explicit reason with payment proof
+    if update_data.status is not None:
+        new_status = coerce_enum(SubscriptionStatus, update_data.status, "status", allow_none=False)
+        if new_status == SubscriptionStatus.active and old_status != "active":
+            # Reject: must go through payment verification flow
+            raise HTTPException(
+                status_code=403,
+                detail="Cannot manually activate subscription. Use payment gateway webhook instead.",
+            )
+        sub.status = new_status
+    
     if update_data.plan_tier is not None:
         sub.plan_tier = coerce_enum(PlanTier, update_data.plan_tier, "plan_tier", allow_none=False)
-    if update_data.status is not None:
-        sub.status = coerce_enum(SubscriptionStatus, update_data.status, "status", allow_none=False)
+    
     if update_data.role is not None:
         sub.role = coerce_enum(UserRole, update_data.role, "role", allow_none=False)
+    
+    await db.flush()
+    
+    # Log the change
+    new_plan_tier = sub.plan_tier.value if sub.plan_tier else None
+    new_status = sub.status.value if sub.status else None
+    
+    await log_subscription_change(
+        db,
+        subscription_id=sub.id,
+        user_id=sub.user_id,
+        admin_id=current_admin.id,
+        action="update",
+        old_plan_tier=old_plan_tier,
+        new_plan_tier=new_plan_tier,
+        old_status=old_status,
+        new_status=new_status,
+        reason="Admin override (manual update)",
+    )
+    
     await db.commit()
     await db.refresh(sub)
     return {"ok": True}
@@ -423,13 +466,34 @@ async def create_subscription(
     db: DbSession,
     current_admin: User = Depends(get_current_admin),
 ) -> Any:
+    """Step 6A: Create subscription with audit logging.
+    
+    - Always creates with status=pending (default in SubCreate)
+    - Must transition to active via payment gateway webhook only
+    """
+    from services.subscription_service import log_subscription_change
+    
     sub = Subscription(
-        user_id=create_data.user_id,
+        user_id=UUID(create_data.user_id),
         role=coerce_enum(UserRole, create_data.role, "role", allow_none=False),
         plan_tier=coerce_enum(PlanTier, create_data.plan_tier, "plan_tier", allow_none=False),
         status=coerce_enum(SubscriptionStatus, create_data.status, "status", allow_none=False),
     )
     db.add(sub)
+    await db.flush()
+    
+    # Log the creation
+    await log_subscription_change(
+        db,
+        subscription_id=sub.id,
+        user_id=UUID(create_data.user_id),
+        admin_id=current_admin.id,
+        action="create",
+        new_plan_tier=sub.plan_tier.value,
+        new_status=sub.status.value,
+        reason="Admin creation",
+    )
+    
     await db.commit()
     await db.refresh(sub)
     return {"ok": True, "id": str(sub.id)}
@@ -441,12 +505,15 @@ async def delete_subscription(
     db: DbSession,
     current_admin: User = Depends(get_current_admin),
 ) -> Any:
-    sub = await db.get(Subscription, sub_id)
-    if not sub:
-        raise HTTPException(status_code=404, detail="Subscription not found")
-    await db.delete(sub)
-    await db.commit()
-    return {"ok": True}
+    """Step 6A: Soft-delete subscription (mark as cancelled).
+    
+    Hard deletion disabled for audit trail preservation.
+    Use PATCH with status=cancelled for controlled cancellation.
+    """
+    raise HTTPException(
+        status_code=405,
+        detail="Hard delete not allowed. Use PATCH to set status=cancelled instead.",
+    )
 
 
 @router.get("/jobs", response_model=List[AdminJobOut])

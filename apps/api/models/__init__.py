@@ -64,8 +64,9 @@ class PlanTier(str, enum.Enum):
 
 
 class SubscriptionStatus(str, enum.Enum):
-    active = "active"
-    cancelled = "cancelled"
+    pending = "pending"     # Awaiting payment verification
+    active = "active"       # Active and in good standing
+    cancelled = "cancelled" # User cancelled or expired
 
 
 class JobType(str, enum.Enum):
@@ -171,6 +172,53 @@ class Subscription(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="subscription")
+
+
+class SubscriptionAuditLog(Base):
+    """Step 6A: Audit trail for all subscription changes."""
+    __tablename__ = "subscription_audit_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    subscription_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("subscriptions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    admin_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Admin who made the change (NULL if system)",
+    )
+    action: Mapped[str] = mapped_column(
+        String(64), nullable=False,
+        comment="create, update_plan, update_status, cancel, delete"
+    )
+    old_plan_tier: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    new_plan_tier: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    old_status: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    new_status: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    reason: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True,
+        comment="Payment verified, Admin override, etc."
+    )
+    payment_transaction_id: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True,
+        comment="Transaction ID if payment-related"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
 
 
 class CandidateProfile(Base):
