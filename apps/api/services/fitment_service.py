@@ -25,29 +25,39 @@ async def ensure_job_embedding(db: AsyncSession, job: JobPosting) -> list[float]
 async def compute_fitment(
     db: AsyncSession, job: JobPosting, limit: int = 20
 ) -> list[FitmentResult]:
-    """Rank candidates by resume↔job embedding distance; skill-overlap heuristic fallback."""
+    """Rank candidates by resume↔job embedding distance; skill-overlap heuristic fallback.
+    
+    Explicitly excludes NULL embeddings (failed/pending).
+    Falls back to heuristic only when job embedding failed or no real embeddings exist.
+    """
     await ensure_job_embedding(db, job)
 
-    try:
-        rows = (
-            (
-                await db.execute(
-                    text("""
-                    SELECT r.candidate_id, r.id AS resume_id,
-                           (r.embedding <-> :job_emb) AS distance
-                    FROM resumes r
-                    WHERE r.embedding IS NOT NULL
-                    ORDER BY r.embedding <-> :job_emb
-                    LIMIT :lim
-                    """),
-                    {"job_emb": str(job.embedding), "lim": limit},
+    rows = []
+    
+    # Try embedding-based ranking if job has a valid embedding
+    if job.embedding is not None and job.embedding_status == "scored":
+        try:
+            rows = (
+                (
+                    await db.execute(
+                        text("""
+                        SELECT r.candidate_id, r.id AS resume_id,
+                               (r.embedding <-> :job_emb) AS distance
+                        FROM resumes r
+                        WHERE r.embedding IS NOT NULL
+                          AND r.embedding_status = 'scored'
+                        ORDER BY r.embedding <-> :job_emb
+                        LIMIT :lim
+                        """),
+                        {"job_emb": str(job.embedding), "lim": limit},
+                    )
                 )
+                .mappings()
+                .all()
             )
-            .mappings()
-            .all()
-        )
-    except Exception:
-        rows = []
+        except Exception as exc:
+            logger.warning("Embedding-based fitment query failed: %s. Falling back to heuristic.", exc)
+            rows = []
 
     results: list[FitmentResult] = []
     if rows:
@@ -65,6 +75,7 @@ async def compute_fitment(
             if existing:
                 existing.score = score
                 existing.rationale = rationale
+                existing.scoring_method = "embedding"  # Real embedding-based score
                 results.append(existing)
             else:
                 fr = FitmentResult(
@@ -72,12 +83,14 @@ async def compute_fitment(
                     candidate_id=row["candidate_id"],
                     score=score,
                     rationale=rationale,
+                    scoring_method="embedding",
                 )
                 db.add(fr)
                 results.append(fr)
         await db.flush()
         return results
 
+    # Heuristic fallback: use skill overlap and vertical matching when embeddings unavailable
     resumes = (await db.execute(select(Resume))).scalars().all()
     job_skills = {s.lower() for s in (job.required_skills or [])}
     scored: list[tuple[UUID, float, str]] = []
@@ -111,6 +124,7 @@ async def compute_fitment(
         if existing:
             existing.score = score
             existing.rationale = rationale
+            existing.scoring_method = "heuristic"  # Fallback heuristic, not embedding
             results.append(existing)
         else:
             fr = FitmentResult(
@@ -118,6 +132,7 @@ async def compute_fitment(
                 candidate_id=candidate_id,
                 score=score,
                 rationale=rationale,
+                scoring_method="heuristic",  # Fallback heuristic, not embedding
             )
             db.add(fr)
             results.append(fr)

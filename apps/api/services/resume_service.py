@@ -536,14 +536,23 @@ async def generate_with_autofix(
             )
             break
 
-    # Step 5: Generate embedding
+    # Step 5: Generate embedding (with error handling)
     highlighted = best_content.get("highlightedSkills", skill_names[:8])
     summary = best_content.get("summary", best_content.get("professional_summary", ""))
     mapping_notes = best_content.get(
         "mappingNotes", best_content.get("mapping_notes", "")
     )
     embedding_text = f"{vertical} {' '.join(highlighted)} {summary} {mapping_notes}"
-    embedding = await embed_text(embedding_text)
+    
+    embedding = None
+    embedding_status = "pending"
+    try:
+        from services.embedding_service import embed_text, EmbeddingError
+        embedding = await embed_text(embedding_text)
+        embedding_status = "scored"
+    except EmbeddingError as exc:
+        logger.warning("Embedding generation failed: %s. Resume will be stored without embedding.", exc)
+        embedding_status = "failed"
 
     return {
         "content": best_content,
@@ -551,6 +560,8 @@ async def generate_with_autofix(
         "ats_status": best_status,
         "ats_breakdown": best_breakdown,
         "embedding": embedding,
+        "embedding_status": embedding_status,
+        "embedding_model": "text-embedding-3-small",
         "generation_metadata": {
             "method": "ai",
             "model": settings.groq_model,

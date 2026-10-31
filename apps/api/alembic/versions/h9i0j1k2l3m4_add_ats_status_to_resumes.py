@@ -15,7 +15,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = 'h9i0j1k2l3m4'
-down_revision = 'g8h9i0j1k2l3'
+down_revision = '43b4f33a0dcf'  # After merge migration
 branch_labels = None
 depends_on = None
 

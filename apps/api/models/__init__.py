@@ -87,6 +87,13 @@ class ATSScoreStatus(str, enum.Enum):
     error = "error"            # Unexpected error during scoring
 
 
+class EmbeddingStatus(str, enum.Enum):
+    """Status of vector embedding for a resume or job."""
+    pending = "pending"         # Not yet embedded
+    scored = "scored"           # Successfully embedded
+    failed = "failed"           # Embedding API failed
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -349,9 +356,13 @@ class Resume(Base):
         Enum(ATSScoreStatus), default=ATSScoreStatus.unavailable.value
     )
     ats_breakdown: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    embedding = mapped_column(Vector(512), nullable=True)  # OpenAI text-embedding-3-small: 512 dims
+    embedding_status: Mapped[str] = mapped_column(
+        Enum(EmbeddingStatus), default=EmbeddingStatus.pending.value
+    )
+    embedding_model: Mapped[str] = mapped_column(String(64), default="text-embedding-3-small")
     generation_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     version: Mapped[int] = mapped_column(Integer, default=1)
-    embedding = mapped_column(Vector(1536), nullable=True)
     gcs_path: Mapped[Optional[str]] = mapped_column(String(1024))
     pdf_path: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -420,7 +431,11 @@ class JobPosting(Base):
     status: Mapped[JobStatus] = mapped_column(
         Enum(JobStatus, name="job_status"), default=JobStatus.draft
     )
-    embedding = mapped_column(Vector(1536), nullable=True)
+    embedding = mapped_column(Vector(512), nullable=True)  # OpenAI text-embedding-3-small: 512 dims
+    embedding_status: Mapped[str] = mapped_column(
+        Enum(EmbeddingStatus), default=EmbeddingStatus.pending.value
+    )
+    embedding_model: Mapped[str] = mapped_column(String(64), default="text-embedding-3-small")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
