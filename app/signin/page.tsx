@@ -67,6 +67,9 @@ export default function SigninPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
+              <Link href="/forgot-password" className="text-xs text-primary hover:underline mt-1 block">
+                Forgot password?
+              </Link>
             </FormField>
 
             {error && <p className="text-sm text-red-600">{error}</p>}

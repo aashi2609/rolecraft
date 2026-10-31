@@ -6,6 +6,7 @@ from core.dependencies import CurrentUser, DbSession
 from core.rate_limit import (
     RATE_LIMITS,
     enforce_limit,
+    enforce_reset_password_limits,
     get_user_key,
     limiter,
 )
@@ -17,6 +18,7 @@ from core.security import (
     verify_password,
 )
 from models import (
+    PasswordResetToken,
     User,
     UserRole,
 )
@@ -25,6 +27,7 @@ from schemas import (
     DeleteAccountRequest,
     ForgotPasswordRequest,
     RefreshTokenRequest,
+    ResetPasswordRequest,
     SigninRequest,
     SignupRequest,
     TokenResponse,
@@ -172,14 +175,104 @@ async def logout(user: CurrentUser, db: DbSession):
 @router.post("/forgot-password")
 @limiter.limit(RATE_LIMITS["forgot_password_ip"])
 async def forgot_password(
-    request: Request, response: Response, body: ForgotPasswordRequest
+    request: Request, response: Response, body: ForgotPasswordRequest, db: DbSession
 ):
-    # Per-email cap (always applied — do not leak account existence)
-    enforce_limit("forgot_password_email", body.email.lower())
-    # Always succeed — do not leak account existence
-    return {
-        "message": "If an account exists for that email, password reset instructions have been sent."
-    }
+    """Password reset request. Always returns same response (no account enumeration)."""
+    from datetime import datetime, timedelta
+    from secrets import token_urlsafe
+    import hashlib
+    from models import PasswordResetToken
+    from services.email_service import send_password_reset_email
+    
+    email = body.email.lower()
+    enforce_limit("forgot_password_email", email)
+    
+    # Find active user
+    user = await db.scalar(select(User).where(User.email == email, User.is_active == True))
+    
+    if user:
+        # Invalidate earlier unused tokens
+        await db.execute(
+            select(PasswordResetToken)
+            .where(
+                PasswordResetToken.user_id == user.id,
+                PasswordResetToken.used_at == None
+            )
+        )
+        old_tokens = (await db.execute(
+            select(PasswordResetToken).where(
+                PasswordResetToken.user_id == user.id,
+                PasswordResetToken.used_at == None
+            )
+        )).scalars().all()
+        for t in old_tokens:
+            await db.delete(t)
+        
+        # Generate new token (raw)
+        raw_token = token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        
+        # Store token (hashed)
+        reset_token = PasswordResetToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=datetime.utcnow() + timedelta(minutes=60),
+            requested_ip=request.client.host if request.client else None,
+        )
+        db.add(reset_token)
+        await db.flush()
+        
+        # Send email in background
+        from fastapi import BackgroundTasks
+        # Note: need to inject this at route level for full impl
+        await send_password_reset_email(user.email, raw_token)
+    
+    return {"message": "If an account exists for that email, password reset instructions have been sent."}
+
+
+@router.post("/reset-password")
+@limiter.limit(RATE_LIMITS["reset_password_ip"])
+async def reset_password(
+    request: Request,
+    response: Response,
+    body: ResetPasswordRequest,
+    db: DbSession,
+):
+    """Reset password using token. Generic error for security."""
+    from datetime import datetime
+    import hashlib
+    from models import PasswordResetToken
+    from core.security import hash_password
+    
+    email = request.headers.get("x-user-email", "").lower() or ""
+    enforce_reset_password_limits(request, email)
+    
+    # Hash the token from request
+    token_hash = hashlib.sha256(body.token.encode()).hexdigest()
+    
+    # Look up by hash
+    reset_token = await db.scalar(
+        select(PasswordResetToken)
+        .where(PasswordResetToken.token_hash == token_hash)
+        .options(selectinload(PasswordResetToken.user))
+    )
+    
+    if not reset_token or reset_token.used_at or reset_token.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    
+    user = await db.get(User, reset_token.user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    
+    # Update password
+    user.password_hash = hash_password(body.new_password)
+    user.token_version += 1  # Invalidate all existing tokens
+    
+    # Mark token as used
+    reset_token.used_at = datetime.utcnow()
+    
+    await db.commit()
+    return {"message": "Password reset successfully"}
 
 
 @router.post("/change-password")

@@ -60,3 +60,7 @@ README.md
 pytest-baseline*.txt
 pytest-after*.txt
 pytest-*-2a.txt
+
+# migration scripts with credentials
+apps/api/migrate_primary.bat
+apps/api/MIGRATION_INSTRUCTIONS.md
