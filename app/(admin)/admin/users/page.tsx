@@ -2,16 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/api";
+import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
 import { Search, Plus, Edit2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export default function AdminUsersPage() {
+  const { showToast } = useToast();
   const [users, setUsers] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -30,13 +33,17 @@ export default function AdminUsersPage() {
 
   const fetchUsers = () => {
     setLoading(true);
+    setError(null);
     const params: any = {};
     if (search) params.search = search;
     if (roleFilter && roleFilter !== "all") params.role = roleFilter;
     
     adminApi.getUsers(params)
       .then((data: any) => setUsers(data))
-      .catch(err => console.error(err))
+      .catch(err => {
+        console.error(err);
+        setError('Failed to load users');
+      })
       .finally(() => setLoading(false));
   };
 
@@ -55,11 +62,11 @@ export default function AdminUsersPage() {
       await adminApi.createUser(formData);
       setIsCreateOpen(false);
       fetchUsers();
-      alert(`User created successfully.\n\nPlease share the temporary password with the user so they can log in, and instruct them to change it in their Settings.`);
+      showToast('success', `User created. Password: ${formData.password}. Please share with user and ask them to change it in Settings.`);
       setFormData({ email: "", password: "", role: "candidate", is_active: true });
     } catch (err) {
       console.error(err);
-      alert("Failed to create user");
+      showToast('error', 'Failed to create user. Please check the form and try again.');
     }
   };
 
@@ -74,9 +81,10 @@ export default function AdminUsersPage() {
       });
       setIsEditOpen(false);
       fetchUsers();
+      showToast('success', 'User updated successfully');
     } catch (err) {
       console.error(err);
-      alert("Failed to update user");
+      showToast('error', 'Failed to update user. Please try again.');
     }
   };
 
@@ -86,9 +94,10 @@ export default function AdminUsersPage() {
       await adminApi.deleteUser(selectedUser.id);
       setIsDeleteOpen(false);
       fetchUsers();
+      showToast('success', 'User deleted successfully');
     } catch (err) {
       console.error(err);
-      alert("Failed to delete user");
+      showToast('error', 'Failed to delete user. Please try again.');
     }
   };
 

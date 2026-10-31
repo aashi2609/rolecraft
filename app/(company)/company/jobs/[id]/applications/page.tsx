@@ -106,7 +106,7 @@ export default function JobApplicationsPage() {
         a.id === appId ? { ...a, status } : a
       ));
     } catch (err) {
-      console.error(err);
+      console.error('Failed to update application status:', err);
     }
   }, []);
 

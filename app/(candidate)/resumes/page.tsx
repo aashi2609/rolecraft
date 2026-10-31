@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { FileText, Download, RotateCcw, CheckCircle2, Sparkles, Loader2, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
+import { useToast } from '@/components/ui/Toast';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { UpsellPrompt } from '@/components/UpsellPrompt';
@@ -15,6 +16,7 @@ import { resumesApi } from '@/lib/api';
 export default function ResumesPage() {
   const { resumes, plan, refreshResumes } = useUser();
   const router = useRouter();
+  const { showToast } = useToast();
   const [defaultResumeId, setDefaultResumeId] = useState<number | string | null>(
     resumes[0]?.id ?? null
   );
@@ -46,9 +48,10 @@ export default function ResumesPage() {
     try {
       const vertical = (resume.vertical || 'resume').replace(/\s+/g, '_').toLowerCase();
       await resumesApi.downloadPdf(id, `resume_${vertical}.pdf`);
+      showToast('success', 'Resume downloaded successfully');
     } catch (err: any) {
       console.error('Download failed:', err);
-      alert(err?.message || 'PDF download failed. Please try again.');
+      showToast('error', err?.message || 'PDF download failed. Please try again.');
     } finally {
       setDownloadingId(null);
     }
@@ -61,6 +64,7 @@ export default function ResumesPage() {
     try {
       await resumesApi.regenerate(id);
       await refreshResumes();
+      showToast('success', 'Resume regenerated successfully');
     } catch (err: any) {
       console.error('Regenerate failed:', err);
       const msg = err?.message || 'Regenerate failed';
@@ -71,7 +75,7 @@ export default function ResumesPage() {
       if (isLimit) {
         setLimitError(msg);
       } else {
-        alert(msg);
+        showToast('error', msg);
       }
     } finally {
       setRegeneratingId(null);
@@ -85,9 +89,10 @@ export default function ResumesPage() {
     try {
       await resumesApi.markCurrent(id);
       await refreshResumes();
+      showToast('success', 'Resume marked as current');
     } catch (err: any) {
       console.error('Mark current failed:', err);
-      alert(err?.message || 'Failed to mark resume as current');
+      showToast('error', err?.message || 'Failed to mark resume as current');
     } finally {
       setMarkingCurrentId(null);
     }
@@ -100,9 +105,10 @@ export default function ResumesPage() {
       await resumesApi.downloadTailored(customRole);
       setIsCustomDownloadOpen(false);
       setCustomRole('');
+      showToast('success', 'Resume downloaded successfully');
     } catch (err: any) {
       console.error('Custom download failed', err);
-      alert('Failed: ' + err.message);
+      showToast('error', 'Failed to download: ' + err.message);
     } finally {
       setIsCustomDownloading(false);
     }

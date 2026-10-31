@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/FormField';
 import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
 import { RangeSlider } from '@/components/ui/RangeSlider';
+import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { UpsellPrompt } from '@/components/UpsellPrompt';
 import { CandidateProfileModal } from '@/components/company/CandidateProfileModal';
 import { MessageModal } from '@/components/company/MessageModal';
@@ -25,7 +26,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useOffline } from '@/hooks/useOffline';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { CANDIDATE_LOCATIONS, SKILLS, VERTICALS, EDUCATION_LEVELS } from '@/lib/constants';
-import { matchLabel, SEED_CANDIDATES } from '@/lib/candidates';
+import { matchLabel } from '@/lib/candidates';
 import { hasFullFilters } from '@/lib/plans';
 import { candidateApi, ApiError } from '@/lib/api';
 
@@ -44,6 +45,7 @@ export default function SearchCandidatesPage() {
   const [page, setPage] = useState(1);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<any[]>([]);
 
   // Warn user if offline
@@ -108,6 +110,7 @@ export default function SearchCandidatesPage() {
   // Fetch candidates from API
   const fetchCandidates = async () => {
     setLoading(true);
+    setError(null);
     try {
       const params: Record<string, string | number | undefined> = {
         page,
@@ -151,26 +154,27 @@ export default function SearchCandidatesPage() {
     } catch (err: any) {
       console.error('Failed to fetch candidates:', err);
       
+      // Show error to user instead of falling back to fake data
+      let message = 'Failed to load candidates. ';
       if (err instanceof ApiError) {
         switch (err.type) {
           case 'network':
-            showToast('error', 'Network error. Using offline data.');
+            message += 'Please check your connection.';
             break;
           case 'auth':
-            showToast('error', 'Authentication failed. Please sign in again.');
+            message += 'Please sign in again.';
             break;
           case 'validation':
-            showToast('warning', 'Invalid search parameters.');
+            message += 'Invalid search parameters.';
             break;
           default:
-            showToast('error', 'Failed to load candidates. Using offline data.');
+            message = err.detail || message + 'Please try again.';
         }
       } else {
-        showToast('error', 'Unexpected error occurred.');
+        message = 'Unexpected error occurred. Please try again.';
       }
-      
-      // Fallback gracefully to seed data on connection or backend error
-      setCandidates(SEED_CANDIDATES);
+      setError(message);
+      setCandidates([]);
     } finally {
       setLoading(false);
     }
@@ -485,6 +489,12 @@ export default function SearchCandidatesPage() {
               <LoadingSpinner size="lg" className="mx-auto mb-3" />
               <p className="text-muted-foreground text-sm">Loading candidates...</p>
             </Card>
+          ) : error ? (
+            <ErrorBanner
+              message={error}
+              onRetry={() => fetchCandidates()}
+              onDismiss={() => setError(null)}
+            />
           ) : pageItems.length === 0 ? (
             <Card className="text-center py-16">
               <h3 className="text-lg font-bold text-foreground mb-2">No candidates found</h3>

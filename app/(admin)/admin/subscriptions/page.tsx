@@ -2,15 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/api";
+import { useToast } from "@/components/ui/Toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/Button";
 import { Search, Plus, Edit2, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export default function AdminSubscriptionsPage() {
+  const { showToast } = useToast();
   const [subs, setSubs] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -29,12 +32,16 @@ export default function AdminSubscriptionsPage() {
 
   const fetchSubs = () => {
     setLoading(true);
+    setError(null);
     const params: any = {};
     if (statusFilter !== "all") params.status = statusFilter;
 
     adminApi.getSubscriptions(params)
       .then((data: any) => setSubs(data))
-      .catch(err => console.error(err))
+      .catch(err => {
+        console.error(err);
+        setError('Failed to load subscriptions');
+      })
       .finally(() => setLoading(false));
   };
 
@@ -49,9 +56,10 @@ export default function AdminSubscriptionsPage() {
       setIsCreateOpen(false);
       fetchSubs();
       setFormData({ user_id: "", role: "candidate", plan_tier: "free", status: "active" });
+      showToast('success', 'Subscription created successfully');
     } catch (err) {
       console.error(err);
-      alert("Failed to create subscription");
+      showToast('error', 'Failed to create subscription. Please try again.');
     }
   };
 
@@ -66,9 +74,10 @@ export default function AdminSubscriptionsPage() {
       });
       setIsEditOpen(false);
       fetchSubs();
+      showToast('success', 'Subscription updated successfully');
     } catch (err) {
       console.error(err);
-      alert("Failed to update subscription");
+      showToast('error', 'Failed to update subscription. Please try again.');
     }
   };
 
@@ -78,9 +87,10 @@ export default function AdminSubscriptionsPage() {
       await adminApi.deleteSubscription(selectedSub.id);
       setIsDeleteOpen(false);
       fetchSubs();
+      showToast('success', 'Subscription deleted successfully');
     } catch (err) {
       console.error(err);
-      alert("Failed to delete subscription");
+      showToast('error', 'Failed to delete subscription. Please try again.');
     }
   };
 

@@ -93,6 +93,7 @@ export default function MessagesPage() {
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileShowChat, setMobileShowChat] = useState(false);
@@ -107,10 +108,13 @@ export default function MessagesPage() {
 
   const loadThreads = useCallback(async () => {
     try {
+      setError(null);
       const data = await messagesApi.threads();
       setThreads(data);
     } catch (e) {
       console.error(e);
+      setError('Failed to load messages. Please try again.');
+      setThreads([]);
     } finally {
       setLoading(false);
     }

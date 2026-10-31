@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { StepProgress } from '@/components/ui/StepProgress';
 import { StrengthMeter } from '@/components/ui/StrengthMeter';
 import { Button } from '@/components/ui/Button';
+import { useToast } from '@/components/ui/Toast';
 import { FormField, Input, Textarea } from '@/components/ui/FormField';
 import { FileDropzone } from '@/components/ui/FileDropzone';
 import { TagInput } from '@/components/ui/TagInput';
@@ -32,6 +33,7 @@ const STEPS = ['Basic', 'Education', 'Certifications', 'Experience', 'Skills'];
 
 export default function OnboardingForm() {
   const router = useRouter();
+  const { showToast } = useToast();
   const { setCandidateProfile, setProfileComplete } = useUser();
   const [currentStep, setCurrentStep] = useState(0);
   const [isParsing, setIsParsing] = useState(false);
@@ -89,7 +91,7 @@ export default function OnboardingForm() {
       }));
     } catch (error) {
       console.error('Failed to parse resume', error);
-      alert('Failed to parse resume: ' + (error as Error).message);
+      showToast('error', 'Failed to parse resume: ' + (error as Error).message);
     } finally {
       setIsParsing(false);
     }
@@ -171,7 +173,8 @@ export default function OnboardingForm() {
         });
       }
     } catch (err: any) {
-      alert(err?.detail || err?.message || 'Failed to save profile. Please try again.');
+      const message = err?.detail || err?.message || 'Failed to save profile. Please try again.';
+      showToast('error', message);
       setSaving(false);
       return;
     }

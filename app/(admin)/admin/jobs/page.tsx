@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { adminApi } from "@/lib/api";
+import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/Button";
 import { Search, Plus, Edit2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -185,10 +186,12 @@ function JobFormFields({
 }
 
 export default function AdminJobsPage() {
+  const { showToast } = useToast();
   const [jobs, setJobs] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -228,13 +231,17 @@ export default function AdminJobsPage() {
 
   const fetchJobs = () => {
     setLoading(true);
+    setError(null);
     const params: any = {};
     if (search) params.search = search;
     if (statusFilter && statusFilter !== "all") params.status = statusFilter;
     
     adminApi.getJobs(params)
       .then((data) => setJobs(data as any[]))
-      .catch(err => console.error(err))
+      .catch(err => {
+        console.error(err);
+        setError('Failed to load jobs');
+      })
       .finally(() => setLoading(false));
   };
 
@@ -280,9 +287,10 @@ export default function AdminJobsPage() {
       setIsCreateOpen(false);
       fetchJobs();
       setFormData(initialFormData);
+      showToast('success', 'Job created successfully');
     } catch (err) {
       console.error(err);
-      alert("Failed to create job");
+      showToast('error', 'Failed to create job. Please check the form and try again.');
     }
   };
 
@@ -291,14 +299,13 @@ export default function AdminJobsPage() {
     if (!selectedJob) return;
     try {
       const payload = mapFormToApi();
-      // Don't send company_id on edit to avoid validation issues if not needed,
-      // but it's safe since it's read-only. We'll send it anyway.
       await adminApi.updateJob(selectedJob.id, payload);
       setIsEditOpen(false);
       fetchJobs();
+      showToast('success', 'Job updated successfully');
     } catch (err) {
       console.error(err);
-      alert("Failed to update job");
+      showToast('error', 'Failed to update job. Please try again.');
     }
   };
 
@@ -308,9 +315,10 @@ export default function AdminJobsPage() {
       await adminApi.deleteJob(selectedJob.id);
       setIsDeleteOpen(false);
       fetchJobs();
+      showToast('success', 'Job deleted successfully');
     } catch (err) {
       console.error(err);
-      alert("Failed to delete job");
+      showToast('error', 'Failed to delete job. Please try again.');
     }
   };
 

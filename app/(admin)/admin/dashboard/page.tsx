@@ -8,13 +8,19 @@ import { Users, Briefcase, FileText, CreditCard, Activity } from "lucide-react";
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     adminApi.getStats()
       .then((data) => {
         setStats(data);
       })
-      .catch((err) => console.error(err))
+      .catch((err) => {
+        console.error(err);
+        setError('Failed to load dashboard statistics');
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -26,11 +32,11 @@ export default function AdminDashboardPage() {
     );
   }
 
-  if (!stats) {
+  if (error || !stats) {
     return (
       <div className="p-6">
         <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
-        <p className="text-red-500">Failed to load statistics.</p>
+        <p className="text-red-500">{error || 'Failed to load statistics. Please try refreshing the page.'}</p>
       </div>
     );
   }

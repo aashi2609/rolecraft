@@ -2,12 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { useUser } from '@/context/UserContext';
+import { useToast } from '@/components/ui/Toast';
 import { useParams, useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Bookmark, BookmarkCheck, MapPin, Briefcase, IndianRupee, Clock, TrendingUp, X } from 'lucide-react';
 import Link from 'next/link';
-import { jobsApi } from '@/lib/api';
+import { jobsApi, ApiError } from '@/lib/api';
 
 function mapJobFromApi(j: any) {
   // snake_case API → camelCase UI (same boundary as UserContext.mapJob / jobs/page)
@@ -99,8 +100,13 @@ export default function JobDetailPage() {
         appliedAt: new Date().toISOString(),
         resumeId: selectedResumeId || bestResume?.id,
       });
-    } catch {
-      alert('You have already applied for this job.');
+    } catch (err: any) {
+      console.error('Apply failed:', err);
+      if (err instanceof ApiError && err.status === 409) {
+        showToast('info', 'You have already applied for this job.');
+      } else {
+        showToast('error', err?.message || 'Failed to apply. Please try again.');
+      }
     }
     setIsApplyModalOpen(false);
   };

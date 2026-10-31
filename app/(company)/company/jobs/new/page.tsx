@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { useToast } from '@/components/ui/Toast';
 import { Card } from '@/components/ui/Card';
 import { FormField, Input, Textarea } from '@/components/ui/FormField';
 import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
@@ -339,11 +340,11 @@ function PostJobContent() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to parse JD';
       setJdParseNote(msg);
-      alert(msg);
+      showToast('error', msg);
     } finally {
       setParsingJd(false);
     }
-  }, [applyParsedJd]);
+  }, [applyParsedJd, showToast]);
 
   const persist = useCallback(async (status: 'Live' | 'Draft') => {
     if (atCap && status === 'Live') return;
