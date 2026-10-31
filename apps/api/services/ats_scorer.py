@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
-import random
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -26,10 +24,11 @@ class ATSIssue:
 
 @dataclass
 class ATSResult:
-    overall_score: int
-    breakdown: dict[str, int]
+    overall_score: Optional[int]
+    breakdown: Optional[dict[str, int]]
     issues: list[ATSIssue] = field(default_factory=list)
     passed: bool = False
+    error: Optional[str] = None  # Error message if scoring failed
 
 
 _SCORER_SYSTEM = """\
@@ -69,28 +68,6 @@ Return ONLY valid JSON matching this schema:
   ]
 }
 """
-
-
-def _fallback_score(vertical: str, skills: list[str]) -> ATSResult:
-    """Deterministic fallback score when Groq is unavailable."""
-    seed = int(
-        hashlib.md5(f"{vertical}:{','.join(skills)}".encode()).hexdigest()[:8], 16
-    )
-    rng = random.Random(seed)
-    base = 78 + rng.randint(0, 18) + min(6, len(skills))
-    overall = min(98, base)
-    return ATSResult(
-        overall_score=overall,
-        breakdown={
-            "keyword_match": min(100, overall + rng.randint(-5, 5)),
-            "formatting": min(100, overall + rng.randint(0, 8)),
-            "experience_relevance": min(100, overall + rng.randint(-8, 5)),
-            "skills_alignment": min(100, overall + rng.randint(-3, 7)),
-            "quantification": min(100, overall + rng.randint(-10, 3)),
-        },
-        issues=[],
-        passed=overall >= 80,
-    )
 
 
 async def score_resume(
@@ -164,5 +141,12 @@ async def score_resume(
         )
 
     except (AIServiceError, Exception) as exc:
-        logger.warning("ATS scoring fell back to deterministic: %s", exc)
-        return _fallback_score(target_vertical, all_skills)
+        error_msg = f"ATS scoring unavailable: {str(exc)}"
+        logger.error(error_msg)
+        return ATSResult(
+            overall_score=None,
+            breakdown=None,
+            issues=[],
+            passed=False,
+            error=error_msg,
+        )

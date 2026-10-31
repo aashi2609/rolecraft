@@ -1,20 +1,18 @@
 """Stage-2 resume generation — Groq-powered AI with auto-fix loop.
 
-Falls back to the deterministic Stage-1 logic when GROQ_API_KEY is empty.
+No fallback to deterministic scoring. Scoring failures return explicit error state.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
-import random
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
 from core.config import get_settings
-from models import CandidateProfile, CandidateSkill, Resume
+from models import CandidateProfile, CandidateSkill, Resume, ATSScoreStatus
 from services.ai_client import AIServiceError, generate_content
 from services.ats_scorer import ATSResult, score_resume
 from services.data_cleaner import CleanedProfile, clean_profile
@@ -40,14 +38,6 @@ VERTICAL_EMPHASIS = {
     "data": ["SQL", "analytics", "insight generation", "quantitative coursework"],
     "general": ["transferable strengths", "problem solving", "collaboration"],
 }
-
-
-def _score_for(vertical: str, skills: list[str]) -> int:
-    seed = int(
-        hashlib.md5(f"{vertical}:{','.join(skills)}".encode()).hexdigest()[:8], 16
-    )
-    rng = random.Random(seed)
-    return min(98, 78 + rng.randint(0, 18) + min(6, len(skills)))
 
 
 async def _generate_deterministic(
@@ -457,9 +447,35 @@ async def generate_with_autofix(
 
     # Step 3: Score it
     ats_result = await score_resume(content, vertical)
+    
+    # CRITICAL: If scoring fails, return immediately without consuming more quota
+    if ats_result.overall_score is None:
+        logger.error("Initial ATS scoring failed: %s. Returning error state.", ats_result.error)
+        return {
+            "content": content,
+            "ats_score": None,
+            "ats_breakdown": None,
+            "ats_status": "unavailable",
+            "embedding": None,
+            "generation_metadata": {
+                "method": "ai",
+                "model": settings.groq_model,
+                "iterations": [{
+                    "iteration": 1,
+                    "score": None,
+                    "error": ats_result.error,
+                }],
+                "final_score": None,
+                "cleaning_warnings": cleaned.warnings,
+                "started_at": started_at,
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            },
+        }
+    
     best_content = content
     best_score = ats_result.overall_score
     best_breakdown = ats_result.breakdown
+    best_status = "scored"
 
     iterations = [
         {
@@ -481,6 +497,16 @@ async def generate_with_autofix(
         try:
             fixed_content = await _fix_with_ai(current_content, current_ats, vertical)
             fixed_ats = await score_resume(fixed_content, vertical)
+            
+            # CRITICAL: Stop loop immediately if scoring fails
+            if fixed_ats.overall_score is None:
+                logger.error("Auto-fix iteration %d: ATS scoring failed: %s. Halting loop.", i, fixed_ats.error)
+                iterations.append({
+                    "iteration": i,
+                    "score": None,
+                    "error": fixed_ats.error,
+                })
+                break
 
             iterations.append(
                 {
@@ -522,6 +548,7 @@ async def generate_with_autofix(
     return {
         "content": best_content,
         "ats_score": best_score,
+        "ats_status": best_status,
         "ats_breakdown": best_breakdown,
         "embedding": embedding,
         "generation_metadata": {
@@ -584,6 +611,7 @@ async def get_or_generate_resume(
             target_vertical=target_vertical,
             content=payload["content"],
             ats_score=payload["ats_score"],
+            ats_status=payload.get("ats_status", ATSScoreStatus.unavailable.value),
             ats_breakdown=payload.get("ats_breakdown"),
             generation_metadata=payload.get("generation_metadata"),
             embedding=payload["embedding"],

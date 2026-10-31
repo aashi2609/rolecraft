@@ -80,6 +80,13 @@ class ApplicationStatus(str, enum.Enum):
     interview = "interview"
 
 
+class ATSScoreStatus(str, enum.Enum):
+    """Status of ATS scoring for a resume."""
+    scored = "scored"           # Successfully scored by AI
+    unavailable = "unavailable" # Scoring failed (Groq API error, etc.)
+    error = "error"            # Unexpected error during scoring
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -338,6 +345,9 @@ class Resume(Base):
     target_vertical: Mapped[str] = mapped_column(String(128), nullable=False)
     content: Mapped[dict] = mapped_column(JSONB, default=dict)
     ats_score: Mapped[Optional[int]] = mapped_column(Integer)
+    ats_status: Mapped[str] = mapped_column(
+        Enum(ATSScoreStatus), default=ATSScoreStatus.unavailable.value
+    )
     ats_breakdown: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     generation_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     version: Mapped[int] = mapped_column(Integer, default=1)
@@ -511,6 +521,9 @@ class FitmentResult(Base):
         index=True,
     )
     score: Mapped[float] = mapped_column(Float, nullable=False)
+    scoring_method: Mapped[str] = mapped_column(
+        String(20), default="embedding"  # "embedding" or "heuristic"
+    )
     rationale: Mapped[Optional[str]] = mapped_column(Text)
     computed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
