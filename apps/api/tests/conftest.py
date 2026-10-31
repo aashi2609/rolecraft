@@ -189,7 +189,7 @@ from httpx import AsyncClient
 from models import User, UserRole, CandidateProfile, Company, PlanTier, Subscription, SubscriptionStatus
 from main import app
 import uuid
-from core.auth import create_access_token
+from core.security import create_access_token
 
 
 @pytest_asyncio.fixture

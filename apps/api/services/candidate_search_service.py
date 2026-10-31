@@ -6,7 +6,7 @@ import re
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, Integer
 from sqlalchemy.orm import selectinload
 
 from models import CandidateProfile, CandidateSkill, Education, Experience, Skill, User
@@ -119,8 +119,46 @@ def apply_experience_filter(
     return query
 
 
+def apply_salary_filter(query, salary_min: Optional[int], salary_max: Optional[int], include_null_salary: bool = False):
+    """Apply salary filter to candidate query using SQL WHERE clause.
+    
+    Filters Experience.expected_salary (parsed as integer LPA).
+    Salary is parsed from strings like "8-12 LPA" or "8 LPA".
+    """
+    if salary_min is None and salary_max is None:
+        return query
+    
+    # Join Experience if not already joined
+    query = query.outerjoin(
+        Experience, CandidateProfile.user_id == Experience.candidate_id
+    )
+    
+    # Build salary conditions
+    conditions = []
+    
+    # Extract first number from expected_salary string (e.g., "8-12 LPA" → 8)
+    salary_expr = func.cast(
+        func.substring(Experience.expected_salary, r'^\d+'),
+        Integer
+    )
+    
+    if salary_min is not None:
+        conditions.append(salary_expr >= salary_min)
+    
+    if salary_max is not None:
+        conditions.append(salary_expr <= salary_max)
+    
+    if not include_null_salary:
+        # Exclude NULL salaries when filter is active
+        conditions.append(Experience.expected_salary.isnot(None))
+    
+    if conditions:
+        query = query.where(or_(*conditions) if len(conditions) > 1 else conditions[0])
+    
+    return query
+
+
 def apply_education_filter(query, education: Optional[str]):
-    """Apply education filter."""
     if not education:
         return query
 
@@ -241,22 +279,21 @@ def calculate_match_score(skill_names: list, exp_years: int) -> float:
 
 
 def transform_profile_to_search_out(
-    profile: CandidateProfile, salary_min: Optional[int], salary_max: Optional[int]
+    profile: CandidateProfile, salary_min: Optional[int] = None, salary_max: Optional[int] = None
 ) -> Optional[CandidateSearchOut]:
-    """Transform a CandidateProfile to CandidateSearchOut with salary filtering."""
+    """Transform a CandidateProfile to CandidateSearchOut.
+    
+    NOTE: Salary filtering is now done in SQL WHERE clause (Step 5D).
+    salary_min/salary_max parameters ignored (kept for compatibility).
+    """
     exp_years = calculate_experience_years(profile.experience)
     skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
     job_title = get_job_title(profile.experience)
     education_level = get_education_level(profile.education)
     expected_salary = parse_expected_salary(profile.experience)
 
-    # Apply salary filters after parsing
-    if salary_min is not None and expected_salary is not None:
-        if expected_salary < salary_min:
-            return None
-    if salary_max is not None and expected_salary is not None:
-        if expected_salary > salary_max:
-            return None
+    # Salary filtering is now done in SQL, not here
+    # (candidates reaching here already passed the WHERE clause)
 
     match_score = calculate_match_score(skill_names, exp_years)
     rationale = template_rationale(skill_names, skill_names)
@@ -306,6 +343,8 @@ async def search_candidates(
     """
     Search candidates with advanced filtering and pagination.
     Returns (candidates, total_count).
+    
+    STEP 5D: Salary filtering happens BEFORE pagination (in SQL WHERE clause).
     """
     # Build base query with skills preloaded
     query = select(CandidateProfile).options(
@@ -315,20 +354,24 @@ async def search_candidates(
         selectinload(CandidateProfile.user),
     )
 
-    # Apply filters in sequence
+    # Apply ALL filters in sequence (including salary) BEFORE pagination
     query = apply_keyword_filter(query, q)
     query = apply_location_filter(query, location)
     query = apply_skills_filter(query, skills)
     query = apply_experience_filter(query, experience_min, experience_max)
     query = apply_education_filter(query, education)
     query = apply_title_filter(query, title)
+    query = apply_salary_filter(query, salary_min, salary_max, include_null_salary=False)  # Step 5D
 
     # Use distinct to avoid duplicate profiles from outer joins
     query = query.distinct()
 
-    # Get total count for pagination
+    # Get total count for pagination (AFTER all filters, BEFORE LIMIT/OFFSET)
     count_query = select(func.count()).select_from(query.subquery())
     total_count = (await db.execute(count_query)).scalar() or 0
+
+    # Add deterministic ordering (sort by user_id to prevent pagination overlap/skips)
+    query = query.order_by(CandidateProfile.user_id.asc())
 
     # Apply pagination
     offset = (page - 1) * page_size
@@ -338,10 +381,10 @@ async def search_candidates(
     result = await db.execute(query)
     profiles = result.scalars().all()
 
-    # Transform to output format with salary filtering
+    # Transform to output format (NO salary filtering here - already done in SQL)
     candidates = []
     for profile in profiles:
-        candidate_out = transform_profile_to_search_out(profile, salary_min, salary_max)
+        candidate_out = transform_profile_to_search_out(profile, salary_min=None, salary_max=None)
         if candidate_out:
             candidates.append(candidate_out)
 
