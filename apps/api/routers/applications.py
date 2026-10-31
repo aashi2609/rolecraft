@@ -38,40 +38,46 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["applications"])
 
 
-async def _app_out(db, app: Application) -> ApplicationOut:
-    job = await db.get(JobPosting, app.job_id)
-    company = await db.get(Company, job.company_id) if job else None
-    user = await db.get(User, app.candidate_id)
+async def _app_out(
+    app: Application,
+    job: JobPosting = None,
+    company: Company = None,
+    user: User = None,
+    profile: CandidateProfile = None,
+    resume: Resume = None,
+) -> ApplicationOut:
+    """
+    Serialize application to ApplicationOut.
+    All supporting entities should be pre-loaded to avoid N+1 queries.
     
+    Args:
+        app: Application model instance
+        job: Pre-loaded JobPosting (from eager load or batch)
+        company: Pre-loaded Company (from batch)
+        user: Pre-loaded User (from batch)
+        profile: Pre-loaded CandidateProfile (from batch)
+        resume: Pre-loaded Resume (from eager load or batch)
+    """
     # Try to get candidate name from profile weblinks (resume parsing stores it here)
     candidate_name = None
     if user:
-        # Try to get from candidate profile weblinks
-        result = await db.execute(
-            select(CandidateProfile).where(CandidateProfile.user_id == user.id)
-        )
-        profile = result.scalar_one_or_none()
-        
         if profile and profile.weblinks:
             # Check for name variations in weblinks (from resume parsing or profile)
             candidate_name = (
                 profile.weblinks.get('full_name') or 
                 profile.weblinks.get('name') or 
                 profile.weblinks.get('display_name') or
-                profile.weblinks.get('linkedin')  # Sometimes stored as LinkedIn URL, parse it
+                profile.weblinks.get('linkedin')
             )
         
-        # If still no name, try to get from resume metadata
-        if not candidate_name and app.resume_id:
-            resume = await db.get(Resume, app.resume_id)
-            if resume:
-                # Resume might have parsed candidate name in metadata or similar field
-                pass  # Resume model doesn't have candidate_name field currently
+        # If still no name, try to get from resume metadata (if available)
+        if not candidate_name and resume:
+            # Resume might have parsed candidate name in metadata
+            pass  # Resume model doesn't have candidate_name field currently
         
         # Final fallback: use email prefix and clean it up
         if not candidate_name:
             email_prefix = user.email.split("@")[0]
-            # Replace common separators with space and title case
             candidate_name = email_prefix.replace(".", " ").replace("_", " ").replace("-", " ").title()
     
     return ApplicationOut(
@@ -140,42 +146,151 @@ async def apply(body: ApplicationCreate, user: CandidateUser, db: DbSession):
         raise HTTPException(
             status_code=400, detail="You have already applied for this job"
         )
-    return await _app_out(db, app)
+    
+    # Refresh to load relationships and convert to output
+    await db.refresh(app)
+    return await _app_out(
+        app,
+        job=job,
+        company=await db.get(Company, job.company_id) if job else None,
+        user=user,
+        profile=await db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == user.id)),
+        resume=await db.get(Resume, app.resume_id) if app.resume_id else None,
+    )
 
 
 @router.get("/applications/me", response_model=list[ApplicationOut])
 async def my_applications(user: CandidateUser, db: DbSession):
+    """
+    Get candidate's applications with optimized batch loading.
+    
+    Fetches all related data (jobs, companies, profiles) in fixed 3 queries:
+    1. Applications (with eager-loaded Job.Company and Resume)
+    2. CandidateProfiles for candidates
+    3. Users for candidates
+    
+    Query count is constant regardless of result set size.
+    """
+    # Query 1: Fetch applications with eager-loaded relationships
     apps = (
         (
             await db.execute(
                 select(Application)
+                .options(
+                    selectinload(Application.job).selectinload(JobPosting.company),
+                    selectinload(Application.resume),
+                )
                 .where(Application.candidate_id == user.id)
                 .order_by(Application.applied_at.desc())
             )
         )
         .scalars()
+        .unique()
         .all()
     )
-    return [await _app_out(db, a) for a in apps]
+    
+    if not apps:
+        return []
+    
+    # Extract candidate IDs (all should be same user, but batch for completeness)
+    candidate_ids = list(set([a.candidate_id for a in apps]))
+    
+    # Query 2: Batch-load candidate profiles
+    profiles_result = await db.execute(
+        select(CandidateProfile).where(CandidateProfile.user_id.in_(candidate_ids))
+    )
+    profiles_dict = {p.user_id: p for p in profiles_result.scalars().all()}
+    
+    # Query 3: Batch-load users
+    users_result = await db.execute(
+        select(User).where(User.id.in_(candidate_ids))
+    )
+    users_dict = {u.id: u for u in users_result.scalars().all()}
+    
+    # Serialize with pre-loaded data (no additional queries)
+    result = []
+    for app in apps:
+        profile = profiles_dict.get(app.candidate_id)
+        app_user = users_dict.get(app.candidate_id)
+        
+        result.append(await _app_out(
+            app,
+            job=app.job,
+            company=app.job.company if app.job else None,
+            user=app_user,
+            profile=profile,
+            resume=app.resume,
+        ))
+    
+    return result
 
 
 @router.get("/jobs/{job_id}/applications", response_model=list[ApplicationOut])
 async def job_applications(job_id: UUID, user: CompanyUser, db: DbSession):
+    """
+    Get applications for a specific job with optimized batch loading.
+    
+    Fetches all related data in fixed 3 queries:
+    1. Applications (with eager-loaded Job and Resume)
+    2. CandidateProfiles
+    3. Users
+    """
     job = await db.get(JobPosting, job_id)
     if not job or job.company_id != user.id:
         raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Query 1: Fetch applications with eager-loaded relationships
     apps = (
         (
             await db.execute(
                 select(Application)
+                .options(
+                    selectinload(Application.job),
+                    selectinload(Application.resume),
+                )
                 .where(Application.job_id == job_id)
                 .order_by(Application.applied_at.desc())
             )
         )
         .scalars()
+        .unique()
         .all()
     )
-    return [await _app_out(db, a) for a in apps]
+    
+    if not apps:
+        return []
+    
+    # Extract candidate IDs for batch loading
+    candidate_ids = list(set([a.candidate_id for a in apps]))
+    
+    # Query 2: Batch-load candidate profiles
+    profiles_result = await db.execute(
+        select(CandidateProfile).where(CandidateProfile.user_id.in_(candidate_ids))
+    )
+    profiles_dict = {p.user_id: p for p in profiles_result.scalars().all()}
+    
+    # Query 3: Batch-load users
+    users_result = await db.execute(
+        select(User).where(User.id.in_(candidate_ids))
+    )
+    users_dict = {u.id: u for u in users_result.scalars().all()}
+    
+    # Serialize with pre-loaded data
+    result = []
+    for app in apps:
+        profile = profiles_dict.get(app.candidate_id)
+        app_user = users_dict.get(app.candidate_id)
+        
+        result.append(await _app_out(
+            app,
+            job=app.job or job,  # Use job from app if present, else the queried job
+            company=job.company,  # Use the company from the job
+            user=app_user,
+            profile=profile,
+            resume=app.resume,
+        ))
+    
+    return result
 
 
 @router.patch(
@@ -196,7 +311,19 @@ async def update_status(
     app.status = coerce_enum(ApplicationStatus, body.status, "status", allow_none=False)
     await db.flush()
 
-    result = await _app_out(db, app)
+    # Batch load related data for serialization
+    app_user = await db.get(User, app.candidate_id)
+    profile = await db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == app.candidate_id))
+    company = await db.get(Company, job.company_id) if job else None
+    
+    result = await _app_out(
+        app,
+        job=job,
+        company=company,
+        user=app_user,
+        profile=profile,
+        resume=None,  # Not needed for status update response
+    )
 
     # Broadcast real-time update to the candidate
     await ws_manager.send_to_user(

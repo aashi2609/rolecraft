@@ -17,7 +17,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create PaymentStatus enum
+    # Create PaymentStatus enum (if not exists)
     payment_status_enum = postgresql.ENUM(
         "pending",
         "completed",
@@ -25,18 +25,20 @@ def upgrade() -> None:
         "cancelled",
         "refunded",
         name="payment_status",
+        create_type=False,  # Don't fail if exists
     )
-    payment_status_enum.create(op.get_bind())
+    payment_status_enum.create(op.get_bind(), checkfirst=True)
 
-    # Create BillingPeriod enum
+    # Create BillingPeriod enum (if not exists)
     billing_period_enum = postgresql.ENUM(
         "monthly",
         "quarterly",
         "annual",
         "lifetime",
         name="billing_period",
+        create_type=False,  # Don't fail if exists
     )
-    billing_period_enum.create(op.get_bind())
+    billing_period_enum.create(op.get_bind(), checkfirst=True)
 
     # Create price_points table
     op.create_table(
@@ -62,6 +64,7 @@ def upgrade() -> None:
                 "corporate_annual",
                 "corporate_lifetime",
                 name="plan_tier",
+                create_type=False,  # Don't fail if exists
             ),
             nullable=False,
         ),
@@ -201,6 +204,13 @@ def downgrade() -> None:
     # Drop price_points table
     op.drop_table("price_points")
 
-    # Drop enums
-    op.execute("DROP TYPE payment_status CASCADE")
-    op.execute("DROP TYPE billing_period CASCADE")
+    # Drop enums (if they exist and are not used elsewhere)
+    try:
+        op.execute("DROP TYPE IF EXISTS payment_status CASCADE")
+    except Exception:
+        pass
+    
+    try:
+        op.execute("DROP TYPE IF EXISTS billing_period CASCADE")
+    except Exception:
+        pass

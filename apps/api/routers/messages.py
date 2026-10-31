@@ -33,7 +33,28 @@ async def _participant_label(db: DbSession, user_id: UUID) -> str:
 
 @router.get("/threads", response_model=list[ThreadOut])
 async def list_threads(user: CurrentUser, db: DbSession):
-    # Get all conversations for this user
+    """Get all message threads for current user with optimized batch loading.
+    
+    Optimized to fetch all supplementary data in fixed 6 queries:
+    1. Conversations
+    2. Last messages per conversation
+    3. Unread counts
+    4. Companies + Candidate profiles
+    5. Users
+    6. Latest experiences
+    7. Related jobs (if any)
+    
+    Query count is constant regardless of result set size.
+    """
+    from services.message_thread_service import (
+        get_last_messages_per_conversation,
+        get_unread_counts_per_conversation,
+        batch_load_participants,
+        batch_load_experiences,
+        batch_load_jobs,
+    )
+    
+    # Query 1: Get all conversations for this user
     if user.role == UserRole.candidate:
         stmt = select(Conversation).where(Conversation.candidate_id == user.id)
     elif user.role == UserRole.company:
@@ -43,46 +64,78 @@ async def list_threads(user: CurrentUser, db: DbSession):
     
     conversations = (await db.execute(stmt.order_by(Conversation.last_message_at.desc()))).scalars().all()
     
+    if not conversations:
+        return []
+    
+    # Extract IDs for batch queries
+    conv_ids = [c.id for c in conversations]
+    user_ids = []
+    candidate_ids = []
+    job_ids = []
+    
+    for conv in conversations:
+        # Determine other user's ID
+        other_id = conv.company_id if user.role == UserRole.candidate else conv.candidate_id
+        user_ids.append(other_id)
+        
+        if user.role == UserRole.company:
+            candidate_ids.append(conv.candidate_id)
+        
+        if conv.job_id:
+            job_ids.append(conv.job_id)
+    
+    # Batch load all supplementary data
+    # Query 2: Last messages
+    last_messages = await get_last_messages_per_conversation(db, conv_ids)
+    
+    # Query 3: Unread counts
+    unread_counts = await get_unread_counts_per_conversation(db, conv_ids, user.id)
+    
+    # Query 4-6: Participants, experiences, jobs
+    companies, profiles, users = await batch_load_participants(db, user_ids)
+    experiences = await batch_load_experiences(db, candidate_ids) if candidate_ids else {}
+    jobs = await batch_load_jobs(db, job_ids) if job_ids else {}
+    
+    # Single serialization pass with all data pre-loaded
     out: list[ThreadOut] = []
     for conv in conversations:
-        # Get last message
-        last_msg = await db.scalar(select(Message).where(Message.conversation_id == conv.id).order_by(Message.sent_at.desc()).limit(1))
-        
-        # Determine the other user's ID
         other_id = conv.company_id if user.role == UserRole.candidate else conv.candidate_id
-        label = await _participant_label(db, other_id)
         
-        # Calculate unread count
-        unread = await db.scalar(select(sa.func.count(Message.id)).where(Message.conversation_id == conv.id, Message.sender_id != user.id, Message.read_at.is_(None)))
-
-        # Avatar URL and subtitle
-        avatar_url = None
-        subtitle = None
+        # Get participant info from pre-loaded dicts
         if user.role == UserRole.candidate:
-            # Other side is company — get logo
-            company = await db.scalar(select(Company).where(Company.user_id == other_id))
-            if company:
-                avatar_url = company.logo_url
-                subtitle = company.industry
+            # Other side is company
+            company = companies.get(other_id)
+            label = company.name if company and company.name else (users.get(other_id).email if other_id in users else "Unknown")
+            avatar_url = company.logo_url if company else None
+            subtitle = company.industry if company else None
         else:
-            # Other side is candidate — get photo
-            profile = await db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == other_id))
-            if profile:
-                avatar_url = profile.photo_url
-                # Try to get latest job title from experience
-                from models import Experience
-                exp = await db.scalar(
-                    select(Experience).where(Experience.candidate_id == other_id).order_by(Experience.from_date.desc().nullslast()).limit(1)
-                )
-                subtitle = exp.designation if exp and exp.designation else None
-
-        # Job title from conversation's linked job
+            # Other side is candidate
+            profile = profiles.get(other_id)
+            user_obj = users.get(other_id)
+            
+            # Build participant label
+            if profile and profile.weblinks and profile.weblinks.get("display_name"):
+                label = profile.weblinks["display_name"]
+            elif profile and profile.full_name:
+                label = profile.full_name
+            else:
+                label = user_obj.email if user_obj else "Unknown"
+            
+            avatar_url = profile.photo_url if profile else None
+            
+            # Get latest designation for subtitle
+            exp = experiences.get(conv.candidate_id)
+            subtitle = exp.designation if exp and exp.designation else None
+        
+        # Get job title if conversation is linked to a job
         job_title = None
-        if conv.job_id:
-            job = await db.scalar(select(JobPosting).where(JobPosting.id == conv.job_id))
-            if job:
-                job_title = job.title or job.job_role
-
+        if conv.job_id and conv.job_id in jobs:
+            job = jobs[conv.job_id]
+            job_title = job.title or job.job_role
+        
+        # Get last message preview
+        last_msg = last_messages.get(conv.id)
+        
         out.append(
             ThreadOut(
                 thread_id=conv.id,
@@ -90,12 +143,13 @@ async def list_threads(user: CurrentUser, db: DbSession):
                 last_sent_at=conv.last_message_at,
                 participant_label=label,
                 other_user_id=other_id,
-                unread_count=unread or 0,
+                unread_count=unread_counts.get(conv.id, 0),
                 avatar_url=avatar_url,
                 job_title=job_title,
                 subtitle=subtitle,
             )
         )
+    
     return out
 
 

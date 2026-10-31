@@ -111,7 +111,10 @@ async def create_job(
     db.add(job)
     await db.flush()
     await refresh_job_embedding(db, job)
-    return await enrich_job(db, job)
+    
+    # Load company for enrichment
+    await db.refresh(job)
+    return await enrich_job(job, company=job.company, stats=None)
 
 
 @router.get("", response_model=list[JobOut])
@@ -185,13 +188,24 @@ async def my_jobs(user: CompanyUser, db: DbSession):
             await db.execute(
                 select(JobPosting)
                 .where(JobPosting.company_id == user.id)
+                .options(selectinload(JobPosting.company))
                 .order_by(JobPosting.created_at.desc())
             )
         )
         .scalars()
         .all()
     )
-    return [await enrich_job(db, j) for j in jobs]
+    
+    if not jobs:
+        return []
+    
+    # Fetch application stats in single query
+    from services.job_search_service import get_job_stats
+    job_ids = [j.id for j in jobs]
+    stats = await get_job_stats(db, job_ids)
+    
+    # Enrich with pre-loaded data
+    return [await enrich_job(j, company=j.company, stats=stats) for j in jobs]
 
 
 @router.get("/hidden")

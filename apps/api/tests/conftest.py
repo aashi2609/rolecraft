@@ -332,3 +332,25 @@ async def current_admin(db_session):
     await db_session.commit()
     await db_session.refresh(admin)
     return admin
+
+
+# ── Query Profiling Fixtures ──────────────────────────────────────────────────
+
+@pytest.fixture
+def db_profiler():
+    """Get or create a database profiler for the current test.
+    
+    Usage:
+        async def test_example(db_profiler):
+            # Make queries...
+            assert db_profiler.query_count <= 5, f"Expected ≤5 queries, got {db_profiler.query_count}"
+    """
+    from core.query_profiler import RequestProfiler, set_current_profiler, get_current_profiler
+    
+    profiler = get_current_profiler()
+    if profiler is None:
+        profiler = RequestProfiler()
+        set_current_profiler(profiler)
+    
+    profiler.reset()  # Reset at start of each test
+    return profiler

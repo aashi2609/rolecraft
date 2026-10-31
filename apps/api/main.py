@@ -50,6 +50,15 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 app.add_exception_handler(RateLimited, rate_limit_exceeded_handler)
 
+# Query Profiler middleware (test/debug mode only)
+if not settings.is_production:
+    from core.query_profiler import ProfilerMiddleware, install_profiler
+    from core.database import engine
+    
+    app.add_middleware(ProfilerMiddleware, enabled=True)
+    install_profiler(engine, enabled=True)
+    logger.info("Query profiler enabled (dev/test mode)")
+
 # Request ID middleware
 app.add_middleware(RequestIdMiddleware)
 
