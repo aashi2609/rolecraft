@@ -303,3 +303,32 @@ async def add_plan(db_session):
         await db_session.commit()
         return subscription
     return _add_plan
+
+
+@pytest_asyncio.fixture
+async def current_admin(db_session):
+    """Create or get an admin user for testing."""
+    from sqlalchemy import select
+    
+    # Try to get existing admin
+    existing_admin = await db_session.scalar(
+        select(User).where(User.role == UserRole.admin).limit(1)
+    )
+    
+    if existing_admin:
+        await db_session.refresh(existing_admin)
+        return existing_admin
+    
+    # Create new admin
+    admin = User(
+        id=uuid.uuid4(),
+        email=f"admin_{uuid.uuid4().hex[:8]}@test.com",
+        password_hash="$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6",  # "password"
+        role=UserRole.admin,
+        is_active=True,
+        token_version=1
+    )
+    db_session.add(admin)
+    await db_session.commit()
+    await db_session.refresh(admin)
+    return admin

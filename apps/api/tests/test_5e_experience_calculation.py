@@ -157,7 +157,7 @@ class TestTotalExperienceYears:
         ]
         total, internship = total_experience_years(exp, as_of=date(2021, 9, 1), include_internships=False)
         assert abs(total - 1.0) < 0.1
-        assert abs(internship - 0.17) < 0.05  # Jul-Sep = ~2 months = 0.17 years, rounds to 0.2
+        assert abs(internship - 0.17) < 0.1  # Jul-Sep = ~2 months = 0.17 years
 
     def test_no_experience_returns_zero(self):
         """Employee with no experience rows returns (0.0, 0.0)."""

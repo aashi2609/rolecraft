@@ -167,8 +167,8 @@ class TestAdminCannotManuallyActivate:
     async def test_patch_endpoint_rejects_status_to_active(self, db_session, candidate_user, current_admin):
         """PATCH /admin/subscriptions/{id} rejects status=active."""
         # This test requires a proper admin user and route setup
-        # Placeholder for integration test
-        pass
+        # Placeholder for integration test - skip for now
+        pytest.skip("Integration test placeholder - requires full route setup")
 
     async def test_admin_can_modify_plan_tier(self, db_session):
         """Admin can still change plan_tier (just not status to active)."""
@@ -212,8 +212,8 @@ class TestSoftDelete:
     async def test_delete_endpoint_disabled(self, db_session, candidate_user):
         """DELETE /admin/subscriptions/{id} returns 405."""
         # Integration test would call the route and assert 405
-        # Placeholder for route testing
-        pass
+        # Placeholder for route testing - skip for now
+        pytest.skip("Integration test placeholder - requires full route setup")
 
     async def test_mark_as_cancelled_preserves_audit(self, db_session):
         """Cancelling a subscription preserves audit history."""

@@ -54,7 +54,7 @@ class TestSalaryFilterBeforePagination:
         for i in range(5):
             user = User(
                 id=uuid4(),
-                email=f"c_{i}@test.com",
+                email=f"c_{i}_{uuid4().hex[:4]}@test.com",
                 password_hash="h",
                 role=UserRole.candidate,
                 is_active=True,
@@ -88,7 +88,7 @@ class TestSalaryFilterBeforePagination:
         for i in range(25):
             user = User(
                 id=uuid4(),
-                email=f"c_{i}@test.com",
+                email=f"c_{i}_{uuid4().hex[:4]}@test.com",
                 password_hash="h",
                 role=UserRole.candidate,
                 is_active=True,
@@ -115,7 +115,7 @@ class TestSalaryFilterBeforePagination:
         for i in range(5):
             user = User(
                 id=uuid4(),
-                email=f"c_{i}@test.com",
+                email=f"c_{i}_{uuid4().hex[:4]}@test.com",
                 password_hash="h",
                 role=UserRole.candidate,
                 is_active=True,
@@ -148,7 +148,7 @@ class TestSalaryFilterBeforePagination:
         for salary in [8, 9, 10, 11, 12]:
             user = User(
                 id=uuid4(),
-                email=f"c_{salary}@test.com",
+                email=f"c_{salary}_{uuid4().hex[:4]}@test.com",
                 password_hash="h",
                 role=UserRole.candidate,
                 is_active=True,
@@ -236,7 +236,7 @@ class TestSalaryFilterBeforePagination:
         for i in range(30):
             user = User(
                 id=uuid4(),
-                email=f"c_{i}@test.com",
+                email=f"c_{i}_{uuid4().hex[:4]}@test.com",
                 password_hash="h",
                 role=UserRole.candidate,
                 is_active=True,
