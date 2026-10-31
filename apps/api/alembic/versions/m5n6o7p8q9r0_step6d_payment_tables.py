@@ -17,27 +17,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Enums that must be created first (if not exist)
-    payment_status_enum = postgresql.ENUM(
-        "pending",
-        "completed",
-        "failed",
-        "cancelled",
-        "refunded",
-        name="payment_status",
-        create_type=True,
-    )
-    payment_status_enum.create(op.get_bind(), checkfirst=True)
-
-    billing_period_enum = postgresql.ENUM(
-        "monthly",
-        "quarterly",
-        "annual",
-        "lifetime",
-        name="billing_period",
-        create_type=True,
-    )
-    billing_period_enum.create(op.get_bind(), checkfirst=True)
+    # Create enums using raw SQL with IF NOT EXISTS to avoid duplicates
+    op.execute("CREATE TYPE IF NOT EXISTS payment_status AS ENUM ('pending', 'completed', 'failed', 'cancelled', 'refunded')")
+    op.execute("CREATE TYPE IF NOT EXISTS billing_period AS ENUM ('monthly', 'quarterly', 'annual', 'lifetime')")
 
     # plan_tier enum already exists from previous migration, so reference it
     # Don't try to create it again
@@ -72,7 +54,14 @@ def upgrade() -> None:
         ),
         sa.Column(
             "billing_period",
-            billing_period_enum,
+            postgresql.ENUM(
+                "monthly",
+                "quarterly",
+                "annual",
+                "lifetime",
+                name="billing_period",
+                create_type=False,  # Already created above via raw SQL
+            ),
             nullable=False,
         ),
         sa.Column("amount_paise", sa.Integer(), nullable=False),
@@ -128,7 +117,15 @@ def upgrade() -> None:
         sa.Column("razorpay_signature", sa.String(255), nullable=True),
         sa.Column(
             "status",
-            payment_status_enum,
+            postgresql.ENUM(
+                "pending",
+                "completed",
+                "failed",
+                "cancelled",
+                "refunded",
+                name="payment_status",
+                create_type=False,  # Already created above via raw SQL
+            ),
             nullable=False,
             server_default="pending",
         ),
