@@ -20,7 +20,7 @@ jobs:
 
     services:
       postgres:
-        image: pgvector/pgvector:pg15-latest
+        image: pgvector/pgvector:pg15
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -180,8 +180,8 @@ jobs:
 
       - name: Check .env.example exists
         run: |
-          [ -f .env.example ] && [ -f apps/api/.env.example ] || \
-          (echo ".env.example missing" && exit 1)
+          test -f .env.example || test -f .env.local.example || (echo "Root .env.example missing" && exit 1)
+          test -f apps/api/.env.example || (echo "Backend .env.example missing" && exit 1)
 
       - name: Check for tracked secrets/dumps
         run: |
