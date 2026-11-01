@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python 3.11.9
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11.9'
           cache: pip
@@ -113,7 +113,7 @@ jobs:
             --junit-xml=junit.xml 2>&1 | tee test_output.log
 
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           files: ./apps/api/coverage.xml
           flags: backend
@@ -121,7 +121,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: backend-test-results
           path: |
@@ -130,7 +130,7 @@ jobs:
             apps/api/coverage.xml
 
   frontend:
-    name: Frontend (Node 20.11.1)
+    name: Frontend (Node 20.19.0)
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -138,10 +138,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20.11.1
+      - name: Set up Node.js 20.19.0
         uses: actions/setup-node@v4
         with:
-          node-version: 20.11.1
+          node-version: 20.19.0
           cache: npm
 
       - name: Install dependencies
