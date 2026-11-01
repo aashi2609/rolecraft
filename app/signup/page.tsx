@@ -8,7 +8,7 @@ import { FormField, Input } from '@/components/ui/FormField';
 import Link from 'next/link';
 import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
 import { Logo } from '@/components/Logo';
-import { isFreePlan, type PlanId } from '@/lib/plans';
+import { /*isFreePlan*/ type PlanId } from '@/lib/plans';
 
 function SignupForm() {
   const searchParams = useSearchParams();

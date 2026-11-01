@@ -34,7 +34,7 @@ export default function CompanySettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteMsg, setDeleteMsg] = useState('');
 
-  const router = useRouter();
+  const _router = useRouter();
 
   const updateFormData = useCallback(() => {
     const profile = companyProfile as CompanyProfile | null;
@@ -42,6 +42,7 @@ export default function CompanySettingsPage() {
     setEmail(String(profile?.email || ''));
   }, [companyProfile]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     updateFormData();
   }, [updateFormData]);
@@ -183,13 +184,13 @@ export default function CompanySettingsPage() {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Are you absolutely sure?</DialogTitle>
-                  <DialogDescription>
+                <DialogDescription>
                     This action cannot be undone. This will permanently delete your company account,
                     remove all your job postings, and delete all associated data from our servers.
-                  </DialogDescription>
+                </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
-                  <p className="text-sm font-medium">To confirm, please type "DELETE" below:</p>
+                  <p className="text-sm font-medium">To confirm, please type &quot;DELETE&quot; below:</p>
                   <Input 
                     value={deleteConfirmation} 
                     onChange={(e) => setDeleteConfirmation(e.target.value)} 

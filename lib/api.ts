@@ -10,10 +10,29 @@ function resolveApiUrl(): string {
   const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (configured) return configured.replace(/\/$/, "");
   if (typeof window !== "undefined") return "/backend";
-  return "http://127.0.0.1:8000";
+  // Server-side: no fallback; will error if NEXT_PUBLIC_API_URL not set at build time
+  throw new Error(
+    "API URL not configured. Set NEXT_PUBLIC_API_URL environment variable."
+  );
 }
 
 const API_URL = resolveApiUrl();
+
+// Build-time validation: DISABLED locally, will be checked in CI on Linux with proper production env
+// In CI/production, ensure API URL is configured and not localhost
+if (process.env.NODE_ENV === "production" && process.env.CI === "true") {
+  const url = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!url) {
+    throw new Error(
+      "Production build failed: NEXT_PUBLIC_API_URL must be set to a non-localhost URL."
+    );
+  }
+  if (url.includes("localhost") || url.includes("127.0.0.1")) {
+    throw new Error(
+      `Production build failed: NEXT_PUBLIC_API_URL must not point to localhost. Got: ${url}`
+    );
+  }
+}
 const TOKEN_KEY = 'rolecraft_token';
 
 // Request cancellation manager
@@ -62,28 +81,71 @@ export function setToken(token: string | null) {
 export class ApiError extends Error {
   status: number;
   detail: string;
-  type: 'network' | 'validation' | 'server' | 'auth' | 'unknown';
-  constructor(status: number, detail: string) {
+  type: 'network' | 'validation' | 'server' | 'auth' | 'rate_limit' | 'unknown';
+  errorCode?: string;
+  retryAfter?: number;
+
+  constructor(status: number, detail: string, errorCode?: string, retryAfter?: number) {
     super(detail);
     this.status = status;
     this.detail = detail;
+    this.errorCode = errorCode;
+    this.retryAfter = retryAfter;
     this.type = this.classifyError(status);
   }
 
-  private classifyError(status: number): 'network' | 'validation' | 'server' | 'auth' | 'unknown' {
+  private classifyError(status: number): 'network' | 'validation' | 'server' | 'auth' | 'rate_limit' | 'unknown' {
+    if (status === 429) return 'rate_limit';
     if (status === 0 || status >= 500) return 'network';
     if (status === 401 || status === 403) return 'auth';
     if (status >= 400 && status < 500) return 'validation';
     if (status >= 500) return 'server';
     return 'unknown';
   }
+
+  // User-friendly message mapping
+  getUserMessage(): string {
+    if (this.errorCode === 'ai_unavailable') {
+      return 'AI service is temporarily unavailable. Please try again in a moment.';
+    }
+    if (this.errorCode === 'ai_rate_limited') {
+      return 'AI service rate limit reached. Please try again in a few minutes.';
+    }
+    if (this.errorCode === 'ai_timeout') {
+      return 'AI request took too long. Please try again with a simpler request.';
+    }
+    if (this.errorCode === 'plan_required') {
+      return 'This feature requires an active subscription. Please upgrade your plan.';
+    }
+    if (this.errorCode === 'quota_exceeded') {
+      return 'You have reached your usage quota. Please upgrade for more.';
+    }
+    if (this.errorCode === 'plan_expired') {
+      return 'Your subscription has expired. Please renew to continue.';
+    }
+    if (this.type === 'rate_limit') {
+      return `Too many requests. Please try again in ${this.retryAfter || 60} seconds.`;
+    }
+    if (this.type === 'auth' && this.status === 401) {
+      return 'Your session has expired. Please sign in again.';
+    }
+    if (this.type === 'auth' && this.status === 403) {
+      return 'You do not have permission to perform this action.';
+    }
+    if (this.type === 'network') {
+      return 'Network error. Please check your connection and try again.';
+    }
+    return this.detail || 'An error occurred. Please try again.';
+  }
 }
 
-type Opts = RequestInit & { auth?: boolean; formData?: FormData; retries?: number; signal?: AbortSignal };
+type Opts = RequestInit & { auth?: boolean; formData?: FormData; retries?: number; signal?: AbortSignal; timeout?: number };
 
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1_000;
 const MAX_DELAY_MS = 10_000;
+const DEFAULT_TIMEOUT_MS = 30_000; // 30 seconds
+const AI_TIMEOUT_MS = 90_000; // 90 seconds for AI actions
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -93,8 +155,18 @@ function calculateDelay(attempt: number): number {
   return Math.min(BASE_DELAY_MS * 2 ** attempt, MAX_DELAY_MS);
 }
 
+function createTimeoutSignal(timeoutMs: number): AbortSignal {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  // Clean up timeout if request completes before timeout
+  controller.signal.addEventListener('abort', () => clearTimeout(timeoutId), { once: true });
+  
+  return controller.signal;
+}
+
 export async function api<T = unknown>(path: string, opts: Opts = {}): Promise<T> {
-  const { auth, formData, retries, signal, body, headers: optHeaders, ...fetchInit } = opts;
+  const { auth, formData, retries, signal, body, headers: optHeaders, timeout, ...fetchInit } = opts;
   const headers = new Headers(optHeaders || {});
   if (!formData && !headers.has('Content-Type') && body) {
     headers.set('Content-Type', 'application/json');
@@ -105,6 +177,8 @@ export async function api<T = unknown>(path: string, opts: Opts = {}): Promise<T
   }
 
   const maxRetries = retries ?? MAX_RETRIES;
+  const timeoutMs = timeout ?? (path.includes('/resumes/') || path.includes('/jobs/parse') ? AI_TIMEOUT_MS : DEFAULT_TIMEOUT_MS);
+  const finalSignal = signal || createTimeoutSignal(timeoutMs);
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -113,18 +187,28 @@ export async function api<T = unknown>(path: string, opts: Opts = {}): Promise<T
         ...fetchInit,
         headers,
         body: formData ?? body,
-        signal,
+        signal: finalSignal,
       });
 
       if (!res.ok) {
         let detail = res.statusText;
+        let errorCode: string | undefined;
+        let retryAfter: number | undefined;
+
+        // Parse Retry-After header for rate limits
+        const retryAfterHeader = res.headers.get('Retry-After');
+        if (retryAfterHeader) {
+          retryAfter = parseInt(retryAfterHeader, 10);
+        }
+
         try {
           const data = await res.json();
           detail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+          errorCode = data.error_code || data.code;
         } catch {
           /* ignore */
         }
-        throw new ApiError(res.status, detail);
+        throw new ApiError(res.status, detail, errorCode, retryAfter);
       }
 
       if (res.status === 204) return undefined as T;
@@ -139,9 +223,9 @@ export async function api<T = unknown>(path: string, opts: Opts = {}): Promise<T
         }
       }
 
-      // Don't retry if request was aborted
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw error;
+      // Don't retry if request was aborted or timed out
+      if (error instanceof DOMException && (error.name === 'AbortError' || error.message.includes('timeout'))) {
+        throw new ApiError(0, 'Request timed out. Please try again.');
       }
 
       // Don't retry on last attempt

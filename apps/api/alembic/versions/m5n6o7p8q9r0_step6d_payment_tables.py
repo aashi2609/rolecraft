@@ -17,9 +17,19 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create enums using raw SQL with IF NOT EXISTS to avoid duplicates
-    op.execute("CREATE TYPE IF NOT EXISTS payment_status AS ENUM ('pending', 'completed', 'failed', 'cancelled', 'refunded')")
-    op.execute("CREATE TYPE IF NOT EXISTS billing_period AS ENUM ('monthly', 'quarterly', 'annual', 'lifetime')")
+    # Create enums using PL/pgSQL block to handle duplicates (asyncpg-safe)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE payment_status AS ENUM ('pending', 'completed', 'failed', 'cancelled', 'refunded');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$;
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE billing_period AS ENUM ('monthly', 'quarterly', 'annual', 'lifetime');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$;
+    """)
 
     # plan_tier enum already exists from previous migration, so reference it
     # Don't try to create it again

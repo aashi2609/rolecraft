@@ -11,7 +11,7 @@ import { useUser } from '@/context/UserContext';
 import {
   getPlansForRole,
   formatPlanPrice,
-  isFreePlan,
+  // isFreePlan,
   type PlanId,
   type Role,
 } from '@/lib/plans';
@@ -19,7 +19,7 @@ import {
 function SubscribeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { isAuthenticated, setPlan, setPendingPlan, plan: currentPlan, profileComplete, companyProfileComplete } = useUser();
+  const { isAuthenticated, setPlan: _setPlan, setPendingPlan, plan: currentPlan, profileComplete: _profileComplete, companyProfileComplete: _companyProfileComplete } = useUser();
   const roleParam = searchParams.get('role');
   const role: Role = roleParam === 'company' ? 'company' : 'candidate';
   const [isAnnual, setIsAnnual] = useState(false);

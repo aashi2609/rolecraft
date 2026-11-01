@@ -20,9 +20,18 @@ function resolveWsBase(): string {
   if (api && /^https?:\/\//i.test(api)) {
     return api.replace(/^http/, 'ws').replace(/\/$/, '');
   }
-  const direct =
-    process.env.NEXT_PUBLIC_WS_URL?.trim() || 'http://127.0.0.1:8000';
-  return direct.replace(/^http/, 'ws').replace(/\/$/, '');
+  const configured = process.env.NEXT_PUBLIC_WS_URL?.trim();
+  if (configured) {
+    return configured.replace(/^http/, 'ws').replace(/\/$/, '');
+  }
+  // In browser, use relative protocol-relative URL for same origin
+  if (typeof window !== 'undefined') {
+    return `ws${window.location.protocol === 'https:' ? 's' : ''}://${window.location.host}`;
+  }
+  // Server-side build: error if not configured
+  throw new Error(
+    "WebSocket URL not configured. Set NEXT_PUBLIC_API_URL or NEXT_PUBLIC_WS_URL."
+  );
 }
 
 const WS_BASE = resolveWsBase();
@@ -119,30 +128,30 @@ export function useApplicationSocket({ onEvent, onPollFallback, enabled }: UseSo
       }
     };
 
-    ws.onclose = () => {
-      if (pingTimerRef.current) {
-        clearInterval(pingTimerRef.current);
-        pingTimerRef.current = null;
-      }
-
-      if (unmountedRef.current) return;
-
-      retriesRef.current += 1;
-      if (retriesRef.current > MAX_RETRIES) {
-        // Exceeded retry limit — fall back to HTTP polling
-        startPolling();
-        return;
-      }
-
-      // Exponential backoff: 1s, 2s, 4s, 8s, 16s, capped at 30s
-      const delay = Math.min(BASE_DELAY_MS * 2 ** (retriesRef.current - 1), MAX_DELAY_MS);
-      reconnectTimerRef.current = setTimeout(connect, delay);
-    };
-
     ws.onerror = () => {
       // onclose will fire after onerror — reconnection handled there
     };
-  }, [onEvent, startPolling, stopPolling]);
+  }, [onEvent, stopPolling]);
+
+  const reconnect = useCallback(() => {
+    if (pingTimerRef.current) {
+      clearInterval(pingTimerRef.current);
+      pingTimerRef.current = null;
+    }
+
+    if (unmountedRef.current) return;
+
+    retriesRef.current += 1;
+    if (retriesRef.current > MAX_RETRIES) {
+      // Exceeded retry limit — fall back to HTTP polling
+      startPolling();
+      return;
+    }
+
+    // Exponential backoff: 1s, 2s, 4s, 8s, 16s, capped at 30s
+    const delay = Math.min(BASE_DELAY_MS * 2 ** (retriesRef.current - 1), MAX_DELAY_MS);
+    reconnectTimerRef.current = setTimeout(connect, delay);
+  }, [connect, startPolling]);
 
   useEffect(() => {
     unmountedRef.current = false;
@@ -160,4 +169,18 @@ export function useApplicationSocket({ onEvent, onPollFallback, enabled }: UseSo
       }
     };
   }, [enabled, connect, clearTimers]);
+
+  // Set up ws.onclose handler after connect callback is defined
+  useEffect(() => {
+    const ws = wsRef.current;
+    if (!ws) return;
+
+    const handleClose = () => reconnect();
+
+    ws.onclose = handleClose;
+
+    return () => {
+      if (ws) ws.onclose = null;
+    };
+  }, [reconnect]);
 }

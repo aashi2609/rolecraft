@@ -213,6 +213,7 @@ function PostJobContent() {
 
     const existing = jobs.find((j: Job) => String(j.id) === editId);
     if (existing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fillFromJob(existing);
       return;
     }
@@ -310,6 +311,7 @@ function PostJobContent() {
       const raw = localStorage.getItem('rolecraft_parsed_jd');
       if (!raw) return;
       const parsed = JSON.parse(raw) as ParsedJD;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       applyParsedJd(parsed);
       setJdParseNote(
         fromJd

@@ -72,7 +72,7 @@ export default function EditCompanyProfilePage() {
         <Card className="bg-white p-8">
           <div className="space-y-6">
             <FormField label="Company Logo">
-              <FileDropzone onFileSelect={(f) => {/* TODO: Implement file upload */}} accept="image/*" />
+              <FileDropzone onFileSelect={(_f) => {/* TODO: Implement file upload */}} accept="image/*" />
             </FormField>
 
             <FormField label="Company ID (share this with support if you need help creating a job posting)">

@@ -23,7 +23,7 @@ export interface PaymentResult {
  * Process payment (mock implementation)
  * In production, this would integrate with Stripe, Razorpay, or similar
  */
-export async function processPayment(details: PaymentDetails): Promise<PaymentResult> {
+export async function processPayment(_details: PaymentDetails): Promise<PaymentResult> {
   // Simulate payment processing delay
   await new Promise((resolve) => setTimeout(resolve, 1500));
 

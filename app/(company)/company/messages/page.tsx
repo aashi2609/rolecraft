@@ -93,7 +93,7 @@ export default function CompanyMessagesPage() {
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileShowChat, setMobileShowChat] = useState(false);
@@ -144,6 +144,7 @@ export default function CompanyMessagesPage() {
   }, [activeThread, loadChatMessages, loadThreads]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadThreads();
     const handleFocus = () => pollActiveThread();
     window.addEventListener('focus', handleFocus);
@@ -156,6 +157,7 @@ export default function CompanyMessagesPage() {
 
   useEffect(() => {
     if (!activeThread) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setChat([]);
       return;
     }

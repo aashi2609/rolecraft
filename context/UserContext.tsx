@@ -6,10 +6,10 @@ import React, {
   useContext,
   useEffect,
   useState,
+  useMemo,
   ReactNode,
 } from 'react';
 import type { PlanId } from '@/lib/plans';
-import { isFreePlan } from '@/lib/plans';
 import { useApplicationSocket } from '@/hooks/useApplicationSocket';
 import {
   adminApi,
@@ -26,6 +26,11 @@ import {
   setToken,
   subscriptionsApi,
 } from '@/lib/api';
+import {
+  initCrossTabSync,
+  onCrossTabAuthEvent,
+  broadcastLogout,
+} from '@/lib/crossTabSync';
 
 type Role = 'candidate' | 'company' | 'admin' | null;
 
@@ -193,59 +198,7 @@ const initialState: UserState = {
 export function UserProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<UserState>(initialState);
 
-  const refreshJobs = useCallback(async () => {
-    try {
-      const role = state.role;
-      const raw =
-        role === 'company' && getToken()
-          ? await jobsApi.mine().catch(() => jobsApi.list({ status: 'live' }))
-          : await jobsApi.list({ status: 'live' });
-      setState((prev) => ({ ...prev, jobs: (raw || []).map(mapJob) }));
-    } catch {
-      /* API may be offline during Stage 0 UI work */
-    }
-  }, [state.role]);
-
-  const refreshResumes = useCallback(async () => {
-    if (!getToken()) return;
-    try {
-      const raw = await resumesApi.list();
-      setState((prev) => ({ ...prev, resumes: (raw || []).map(mapResume) }));
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const refreshApplications = useCallback(async () => {
-    if (!getToken()) return;
-    try {
-      const raw = await applicationsApi.mine();
-      setState((prev) => ({ ...prev, applications: (raw || []).map(mapApplication) }));
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const refreshMessages = useCallback(async () => {
-    if (!getToken()) return;
-    try {
-      const raw = await messagesApi.threads();
-      setState((prev) => ({
-        ...prev,
-        messages: (raw || []).map((t: any) => ({
-          id: t.thread_id,
-          threadId: t.thread_id,
-          companyName: t.participant_label,
-          lastMessage: t.last_body,
-          timestamp: t.last_sent_at,
-          otherUserId: t.other_user_id,
-        })),
-      }));
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
+  // Define refreshSession early so it can be used in other effects
   const refreshSession = useCallback(async () => {
     const token = getToken();
     if (!token) {
@@ -367,7 +320,77 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Initialize cross-tab sync on mount
   useEffect(() => {
+    initCrossTabSync();
+    const unsubscribe = onCrossTabAuthEvent((action) => {
+      if (action === 'logout') {
+        setState({ ...initialState, loading: false });
+      } else if (action === 'token_changed') {
+        // Token was updated in another tab; refresh session
+        refreshSession();
+      }
+    });
+
+    return unsubscribe;
+  }, [refreshSession]);
+
+  const refreshJobs = useCallback(async () => {
+    try {
+      const role = state.role;
+      const raw =
+        role === 'company' && getToken()
+          ? await jobsApi.mine().catch(() => jobsApi.list({ status: 'live' }))
+          : await jobsApi.list({ status: 'live' });
+      setState((prev) => ({ ...prev, jobs: (raw || []).map(mapJob) }));
+    } catch (err) {
+      console.error('Failed to refresh jobs:', err instanceof Error ? err.message : String(err));
+    }
+  }, [state.role]);
+
+  const refreshResumes = useCallback(async () => {
+    if (!getToken()) return;
+    try {
+      const raw = await resumesApi.list();
+      setState((prev) => ({ ...prev, resumes: (raw || []).map(mapResume) }));
+    } catch (err) {
+      console.error('Failed to refresh resumes:', err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  const refreshApplications = useCallback(async () => {
+    if (!getToken()) return;
+    try {
+      const raw = await applicationsApi.mine();
+      setState((prev) => ({ ...prev, applications: (raw || []).map(mapApplication) }));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const refreshMessages = useCallback(async () => {
+    if (!getToken()) return;
+    try {
+      const raw = await messagesApi.threads();
+      setState((prev) => ({
+        ...prev,
+        messages: (raw || []).map((t: any) => ({
+          id: t.thread_id,
+          threadId: t.thread_id,
+          companyName: t.participant_label,
+          lastMessage: t.last_body,
+          timestamp: t.last_sent_at,
+          otherUserId: t.other_user_id,
+        })),
+      }));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    // Call refreshSession only on initial mount to avoid cascading rerenders
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshSession();
   }, [refreshSession]);
 
@@ -400,7 +423,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     enabled: state.isAuthenticated && state.role === 'candidate',
   });
 
-  const signInWithApi = async (email: string, password: string) => {
+  const signInWithApi = useCallback(async (email: string, password: string) => {
     const res = await authApi.signin({ email, password });
     setToken(res.access_token);
     await refreshSession();
@@ -427,9 +450,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
 
     return { role: res.role, plan: res.plan, profileComplete: isProfileComplete, companyProfileComplete: isCompanyProfileComplete };
-  };
+  }, [refreshSession]);
 
-  const signUpWithApi = async (payload: {
+  const signUpWithApi = useCallback(async (payload: {
     email: string;
     password: string;
     role: 'candidate' | 'company';
@@ -449,21 +472,22 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }));
     await refreshSession();
     return { role: res.role, plan: res.plan };
-  };
+  }, [refreshSession]);
 
-  /** Legacy stub login removed — use signInWithApi / signUpWithApi */
-
-  const logout = () => {
-    setToken(null);
+  const logout = useCallback(() => {
+    broadcastLogout(); // Notify other tabs
     setState({ ...initialState, loading: false });
-  };
+  }, []);
 
-  const setProfileComplete = (status: boolean) =>
-    setState((prev) => ({ ...prev, profileComplete: status }));
-  const setCompanyProfileComplete = (status: boolean) =>
-    setState((prev) => ({ ...prev, companyProfileComplete: status }));
-  const switchRole = (role: Role) => setState((prev) => ({ ...prev, role }));
-  const setPlan = async (plan: PlanId) => {
+  const setProfileComplete = useCallback((status: boolean) =>
+    setState((prev) => ({ ...prev, profileComplete: status })), []);
+
+  const setCompanyProfileComplete = useCallback((status: boolean) =>
+    setState((prev) => ({ ...prev, companyProfileComplete: status })), []);
+
+  const switchRole = useCallback((role: Role) => setState((prev) => ({ ...prev, role })), []);
+
+  const setPlan = useCallback(async (plan: PlanId) => {
     try {
       await subscriptionsApi.set(plan);
       setState((prev) => ({
@@ -482,20 +506,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
         planValidTill: defaultValidTill(),
       }));
     }
-  };
-  const setPendingPlan = (plan: PlanId | null) =>
-    setState((prev) => ({ ...prev, pendingPlan: plan }));
-  const setCandidateProfile = (profile: Record<string, unknown>) =>
-    setState((prev) => ({ ...prev, candidateProfile: { ...prev.candidateProfile, ...profile } }));
+  }, []);
 
-  const addJob = (job: any) => setState((prev) => ({ ...prev, jobs: [job, ...prev.jobs] }));
-  const updateJob = (job: any) =>
+  const setPendingPlan = useCallback((plan: PlanId | null) =>
+    setState((prev) => ({ ...prev, pendingPlan: plan })), []);
+
+  const setCandidateProfile = useCallback((profile: Record<string, unknown>) =>
+    setState((prev) => ({ ...prev, candidateProfile: { ...prev.candidateProfile, ...profile } })), []);
+
+  const addJob = useCallback((job: any) => setState((prev) => ({ ...prev, jobs: [job, ...prev.jobs] })), []);
+
+  const updateJob = useCallback((job: any) =>
     setState((prev) => ({
       ...prev,
       jobs: prev.jobs.map((j) => (String(j.id) === String(job.id) ? { ...j, ...job } : j)),
-    }));
+    })), []);
 
-  const toggleSavedJob = async (jobId: string | number) => {
+  const toggleSavedJob = useCallback(async (jobId: string | number) => {
     const id = String(jobId);
     const isSaved = state.savedJobs.includes(id);
     setState((prev) => ({
@@ -512,9 +539,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
         savedJobs: isSaved ? [...prev.savedJobs, id] : prev.savedJobs.filter((x) => x !== id),
       }));
     }
-  };
+  }, [state.savedJobs]);
 
-  const applyToJob = async (application: any) => {
+  const applyToJob = useCallback(async (application: any) => {
     const jobId = String(application.jobId || application.job_id);
     try {
       const created = await applicationsApi.apply(jobId, application.resumeId);
@@ -527,13 +554,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
       // Re-throw so callers can handle UI feedback (e.g. "Already applied" toast).
       throw err;
     }
-  };
+  }, []);
 
-  const addResume = (resume: any) =>
-    setState((prev) => ({ ...prev, resumes: [resume, ...prev.resumes] }));
-  const addMessage = (message: any) =>
-    setState((prev) => ({ ...prev, messages: [...prev.messages, message] }));
-  const hideJob = (jobId: string | number) => {
+  const addResume = useCallback((resume: any) =>
+    setState((prev) => ({ ...prev, resumes: [resume, ...prev.resumes] })), []);
+
+  const addMessage = useCallback((message: any) =>
+    setState((prev) => ({ ...prev, messages: [...prev.messages, message] })), []);
+
+  const hideJob = useCallback((jobId: string | number) => {
     const sid = String(jobId);
     // Optimistic update
     setState((prev) => ({
@@ -551,8 +580,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
         hiddenJobIds: prev.hiddenJobIds.filter((id) => id !== sid),
       }));
     });
-  };
-  const unhideJob = (jobId: string | number) => {
+  }, []);
+  const unhideJob = useCallback((jobId: string | number) => {
     const sid = String(jobId);
     setState((prev) => ({
       ...prev,
@@ -567,8 +596,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
           : [...prev.hiddenJobIds, sid],
       }));
     });
-  };
-  const toggleSavedCandidate = (candidateId: string | number) =>
+  }, []);
+
+  const toggleSavedCandidate = useCallback((candidateId: string | number) =>
     setState((prev) => {
       const sid = String(candidateId);
       const has = prev.savedCandidateIds.includes(sid);
@@ -578,37 +608,40 @@ export function UserProvider({ children }: { children: ReactNode }) {
           ? prev.savedCandidateIds.filter((x) => x !== sid)
           : [...prev.savedCandidateIds, sid],
       };
-    });
+    }), []);
+
+  const contextValue = useMemo(
+    () => ({
+      ...state,
+      logout,
+      setProfileComplete,
+      setCompanyProfileComplete,
+      switchRole,
+      setPlan,
+      setPendingPlan,
+      setCandidateProfile,
+      refreshSession,
+      refreshJobs,
+      refreshResumes,
+      refreshApplications,
+      refreshMessages,
+      addJob,
+      updateJob,
+      toggleSavedJob,
+      applyToJob,
+      addResume,
+      addMessage,
+      hideJob,
+      unhideJob,
+      toggleSavedCandidate,
+      signInWithApi,
+      signUpWithApi,
+    }),
+    [state, logout, setProfileComplete, setCompanyProfileComplete, switchRole, setPlan, setPendingPlan, setCandidateProfile, refreshSession, refreshJobs, refreshResumes, refreshApplications, refreshMessages, addJob, updateJob, toggleSavedJob, applyToJob, addResume, addMessage, hideJob, unhideJob, toggleSavedCandidate, signInWithApi, signUpWithApi]
+  );
 
   return (
-    <UserContext.Provider
-      value={{
-        ...state,
-        logout,
-        setProfileComplete,
-        setCompanyProfileComplete,
-        switchRole,
-        setPlan,
-        setPendingPlan,
-        setCandidateProfile,
-        refreshSession,
-        refreshJobs,
-        refreshResumes,
-        refreshApplications,
-        refreshMessages,
-        addJob,
-        updateJob,
-        toggleSavedJob,
-        applyToJob,
-        addResume,
-        addMessage,
-        hideJob,
-        unhideJob,
-        toggleSavedCandidate,
-        signInWithApi,
-        signUpWithApi,
-      }}
-    >
+    <UserContext.Provider value={contextValue}>
       {children}
     </UserContext.Provider>
   );

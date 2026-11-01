@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Logo } from '@/components/Logo';
 import { useUser } from '@/context/UserContext';
 
 import { Globe, Mail, MessageSquare } from 'lucide-react';

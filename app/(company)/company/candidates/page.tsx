@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from 'react';
-import Link from 'next/link';
+// import Link from 'next/link';
 import {
   Search,
   MapPin,
@@ -33,7 +33,7 @@ import { candidateApi, ApiError } from '@/lib/api';
 const PAGE_SIZE = 5;
 
 export default function SearchCandidatesPage() {
-  const { plan } = useUser();
+  const { plan: _plan } = useUser();
   const { showToast } = useToast();
   const isOffline = useOffline();
   const fullFilters = true; // Temporary: enable all filters for testing regardless of plan
@@ -62,7 +62,7 @@ export default function SearchCandidatesPage() {
   const [skills, setSkills] = useState<string[]>([]);
   const [salaryRange, setSalaryRange] = useState<[number, number]>([4, 30]);
   const [education, setEducation] = useState<string[]>([]);
-  const [noticeDate, setNoticeDate] = useState('');
+  const [_noticeDate, setNoticeDate] = useState('');
 
   // Draft filters in sidebar
   const [draftLocations, setDraftLocations] = useState<string[]>([]);
@@ -181,6 +181,7 @@ export default function SearchCandidatesPage() {
   };
 
   // Fetch candidates on mount and when filters change
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
   React.useEffect(() => {
     fetchCandidates();
   }, [

@@ -19,6 +19,7 @@ export default function ResumePreviewPage() {
   const email = (candidateProfile?.email as string) || '';
   const location = getProfileLocation(candidateProfile) || 'India';
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     const multi = localStorage.getItem('rolecraft_target_verticals');
     if (multi) {

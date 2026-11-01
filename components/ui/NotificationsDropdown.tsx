@@ -46,10 +46,17 @@ export function NotificationsDropdown() {
   }, []);
 
   useEffect(() => {
+    if (!isOpen) return;
+
+    // Load notifications only when dropdown opens
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadNotifications();
+    
+    // Poll for updates every 30s
     const interval = setInterval(loadNotifications, 30000);
+    
     return () => clearInterval(interval);
-  }, [loadNotifications]);
+  }, [isOpen, loadNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 

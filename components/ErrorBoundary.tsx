@@ -1,61 +1,68 @@
 'use client';
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { ReactNode, ReactElement } from 'react';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { AlertCircle } from 'lucide-react';
 
-interface Props {
+interface ErrorBoundaryProps {
   children: ReactNode;
-  fallback?: ReactNode;
+  fallback?: (error: Error, retry: () => void) => ReactElement;
 }
 
 interface State {
-  hasError: boolean;
-  error?: Error;
+  error: Error | null;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, State> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { error: null };
   }
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
+    console.error('Error caught by boundary:', error, errorInfo);
   }
 
-  render() {
-    if (this.state.hasError) {
+  retry = (): void => {
+    this.setState({ error: null });
+  };
+
+  render(): ReactNode {
+    if (this.state.error) {
       if (this.props.fallback) {
-        return this.props.fallback;
+        return this.props.fallback(this.state.error, this.retry);
       }
 
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-md">
-            <h2 className="text-2xl font-bold text-red-600 mb-4">Something went wrong</h2>
-            <p className="text-gray-600 mb-6">
-              An unexpected error occurred. Please try refreshing the page.
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition"
-            >
-              Refresh Page
-            </button>
-            {this.state.error && (
-              <details className="mt-4">
-                <summary className="cursor-pointer text-sm text-gray-500">
-                  Error details
-                </summary>
-                <pre className="mt-2 text-xs text-red-500 bg-red-50 p-2 rounded overflow-auto">
-                  {this.state.error.message}
-                </pre>
-              </details>
-            )}
-          </div>
+        <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+          <Card className="w-full max-w-md p-6 border-red-200 bg-red-50">
+            <div className="flex gap-3">
+              <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h2 className="font-bold text-red-900 mb-2">Something went wrong</h2>
+                <p className="text-sm text-red-800 mb-4">
+                  {this.state.error.message || 'An unexpected error occurred.'}
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={this.retry} className="text-red-600">
+                    Try Again
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => { if (typeof window !== 'undefined') window.location.href = '/'; }}
+                    className="text-red-600"
+                  >
+                    Back to Home
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
         </div>
       );
     }

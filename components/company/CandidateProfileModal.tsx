@@ -42,14 +42,16 @@ export function CandidateProfileModal({
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
+    // Only fetch when modal opens with a candidate ID
     if (!isOpen || !candidate?.id) {
-      setProfile(null);
-      setError('');
       return;
     }
+
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError('');
+
     candidateApi
       .getPublicProfile(String(candidate.id))
       .then((data) => {
@@ -61,6 +63,7 @@ export function CandidateProfileModal({
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+
     return () => {
       cancelled = true;
     };

@@ -91,8 +91,10 @@ export default function ProfileForm() {
   }, [candidateProfile]);
 
   useEffect(() => {
+    // Populate form when profile data changes
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     updateFormData();
-  }, [updateFormData]);
+  }, [candidateProfile, updateFormData]);
 
   const updateForm = (key: string, value: unknown) => {
     setFormData((prev) => ({ ...prev, [key]: value }));

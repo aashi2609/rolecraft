@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { X, Send, Loader2, AlertCircle } from 'lucide-react';
 import { messagesApi, ApiError } from '@/lib/api';
@@ -15,7 +15,6 @@ interface MessageModalProps {
 export function MessageModal({ candidateId, candidateName, isOpen, onClose }: MessageModalProps) {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<{sender: string, text: string}[]>([]);
-  const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

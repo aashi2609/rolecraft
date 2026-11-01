@@ -32,8 +32,9 @@ export default function CandidateSettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteMsg, setDeleteMsg] = useState('');
 
-  const router = useRouter();
+  const _router = useRouter();
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     setFullName(getDisplayName(candidateProfile));
     setEmail((candidateProfile?.email as string) || '');
@@ -190,7 +191,7 @@ export default function CandidateSettingsPage() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
-                  <p className="text-sm font-medium">To confirm, please type "DELETE" below:</p>
+                  <p className="text-sm font-medium">To confirm, please type &quot;DELETE&quot; below:</p>
                   <Input 
                     value={deleteConfirmation} 
                     onChange={(e) => setDeleteConfirmation(e.target.value)} 

@@ -5,7 +5,6 @@ import { FormField, Input, Textarea } from '@/components/ui/FormField';
 import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
 import { RepeatableSection } from '@/components/ui/RepeatableSection';
 import { FileDropzone } from '@/components/ui/FileDropzone';
-import { TagInput } from '@/components/ui/TagInput';
 import { SKILLS } from '@/lib/constants';
 
 export const EDU_LEVELS = ['10th', '12th', 'Diploma', 'B.Tech/B.E.', 'B.Sc', 'B.Com', 'BA', 'BBA', 'BCA', 'M.Tech/M.E.', 'M.Sc', 'MBA', 'MCA', 'PhD', 'Other'];

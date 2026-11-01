@@ -6,11 +6,11 @@ import { StepProgress } from '@/components/ui/StepProgress';
 import { StrengthMeter } from '@/components/ui/StrengthMeter';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
-import { FormField, Input, Textarea } from '@/components/ui/FormField';
+import { FormField, /*Input,*/ Textarea } from '@/components/ui/FormField';
 import { FileDropzone } from '@/components/ui/FileDropzone';
 import { TagInput } from '@/components/ui/TagInput';
-import { RepeatableSection } from '@/components/ui/RepeatableSection';
-import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
+// import { RepeatableSection } from '@/components/ui/RepeatableSection';
+// import { SearchableCombobox } from '@/components/ui/SearchableCombobox';
 import { useUser } from '@/context/UserContext';
 import { SKILLS } from '@/lib/constants';
 import { candidateApi, resumesApi } from '@/lib/api';
@@ -21,12 +21,12 @@ import {
   ExperienceSection,
   ProjectsSection,
   SkillsSection,
-  EDU_LEVELS,
-  DEGREES,
-  UNIVERSITIES,
-  CERT_NAMES,
-  ORGS,
-  TECH_SKILLS
+  // EDU_LEVELS,
+  // DEGREES,
+  // UNIVERSITIES,
+  // CERT_NAMES,
+  // ORGS,
+  // TECH_SKILLS
 } from './ProfileSections';
 
 const STEPS = ['Basic', 'Education', 'Certifications', 'Experience', 'Skills'];
@@ -97,7 +97,7 @@ export default function OnboardingForm() {
     }
   };
 
-  const updateArrayItem = (key: string, index: number, field: string, value: any) => {
+  const _updateArrayItem = (key: string, index: number, field: string, value: any) => {
     const newArr = [...formData[key]];
     newArr[index] = { ...newArr[index], [field]: value };
     updateForm(key, newArr);

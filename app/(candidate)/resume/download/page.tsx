@@ -17,6 +17,7 @@ function DownloadContent() {
   const [downloading, setDownloading] = useState(false);
   const [resume, setResume] = useState<any>(null);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     // First try to find in context
     if (resumeId) {

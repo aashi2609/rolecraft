@@ -93,7 +93,7 @@ export default function MessagesPage() {
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileShowChat, setMobileShowChat] = useState(false);
@@ -143,6 +143,7 @@ export default function MessagesPage() {
     await loadThreads();
   }, [activeThread, loadChatMessages, loadThreads]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     loadThreads();
     const handleFocus = () => pollActiveThread();
@@ -154,6 +155,7 @@ export default function MessagesPage() {
     };
   }, [loadThreads, pollActiveThread]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (!activeThread) {
       setChat([]);

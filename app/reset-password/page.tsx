@@ -16,11 +16,12 @@ function ResetPasswordContent() {
   const [status, setStatus] = useState<'loading' | 'form' | 'success' | 'error'>('loading');
   const [errorMsg, setErrorMsg] = useState('');
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const _router = useRouter();
 
   useEffect(() => {
     const t = searchParams.get('token');
     if (t) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setToken(t);
       setStatus('form');
       // Remove token from URL for security

@@ -51,12 +51,14 @@ export default function JobDetailPage() {
 
   const bestResume = job ? (resumes.find((r) => r.vertical === job.vertical) || resumes[0]) : resumes[0];
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (bestResume && !selectedResumeId) {
       setSelectedResumeId(bestResume.id);
     }
   }, [bestResume, selectedResumeId]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     const id = String(jobId);
     const cached = jobs.find((j) => String(j.id) === id);

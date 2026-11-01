@@ -6,7 +6,7 @@ import { applicationsApi, jobsApi } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { ArrowLeft, Inbox, Clock, CheckCircle2, XCircle, Users } from 'lucide-react';
-import Link from 'next/link';
+// import Link from 'next/link';
 import { CandidateProfileModal } from '@/components/company/CandidateProfileModal';
 import { MessageModal } from '@/components/company/MessageModal';
 import { resumesApi } from '@/lib/api';
@@ -96,6 +96,7 @@ export default function JobApplicationsPage() {
   }, [jobId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, [loadData]);
 

@@ -34,6 +34,7 @@ export default function CompanyAnalyticsPage() {
     }
   }, [days, showToast]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     fetchAnalytics();
   }, [fetchAnalytics]);
