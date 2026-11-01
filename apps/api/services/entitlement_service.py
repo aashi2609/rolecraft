@@ -8,9 +8,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Optional, NamedTuple
-from uuid import UUID
 
-from sqlalchemy import and_, select
+from sqlalchemy import select
 
 from models import Subscription, SubscriptionStatus, User, UserRole, PlanTier
 

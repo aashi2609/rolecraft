@@ -89,74 +89,29 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     settings.rate_limit_enabled = False
     reset_rate_limit_backends()
     limiter.enabled = False
-        AsyncSession,
+
+@pytest_asyncio.fixture
+async def db_session():
+    """Isolated async db session for unit/integration tests.
+
+    Uses SQLAlchemy 2 savepoint mode for nested transaction isolation:
+    each test gets a savepoint that rolls back on fixture teardown.
+    """
+    test_db_url = os.getenv("TEST_DATABASE_URL", "").strip()
+    db_url, connect_args = asyncpg_engine_kwargs(test_db_url)
+    connect_args["statement_cache_size"] = 0
+    engine = create_async_engine(db_url, connect_args=connect_args)
+    # join_transaction_mode="create_savepoint" enables per-test transaction isolation
+    session_factory = async_sessionmaker(
+        engine,
+        expire_on_commit=False,
+        class_=AsyncSession,
+        join_transaction_mode="create_savepoint",
     )
-
-    db_url, connect_args = database.asyncpg_engine_kwargs(os.environ["DATABASE_URL"])
-    database.engine = create_async_engine(
-        db_url,
-        echo=False,
-        poolclass=NullPool,
-        connect_args=connect_args,
-    )
-    database.AsyncSessionLocal = async_sessionmaker(
-        database.engine, class_=AsyncSession, expire_on_commit=False
-    )
-
-    # Seed required static test users (admin and cancelled company)
-    import asyncio
-    from sqlalchemy import text
-
-    async def _seed_test_users():
-        async with database.engine.begin() as conn:
-            await conn.execute(
-                text("""
-                INSERT INTO users (id, email, password_hash, role, is_active, token_version)
-                VALUES ('b55c77e8-1a01-4f9c-a1ff-4568879121c7', 'admin@acme.com', '$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6', 'admin', true, 1)
-                ON CONFLICT (id) DO UPDATE SET token_version = 1, is_active = true, role = 'admin';
-            """)
-            )
-            await conn.execute(
-                text("""
-                INSERT INTO users (id, email, password_hash, role, is_active, token_version)
-                VALUES ('5f7f4c5d-6fb3-41e1-8b12-5bb7d1670de1', 'kauraashi26@gmail.com', '$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6', 'company', true, 1)
-                ON CONFLICT (id) DO UPDATE SET token_version = 1, is_active = true, role = 'company';
-            """)
-            )
-            await conn.execute(
-                text("""
-                INSERT INTO companies (user_id, name)
-                VALUES ('5f7f4c5d-6fb3-41e1-8b12-5bb7d1670de1', 'Aashi Corp')
-                ON CONFLICT (user_id) DO NOTHING;
-            """)
-            )
-            await conn.execute(
-                text("""
-                INSERT INTO subscriptions (id, user_id, role, plan_tier, status)
-                VALUES ('5f7f4c5d-6fb3-41e1-8b12-5bb7d1670de2', '5f7f4c5d-6fb3-41e1-8b12-5bb7d1670de1', 'company', 'starter', 'cancelled')
-                ON CONFLICT (id) DO UPDATE SET status = 'cancelled';
-            """)
-            )
-            await conn.execute(
-                text("""
-                INSERT INTO users (id, email, password_hash, role, is_active, token_version)
-                VALUES ('85e85c0d-327c-40ad-be00-e794354224c5', 'kauraashi8777@gmail.com', '$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6', 'candidate', true, 1)
-                ON CONFLICT (id) DO UPDATE SET token_version = 1, is_active = true, role = 'candidate';
-            """)
-            )
-            await conn.execute(
-                text("""
-                    INSERT INTO candidate_profiles (user_id, weblinks)
-                    VALUES ('85e85c0d-327c-40ad-be00-e794354224c5', CAST(:weblinks AS jsonb))
-                    ON CONFLICT (user_id) DO NOTHING;
-                """),
-                {"weblinks": '{"full_name": "Aashi Candidate"}'},
-            )
-
-    try:
-        asyncio.run(_seed_test_users())
-    except Exception as exc:
-        print(f"Warning: seeding static test users failed: {exc}")
+    async with session_factory() as session:
+        yield session
+        await session.rollback()
+    await engine.dispose()
 
 
 @pytest.fixture(autouse=True)

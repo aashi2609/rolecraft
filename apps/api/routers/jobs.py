@@ -82,10 +82,6 @@ async def parse_jd(
     return JobParsedJDOut.model_validate(parsed)
 
 
-from typing import Annotated
-from core.dependencies import require_role
-
-
 @router.post("", response_model=JobOut)
 async def create_job(
     body: JobCreate,
