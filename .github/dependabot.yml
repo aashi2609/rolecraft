@@ -1,0 +1,38 @@
+version: 2
+updates:
+  # Python dependencies (pip)
+  - package-ecosystem: pip
+    directory: /apps/api
+    schedule:
+      interval: weekly
+      day: monday
+      time: '03:00'
+    pull-request-branch-name:
+      separator: /
+    reviewers:
+      - aashi2609
+    auto-merge: false
+
+  # JavaScript/npm dependencies
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '03:00'
+    pull-request-branch-name:
+      separator: /
+    reviewers:
+      - aashi2609
+    auto-merge: false
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '03:00'
+    reviewers:
+      - aashi2609
+    auto-merge: false

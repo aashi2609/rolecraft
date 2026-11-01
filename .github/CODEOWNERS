@@ -1,0 +1,41 @@
+# This file defines code ownership and review requirements for the RoleCraft repository.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global fallback
+* @aashi2609
+
+# Backend (Python/FastAPI)
+apps/api/ @aashi2609
+apps/api/routers/ @aashi2609
+apps/api/services/ @aashi2609
+apps/api/core/ @aashi2609
+apps/api/models/ @aashi2609
+apps/api/schemas/ @aashi2609
+apps/api/alembic/ @aashi2609
+apps/api/tests/ @aashi2609
+
+# Frontend (Next.js/React)
+app/ @aashi2609
+components/ @aashi2609
+context/ @aashi2609
+hooks/ @aashi2609
+lib/ @aashi2609
+public/ @aashi2609
+
+# Configuration
+.github/ @aashi2609
+.env.example @aashi2609
+.env.local.example @aashi2609
+.env.production.example @aashi2609
+next.config.ts @aashi2609
+tsconfig.json @aashi2609
+package.json @aashi2609
+render.yaml @aashi2609
+
+# Migrations & Database
+apps/api/alembic/versions/ @aashi2609
+
+# Documentation
+*.md @aashi2609
+README.md @aashi2609
+ARCHITECTURE_PLAN.md @aashi2609

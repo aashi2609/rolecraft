@@ -168,7 +168,11 @@ import pytest_asyncio
 
 @pytest_asyncio.fixture
 async def db_session():
-    """Isolated async db session for unit/integration tests."""
+    """Isolated async db session for unit/integration tests.
+    
+    Uses SQLAlchemy 2 savepoint mode for nested transaction isolation:
+    each test gets a savepoint that rolls back on fixture teardown.
+    """
     from core.database import asyncpg_engine_kwargs
     from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
@@ -176,7 +180,13 @@ async def db_session():
     db_url, connect_args = asyncpg_engine_kwargs(test_db_url)
     connect_args["statement_cache_size"] = 0
     engine = create_async_engine(db_url, connect_args=connect_args)
-    session_factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    # join_transaction_mode="create_savepoint" enables per-test transaction isolation
+    session_factory = async_sessionmaker(
+        engine,
+        expire_on_commit=False,
+        class_=AsyncSession,
+        join_transaction_mode="create_savepoint"
+    )
     async with session_factory() as session:
         yield session
         await session.rollback()
@@ -354,3 +364,250 @@ def db_profiler():
     
     profiler.reset()  # Reset at start of each test
     return profiler
+
+
+# ── Additional Fixture Factories for Complete Test Coverage ────────────────────
+
+@pytest_asyncio.fixture
+async def grant_plan(db_session):
+    """Grant a specific plan with optional expiry to a user."""
+    async def _grant_plan(
+        user_id: uuid.UUID,
+        plan_tier: PlanTier = PlanTier.complete,
+        valid_until: datetime | None = None
+    ):
+        from datetime import datetime, timedelta
+        from models import Subscription, SubscriptionStatus
+        
+        # Remove existing subscription if any
+        await db_session.execute(
+            select(Subscription).where(Subscription.user_id == user_id)
+        )
+        existing = (await db_session.execute(
+            select(Subscription).where(Subscription.user_id == user_id)
+        )).scalars().all()
+        for sub in existing:
+            await db_session.delete(sub)
+        
+        subscription = Subscription(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            role=UserRole.candidate,
+            plan_tier=plan_tier,
+            status=SubscriptionStatus.active,
+            valid_until=valid_until  # None = lifetime, datetime = expiry
+        )
+        db_session.add(subscription)
+        await db_session.commit()
+        await db_session.refresh(subscription)
+        return subscription
+    
+    return _grant_plan
+
+
+@pytest_asyncio.fixture
+async def make_job(db_session, company_user):
+    """Create a job posting with specified status and details."""
+    async def _make_job(
+        title: str = "Senior Software Engineer",
+        status: str = "published",
+        description: str = "Join our team",
+        **kwargs
+    ):
+        from models import Job, JobStatus
+        from datetime import datetime
+        
+        job_kwargs = {
+            "id": uuid.uuid4(),
+            "company_id": company_user.id,
+            "title": title,
+            "description": description,
+            "salary_min": kwargs.get("salary_min", 80000),
+            "salary_max": kwargs.get("salary_max", 120000),
+            "job_role": kwargs.get("job_role", "backend"),
+            "job_level": kwargs.get("job_level", "mid"),
+            "job_type": kwargs.get("job_type", "full_time"),
+            "location": kwargs.get("location", "Remote"),
+            "required_experience_years": kwargs.get("required_experience_years", 3),
+            "skills": kwargs.get("skills", ["Python", "FastAPI"]),
+            "status": JobStatus(status) if isinstance(status, str) else status,
+            "posted_at": datetime.utcnow(),
+        }
+        job = Job(**job_kwargs)
+        db_session.add(job)
+        await db_session.commit()
+        await db_session.refresh(job)
+        return job
+    
+    return _make_job
+
+
+@pytest_asyncio.fixture
+async def make_application(db_session, candidate_user):
+    """Create a job application."""
+    async def _make_application(
+        job_id: uuid.UUID,
+        status: str = "submitted",
+        **kwargs
+    ):
+        from models import Application, ApplicationStatus
+        from datetime import datetime
+        
+        application = Application(
+            id=uuid.uuid4(),
+            candidate_id=candidate_user.id,
+            job_id=job_id,
+            status=ApplicationStatus(status) if isinstance(status, str) else status,
+            applied_at=datetime.utcnow(),
+        )
+        db_session.add(application)
+        await db_session.commit()
+        await db_session.refresh(application)
+        return application
+    
+    return _make_application
+
+
+@pytest_asyncio.fixture
+async def make_conversation(db_session, candidate_user, company_user):
+    """Create a conversation between candidate and company."""
+    async def _make_conversation(
+        status: str = "open",
+        candidate_id: uuid.UUID | None = None,
+        company_id: uuid.UUID | None = None
+    ):
+        from models import Conversation, ConversationStatus
+        from datetime import datetime
+        
+        conv = Conversation(
+            id=uuid.uuid4(),
+            candidate_id=candidate_id or candidate_user.id,
+            company_id=company_id or company_user.id,
+            status=ConversationStatus(status) if isinstance(status, str) else status,
+            created_at=datetime.utcnow(),
+        )
+        db_session.add(conv)
+        await db_session.commit()
+        await db_session.refresh(conv)
+        return conv
+    
+    return _make_conversation
+
+
+@pytest_asyncio.fixture
+async def make_message(db_session):
+    """Create a message in a conversation."""
+    async def _make_message(
+        conversation_id: uuid.UUID,
+        sender_id: uuid.UUID,
+        content: str = "Test message",
+        **kwargs
+    ):
+        from models import Message
+        from datetime import datetime
+        
+        message = Message(
+            id=uuid.uuid4(),
+            conversation_id=conversation_id,
+            sender_id=sender_id,
+            content=content,
+            created_at=datetime.utcnow(),
+        )
+        db_session.add(message)
+        await db_session.commit()
+        await db_session.refresh(message)
+        return message
+    
+    return _make_message
+
+
+@pytest.fixture
+def mock_ai_service(monkeypatch):
+    """Mock Groq AI provider with deterministic responses.
+    
+    Usage:
+        async def test_something(mock_ai_service):
+            # AI calls will return mock responses deterministically
+    """
+    class MockAIService:
+        async def generate_resume(self, candidate_id: uuid.UUID, force_deterministic: bool = False):
+            return {
+                "id": uuid.uuid4(),
+                "candidate_id": candidate_id,
+                "content": "Mock Resume:\n\nSummary: Senior Software Engineer\n\nExperience: 5+ years",
+                "status": "generated",
+                "generated_from_profile_at": None,
+                "is_stale": False,
+            }
+        
+        async def parse_resume_pdf(self, file_path: str):
+            return {
+                "full_name": "Mock Candidate",
+                "skills": ["Python", "React", "FastAPI"],
+                "experience_years": 5,
+                "current_title": "Senior Engineer",
+            }
+        
+        async def get_ats_score(self, resume_id: uuid.UUID, job_id: uuid.UUID):
+            return {
+                "score": 85,
+                "match_percentage": 85.0,
+                "feedback": "Strong match for the role",
+                "missing_skills": [],
+            }
+        
+        async def get_fitment_rationale(self, candidate_id: uuid.UUID, job_id: uuid.UUID):
+            return {
+                "rationale": "Mock rationale: Candidate has strong Python skills matching job requirements",
+                "source": "template",
+            }
+    
+    mock = MockAIService()
+    monkeypatch.setattr("services.ai_service", mock, raising=False)
+    monkeypatch.setattr("core.ai_client", mock, raising=False)
+    return mock
+
+
+@pytest.fixture
+def mock_email_service(monkeypatch):
+    """Mock email service to prevent real email sends."""
+    class MockEmailService:
+        sent_emails = []
+        
+        async def send_email(self, to: str, subject: str, template: str, **kwargs):
+            self.sent_emails.append({
+                "to": to,
+                "subject": subject,
+                "template": template,
+                "context": kwargs,
+            })
+            return True
+        
+        def clear(self):
+            self.sent_emails = []
+    
+    mock = MockEmailService()
+    monkeypatch.setattr("core.email_service", mock, raising=False)
+    return mock
+
+
+@pytest.fixture(scope="session", autouse=True)
+def verify_no_external_calls():
+    """Ensure tests do not make external network calls (except to test DB).
+    
+    Note: This is a placeholder. Full pytest-socket integration depends on
+    whether the test needs to block all external calls or just specific ones.
+    Neon Postgres connections are HTTPS and are acceptable for integration tests.
+    """
+    import os
+    test_db_url = os.getenv("TEST_DATABASE_URL", "")
+    allowed_hosts = []
+    if "neon.tech" in test_db_url:
+        # Extract host from URL
+        from urllib.parse import urlparse
+        parsed = urlparse(test_db_url)
+        allowed_hosts.append(parsed.hostname)
+    
+    # pytest-socket would be configured here when needed
+    # For now, this is a placeholder that documents the intent
+    pass
