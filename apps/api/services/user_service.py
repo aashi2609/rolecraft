@@ -1,13 +1,14 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from core.security import hash_password
 from models import (
-    User,
-    UserRole,
+    CandidateProfile,
+    Company,
     PlanTier,
     Subscription,
     SubscriptionStatus,
-    CandidateProfile,
-    Company,
+    User,
+    UserRole,
 )
 
 

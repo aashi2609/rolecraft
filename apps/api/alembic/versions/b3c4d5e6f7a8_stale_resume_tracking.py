@@ -5,8 +5,9 @@ Revises: f526df99dd65
 Create Date: 2026-09-28
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "b3c4d5e6f7a8"
 down_revision = "f526df99dd65"

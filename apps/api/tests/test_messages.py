@@ -9,9 +9,11 @@ Covers:
 - WebSocket messaging (if implemented)
 """
 
-from sqlalchemy import select
-from models import Notification
 import uuid
+
+from sqlalchemy import select
+
+from models import Notification
 
 
 class TestConversationAuthorization:

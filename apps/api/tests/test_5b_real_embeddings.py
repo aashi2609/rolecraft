@@ -12,9 +12,10 @@ Comprehensive tests to verify:
 8. Database schema enforces correct dimensions
 """
 
-import pytest
 import uuid
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 pytestmark = pytest.mark.skip_db_guard
@@ -26,7 +27,7 @@ class TestEmbedTextNoMockVectors:
     @pytest.mark.asyncio
     async def test_embed_text_raises_without_api_key(self):
         """When embedding_api_key is empty, embed_text raises EmbeddingError."""
-        from services.embedding_service import embed_text, EmbeddingError
+        from services.embedding_service import EmbeddingError, embed_text
 
         with patch("services.embedding_service.settings") as mock_settings:
             mock_settings.embedding_api_key = ""
@@ -39,8 +40,8 @@ class TestEmbedTextNoMockVectors:
     @pytest.mark.asyncio
     async def test_embed_text_raises_on_api_failure(self):
         """When OpenAI API fails, embed_text raises EmbeddingError, not mock."""
-        from services.embedding_service import embed_text, EmbeddingError
         from services.embedding_client import EmbeddingServiceError
+        from services.embedding_service import EmbeddingError, embed_text
 
         with (
             patch("services.embedding_service.settings") as mock_settings,
@@ -89,7 +90,7 @@ class TestEmbeddingValidation:
 
     def test_validate_embedding_rejects_wrong_dimension(self):
         """Vector with wrong dimension raises EmbeddingError."""
-        from services.embedding_service import validate_embedding, EmbeddingError
+        from services.embedding_service import EmbeddingError, validate_embedding
 
         vector = [0.1] * 1536  # Wrong! Should be 512
 
@@ -100,7 +101,7 @@ class TestEmbeddingValidation:
 
     def test_validate_embedding_rejects_nan(self):
         """Vector containing NaN raises EmbeddingError."""
-        from services.embedding_service import validate_embedding, EmbeddingError
+        from services.embedding_service import EmbeddingError, validate_embedding
 
         vector = [0.1] * 511 + [float("nan")]
 
@@ -111,7 +112,7 @@ class TestEmbeddingValidation:
 
     def test_validate_embedding_rejects_inf(self):
         """Vector containing inf raises EmbeddingError."""
-        from services.embedding_service import validate_embedding, EmbeddingError
+        from services.embedding_service import EmbeddingError, validate_embedding
 
         vector = [0.1] * 511 + [float("inf")]
 
@@ -122,7 +123,7 @@ class TestEmbeddingValidation:
 
     def test_validate_embedding_rejects_all_zero_vector(self):
         """All-zero vector (zero norm) raises EmbeddingError."""
-        from services.embedding_service import validate_embedding, EmbeddingError
+        from services.embedding_service import EmbeddingError, validate_embedding
 
         vector = [0.0] * 512
 
@@ -133,7 +134,7 @@ class TestEmbeddingValidation:
 
     def test_validate_embedding_rejects_empty_text(self):
         """Empty or whitespace-only text raises EmbeddingError."""
-        from services.embedding_service import validate_embedding, EmbeddingError
+        from services.embedding_service import EmbeddingError, validate_embedding
 
         vector = [0.1] * 512
 
@@ -150,8 +151,8 @@ class TestFitmentExcludesNullEmbeddings:
     @pytest.mark.asyncio
     async def test_compute_fitment_excludes_null_embeddings(self):
         """Fitment query only considers resumes with embedding_status='scored'."""
-        from services.fitment_service import compute_fitment
         from models import JobPosting
+        from services.fitment_service import compute_fitment
 
         # Mock DB session and job
         mock_db = AsyncMock(spec=AsyncSession)
@@ -178,7 +179,7 @@ class TestEmbeddingStatusTracking:
 
     def test_resume_embedding_status_default_pending(self):
         """New Resume has embedding_status='pending' as server default."""
-        from models import Resume, EmbeddingStatus
+        from models import EmbeddingStatus, Resume
 
         # Note: Python object may not have the default until persisted to DB
         # The server_default='pending' applies on INSERT
@@ -206,7 +207,7 @@ class TestEmbeddingStatusTracking:
 
     def test_job_embedding_status_default_pending(self):
         """New JobPosting has embedding_status='pending' as server default."""
-        from models import JobPosting, EmbeddingStatus
+        from models import EmbeddingStatus, JobPosting
 
         job = JobPosting(
             company_id="comp-1",
@@ -235,8 +236,8 @@ class TestRefreshEmbeddingHandlesFailure:
     @pytest.mark.asyncio
     async def test_refresh_job_embedding_stores_null_on_failure(self):
         """When embed_text raises, refresh_job_embedding stores NULL + failed status."""
-        from services.embedding_service import refresh_job_embedding, EmbeddingError
-        from models import JobPosting, EmbeddingStatus
+        from models import EmbeddingStatus, JobPosting
+        from services.embedding_service import EmbeddingError, refresh_job_embedding
 
         mock_db = AsyncMock(spec=AsyncSession)
         job = JobPosting(company_id="c1", title="Engineer")
@@ -252,8 +253,8 @@ class TestRefreshEmbeddingHandlesFailure:
     @pytest.mark.asyncio
     async def test_refresh_resume_embeddings_tracks_success_count(self):
         """refresh_resume_embeddings_for_candidate returns count of successful embeddings."""
+        from models import EmbeddingStatus, Resume
         from services.embedding_service import refresh_resume_embeddings_for_candidate
-        from models import Resume, EmbeddingStatus
 
         mock_db = AsyncMock(spec=AsyncSession)
 

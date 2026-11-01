@@ -17,37 +17,38 @@ Usage:
     python scripts/seed_perf.py --check    # Show current counts
 """
 
+import argparse
 import asyncio
 import os
 import sys
-import argparse
-from pathlib import Path
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
 from core.database import asyncpg_engine_kwargs
 from models import (
-    User,
-    UserRole,
-    Company,
+    Application,
+    ApplicationStatus,
     CandidateProfile,
+    Company,
+    Conversation,
     Experience,
     JobPosting,
     JobStatus,
-    Skill,
-    Application,
-    ApplicationStatus,
-    Conversation,
     Message,
     Notification,
     NotificationType,
+    PlanTier,
+    Skill,
     Subscription,
     SubscriptionStatus,
-    PlanTier,
+    User,
+    UserRole,
 )
 
 SEED_GROUP = "perf_test"

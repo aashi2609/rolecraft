@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from services.experience_calculator import total_experience_years, experience_in_role
+from services.experience_calculator import experience_in_role, total_experience_years
 
 
 class MockExperience:

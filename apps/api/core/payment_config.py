@@ -9,9 +9,9 @@ Safe by default: app refuses to start in 'test' or 'live' modes
 without proper environment configuration.
 """
 
+import logging
 from enum import Enum
 from typing import Optional
-import logging
 
 logger = logging.getLogger(__name__)
 

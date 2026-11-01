@@ -10,8 +10,9 @@ Step 5A: Replace fake fallback scores with explicit status tracking.
 - Default existing resumes to 'scored' if ats_score IS NOT NULL, else 'unavailable'
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "h9i0j1k2l3m4"
 down_revision = "43b4f33a0dcf"  # After merge migration

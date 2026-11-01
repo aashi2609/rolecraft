@@ -9,8 +9,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
-from core.database import asyncpg_engine_kwargs
 
+from core.database import asyncpg_engine_kwargs
 
 PRIMARY_URL = os.getenv("PRIMARY_DATABASE_URL")
 TEST_URL = os.getenv("TEST_DATABASE_URL")

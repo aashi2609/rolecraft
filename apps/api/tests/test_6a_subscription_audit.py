@@ -8,22 +8,22 @@ Verify:
 5. Admin can still modify plan_tier and role
 """
 
-import pytest
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import select, func
+import pytest
+from sqlalchemy import func, select
 
 from models import (
-    UserRole,
-    Subscription,
-    SubscriptionStatus,
-    SubscriptionAuditLog,
     PlanTier,
+    Subscription,
+    SubscriptionAuditLog,
+    SubscriptionStatus,
+    UserRole,
 )
 from routers.admin import SubCreate
-from services.user_service import create_user_with_profile
 from services.subscription_service import log_subscription_change
+from services.user_service import create_user_with_profile
 
 
 @pytest.mark.asyncio

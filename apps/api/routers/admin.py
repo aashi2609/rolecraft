@@ -1,6 +1,6 @@
+from datetime import datetime, timedelta, timezone
 from typing import Any, List, Optional
 from uuid import UUID
-from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, field_validator
@@ -21,10 +21,10 @@ from models import (
     User,
     UserRole,
 )
-from services.user_service import create_user_with_profile
+from schemas import JobCreate, JobUpdate
 from services.admin_service import get_dashboard_stats
 from services.subscription_service import log_subscription_change
-from schemas import JobCreate, JobUpdate
+from services.user_service import create_user_with_profile
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 

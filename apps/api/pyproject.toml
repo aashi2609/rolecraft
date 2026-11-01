@@ -1,0 +1,33 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+exclude = [
+    "scratch",
+    "history",
+    ".venv",
+    ".venv311",
+    ".venv313",
+    "venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+]
+ignore = [
+    "E501",  # line-too-long (100 char limit is already enforced by formatter)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# tests/conftest.py: Load-bearing import order (env must be set before app imports)
+"tests/conftest.py" = ["E402", "I001"]
+# alembic/env.py: Load-bearing import order (env must be set before app imports)
+"alembic/env.py" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "models", "routers", "schemas", "services"]

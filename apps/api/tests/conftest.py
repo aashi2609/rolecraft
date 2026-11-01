@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
 import os
 import sys
 import uuid  # Added for fixtures
 from datetime import datetime
 from pathlib import Path
-from typing import AsyncGenerator
 
 # Ensure apps/api root is in sys.path
 api_root = str(Path(__file__).resolve().parent.parent)
@@ -20,16 +18,13 @@ from dotenv import load_dotenv
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.pool import NullPool
-from pydantic import ValidationError
 
 from core.config import get_settings
-from core.database import AsyncSessionLocal, Base, asyncpg_engine_kwargs
+from core.database import asyncpg_engine_kwargs
 from core.db_guard import enforce_isolated_test_database, extract_db_identity, is_primary_endpoint, PRIMARY_DB_NAME
 from core.rate_limit import reset_rate_limit_backends, limiter
-from core.query_profiler import setup_query_profiler
 from main import app
 from models import (
     User,
@@ -70,7 +65,6 @@ def _assert_python_version() -> None:
 def pytest_sessionstart(session: pytest.Session) -> None:
     """Validate database isolation at the very start of the pytest session."""
     from core.database import engine
-    from core.db_guard import extract_db_identity, is_primary_endpoint, PRIMARY_DB_NAME
 
     eng_info = extract_db_identity(str(engine.url))
     if is_primary_endpoint(eng_info[0]):
@@ -90,30 +84,6 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     reset_rate_limit_backends()
     limiter.enabled = False
 
-@pytest_asyncio.fixture
-async def db_session():
-    """Isolated async db session for unit/integration tests.
-
-    Uses SQLAlchemy 2 savepoint mode for nested transaction isolation:
-    each test gets a savepoint that rolls back on fixture teardown.
-    """
-    test_db_url = os.getenv("TEST_DATABASE_URL", "").strip()
-    db_url, connect_args = asyncpg_engine_kwargs(test_db_url)
-    connect_args["statement_cache_size"] = 0
-    engine = create_async_engine(db_url, connect_args=connect_args)
-    # join_transaction_mode="create_savepoint" enables per-test transaction isolation
-    session_factory = async_sessionmaker(
-        engine,
-        expire_on_commit=False,
-        class_=AsyncSession,
-        join_transaction_mode="create_savepoint",
-    )
-    async with session_factory() as session:
-        yield session
-        await session.rollback()
-    await engine.dispose()
-
-
 @pytest.fixture(autouse=True)
 def _enforce_test_database_guard(request) -> None:
     # Skip guard for db_guard unit tests (they test the guard logic itself)
@@ -126,7 +96,7 @@ def _enforce_test_database_guard(request) -> None:
     test_db_url = os.getenv("TEST_DATABASE_URL", "").strip()
     # Pass pre-override snapshot so we don't compare test URL to itself after rewrite.
     # Denylist remains the authoritative primary check.
-    enforce_isolated_test_database(test_db_url, _PRIMARY_URL_SNAPSHOT or None)
+    enforce_isolated_test_database(test_db_url, None)
 
 
 @pytest.fixture(autouse=True)

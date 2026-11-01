@@ -6,6 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
+
 from core.database import asyncpg_engine_kwargs
 
 TEST_URL = "postgresql://neondb_owner:npg_7kYhuUif3cRL@ep-icy-moon-b4njrgcs-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"

@@ -1,9 +1,10 @@
 import pytest
+
 from core.db_guard import (
-    is_same_database,
     enforce_isolated_test_database,
     extract_db_identity,
     is_primary_endpoint,
+    is_same_database,
 )
 
 # Mark these tests to skip the database guard

@@ -1,26 +1,26 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request, Response
 import sqlalchemy as sa
+from fastapi import APIRouter, HTTPException, Request, Response
 from sqlalchemy import or_, select
 
 from core.dependencies import CurrentUser, DbSession
-from core.rate_limit import RATE_LIMITS, get_user_key, limiter
 from core.messaging_auth import (
     can_company_message_candidate,
     get_conversation_permission,
 )
+from core.rate_limit import RATE_LIMITS, get_user_key, limiter
 from models import (
-    CandidateProfile,
-    Company,
-    Message,
-    User,
-    UserRole,
-    Conversation,
-    JobPosting,
     Application,
     ApplicationStatus,
+    CandidateProfile,
+    Company,
+    Conversation,
+    JobPosting,
+    Message,
     Notification,
+    User,
+    UserRole,
 )
 from schemas import MessageCreate, MessageOut, ThreadOut
 
@@ -61,11 +61,11 @@ async def list_threads(user: CurrentUser, db: DbSession):
     Query count is constant regardless of result set size.
     """
     from services.message_thread_service import (
-        get_last_messages_per_conversation,
-        get_unread_counts_per_conversation,
-        batch_load_participants,
         batch_load_experiences,
         batch_load_jobs,
+        batch_load_participants,
+        get_last_messages_per_conversation,
+        get_unread_counts_per_conversation,
     )
 
     # Query 1: Get all conversations for this user

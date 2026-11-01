@@ -12,8 +12,9 @@ Step 5B: Replace fake embeddings with real OpenAI vectors:
 - Same changes for both resumes and job_postings tables
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "j1k2l3m4n5o6"
 down_revision = "i0j1k2l3m4n5"

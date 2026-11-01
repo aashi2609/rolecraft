@@ -10,8 +10,9 @@ Step 5A: Track whether fitment scores are embedding-based (real) or heuristic (f
 - Future updates will set "heuristic" when skill-overlap fallback is used
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "i0j1k2l3m4n5"
 down_revision = "h9i0j1k2l3m4"

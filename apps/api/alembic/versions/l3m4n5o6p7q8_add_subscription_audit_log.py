@@ -3,10 +3,10 @@
 Track who changed what, when, and why for compliance and fraud detection.
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "l3m4n5o6p7q8"

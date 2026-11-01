@@ -13,11 +13,11 @@ from uuid import UUID
 
 from core.config import get_settings
 from models import (
+    ATSScoreStatus,
     CandidateProfile,
     CandidateSkill,
-    Resume,
-    ATSScoreStatus,
     EmbeddingStatus,
+    Resume,
 )
 from services.ai_client import AIServiceError, generate_content
 from services.ats_scorer import ATSResult, score_resume
@@ -570,7 +570,7 @@ async def generate_with_autofix(
     embedding = None
     embedding_status = "pending"
     try:
-        from services.embedding_service import embed_text, EmbeddingError
+        from services.embedding_service import EmbeddingError, embed_text
 
         embedding = await embed_text(embedding_text)
         embedding_status = "scored"

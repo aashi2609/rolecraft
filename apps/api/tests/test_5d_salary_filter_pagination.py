@@ -1,9 +1,10 @@
 """Step 5D: Salary filtering before pagination — SQL WHERE clause, deterministic ordering."""
 
-import pytest
 from uuid import uuid4
 
-from models import CandidateProfile, User, Experience, UserRole
+import pytest
+
+from models import CandidateProfile, Experience, User, UserRole
 from services.candidate_search_service import search_candidates
 
 

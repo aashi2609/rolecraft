@@ -1,10 +1,12 @@
 """Tests for 4A: GET /jobs/hidden route ordering, hide, unhide, and hidden job filtering."""
 
 import uuid
+
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.security import create_access_token
 from main import app
 from models import (
     CandidateProfile,
@@ -15,7 +17,6 @@ from models import (
     User,
     UserRole,
 )
-from core.security import create_access_token
 
 
 @pytest.mark.asyncio

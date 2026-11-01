@@ -169,7 +169,7 @@ async def get_job_stats(db, job_ids: list) -> dict:
 
     Returns: { job_id: { 'matched': int, 'shortlisted': int }, ... }
     """
-    from sqlalchemy import func, case
+    from sqlalchemy import case, func
 
     if not job_ids:
         return {}

@@ -12,7 +12,6 @@ These indexes were added after EXPLAIN ANALYZE on hot queries:
 
 from alembic import op
 
-
 # revision identifiers, used by Alembic.
 revision = "n6o7p8q9r0s1"
 down_revision = "m5n6o7p8q9r0"

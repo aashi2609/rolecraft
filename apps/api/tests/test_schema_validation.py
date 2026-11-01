@@ -116,6 +116,7 @@ def test_job_out_accepts_orm_status_enum() -> None:
 def test_validation_error_never_leaks_password() -> None:
     """FastAPI validation error responses must strip the submitted password from response body."""
     from fastapi.testclient import TestClient
+
     from main import app
 
     client = TestClient(app)

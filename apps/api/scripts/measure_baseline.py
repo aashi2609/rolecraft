@@ -12,16 +12,17 @@ Usage:
 
 import asyncio
 import os
+import statistics
 import sys
 import time
-import statistics
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from httpx import AsyncClient
-from main import app
+
 from core.security import create_access_token
+from main import app
 
 # Settings
 ITERATIONS = 20
@@ -36,6 +37,7 @@ async def get_test_users() -> tuple:
     """Get or create test users."""
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
+
     from core.database import asyncpg_engine_kwargs
 
     test_db_url = os.getenv("TEST_DATABASE_URL", "").strip()

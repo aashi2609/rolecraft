@@ -9,9 +9,10 @@ the legacy `thread_id` and `recipient_id` columns and their indexes/constraints
 using IF EXISTS so it is safe against databases where they were already removed.
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision = "c7d8e9f0a1b2"
 down_revision = "b4c5d6e7f8a9"

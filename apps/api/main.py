@@ -1,19 +1,18 @@
-from pathlib import Path
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from core.config import get_settings
 from core.rate_limit import RateLimited, limiter, rate_limit_exceeded_handler
 from core.request_id import RequestIdMiddleware
 from core.timeout_middleware import TimeoutMiddleware
-from services.ai_client import AIServiceError
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from routers import (
     admin,
     analytics,
@@ -32,6 +31,7 @@ from routers.notifications import (
     router_subscriptions,
     router_uploads,
 )
+from services.ai_client import AIServiceError
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -56,8 +56,8 @@ app.add_middleware(TimeoutMiddleware)
 
 # Query Profiler middleware (test/debug mode only)
 if not settings.is_production:
-    from core.query_profiler import ProfilerMiddleware, install_profiler
     from core.database import engine
+    from core.query_profiler import ProfilerMiddleware, install_profiler
 
     app.add_middleware(ProfilerMiddleware, enabled=True)
     install_profiler(engine, enabled=True)

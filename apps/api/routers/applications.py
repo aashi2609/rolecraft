@@ -11,11 +11,11 @@ from core.dependencies import (
     DbSession,
     check_plan_limit,
 )
+from core.enum_utils import coerce_enum
 from core.websocket_auth import (
     authenticate_websocket_connection,
     handle_websocket_lifecycle,
 )
-from core.enum_utils import coerce_enum
 from core.ws_manager import ws_manager
 from models import (
     Application,

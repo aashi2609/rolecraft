@@ -178,9 +178,10 @@ async def forgot_password(
     request: Request, response: Response, body: ForgotPasswordRequest, db: DbSession
 ):
     """Password reset request. Always returns same response (no account enumeration)."""
+    import hashlib
     from datetime import datetime, timedelta
     from secrets import token_urlsafe
-    import hashlib
+
     from services.email_service import send_password_reset_email
 
     email = body.email.lower()
@@ -246,8 +247,9 @@ async def reset_password(
     db: DbSession,
 ):
     """Reset password using token. Generic error for security."""
-    from datetime import datetime
     import hashlib
+    from datetime import datetime
+
     from core.security import hash_password
 
     email = request.headers.get("x-user-email", "").lower() or ""

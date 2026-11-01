@@ -10,8 +10,8 @@ Usage:
 3. Response headers: X-DB-Queries, X-DB-Time-Ms
 """
 
-import time
 import logging
+import time
 from contextvars import ContextVar
 from typing import Optional
 

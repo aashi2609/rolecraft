@@ -5,8 +5,9 @@ All messaging routes and UI elements (search, applications, WebSocket) use
 can_company_message_candidate() to enforce a consistent, configurable policy.
 """
 
-from uuid import UUID
 from enum import Enum
+from uuid import UUID
+
 from sqlalchemy import or_, select
 
 from core.config import get_settings

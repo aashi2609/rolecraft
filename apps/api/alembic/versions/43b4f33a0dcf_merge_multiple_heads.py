@@ -7,7 +7,6 @@ Create Date: 2026-10-31 17:24:17.710679
 
 from typing import Sequence, Union
 
-
 revision: str = "43b4f33a0dcf"
 down_revision: Union[str, None] = ("c7d8e9f0a1b2", "g8h9i0j1k2l3")
 branch_labels: Union[str, Sequence[str], None] = None

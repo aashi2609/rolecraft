@@ -11,6 +11,7 @@ Verification requirements:
 from __future__ import annotations
 
 import uuid
+
 from fastapi.testclient import TestClient
 
 from core.security import create_access_token

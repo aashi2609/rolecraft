@@ -1,5 +1,6 @@
 import enum
 from typing import Any, Optional, Type, TypeVar
+
 from fastapi import HTTPException, status
 
 E = TypeVar("E", bound=enum.Enum)

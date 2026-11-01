@@ -30,11 +30,11 @@ logger = logging.getLogger(__name__)
 
 async def backfill_resume_embeddings(db: AsyncSession) -> dict:
     """Re-embed all resumes. Return stats dict."""
-    from models import Resume, EmbeddingStatus
+    from models import EmbeddingStatus, Resume
     from services.embedding_service import (
+        EmbeddingError,
         build_resume_embedding_text,
         embed_text,
-        EmbeddingError,
     )
 
     logger.info("Starting resume backfill...")
@@ -103,11 +103,11 @@ async def backfill_resume_embeddings(db: AsyncSession) -> dict:
 
 async def backfill_job_embeddings(db: AsyncSession) -> dict:
     """Re-embed all jobs. Return stats dict."""
-    from models import JobPosting, EmbeddingStatus
+    from models import EmbeddingStatus, JobPosting
     from services.embedding_service import (
+        EmbeddingError,
         build_job_embedding_text,
         embed_text,
-        EmbeddingError,
     )
 
     logger.info("Starting job backfill...")
@@ -175,8 +175,9 @@ async def backfill_job_embeddings(db: AsyncSession) -> dict:
 
 async def verify_cosine_similarity(db: AsyncSession) -> None:
     """Spot-check: compute cosine distance between two clearly different resumes."""
-    from models import Resume
     import math
+
+    from models import Resume
 
     logger.info("Verifying cosine similarity between sample resumes...")
 

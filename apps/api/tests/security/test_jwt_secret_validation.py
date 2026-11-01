@@ -240,6 +240,7 @@ def test_dev_defaults_applied():
 def test_no_hardcoded_jwt_default_in_source():
     """Ensure the source code doesn't contain the old unsafe default."""
     import inspect
+
     from core.config import Settings
 
     source = inspect.getsource(Settings)

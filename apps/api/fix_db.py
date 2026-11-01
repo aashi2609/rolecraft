@@ -1,6 +1,8 @@
 import asyncio
-from core.database import AsyncSessionLocal
+
 from sqlalchemy import update
+
+from core.database import AsyncSessionLocal
 from models import Company
 
 

@@ -1,7 +1,7 @@
 """Email service with provider abstraction: console | smtp | resend."""
 
-import os
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 

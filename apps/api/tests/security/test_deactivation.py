@@ -20,7 +20,6 @@ from fastapi.testclient import TestClient
 
 from core.security import create_access_token
 
-
 # ── Fixtures ─────────────────────────────────────────────────────────────
 
 # The admin UUID that exists in the production/test database.

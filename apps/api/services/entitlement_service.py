@@ -7,11 +7,11 @@ No hardcoded limits, no scattered checks.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional, NamedTuple
+from typing import NamedTuple, Optional
 
 from sqlalchemy import select
 
-from models import Subscription, SubscriptionStatus, User, UserRole, PlanTier
+from models import PlanTier, Subscription, SubscriptionStatus, User, UserRole
 
 
 class PlanFeatures(NamedTuple):

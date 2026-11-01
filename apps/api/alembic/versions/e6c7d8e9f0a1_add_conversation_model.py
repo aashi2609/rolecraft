@@ -11,9 +11,10 @@ deleted. Old columns (thread_id, recipient_id) are kept for rollback
 safety; a later contract migration can drop them.
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision = "e6c7d8e9f0a1"
 down_revision = "d5b69ec5aecb"

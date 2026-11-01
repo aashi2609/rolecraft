@@ -5,9 +5,10 @@ eliminating N+1 patterns from list_threads endpoint.
 """
 
 from uuid import UUID
-from sqlalchemy import select, func, desc
 
-from models import Message, Company, CandidateProfile, User, Experience, JobPosting
+from sqlalchemy import desc, func, select
+
+from models import CandidateProfile, Company, Experience, JobPosting, Message, User
 
 
 async def get_last_messages_per_conversation(db, conversation_ids: list[UUID]) -> dict:

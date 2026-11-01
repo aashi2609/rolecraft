@@ -1,6 +1,7 @@
 """Unit and integration tests for plan limits and get_user_plan entitlement."""
 
 import uuid
+
 import pytest
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -218,6 +219,7 @@ def test_check_plan_limit_ast_no_unconditional_return():
     """Static AST guard: fails if check_plan_limit has an early return or bypass keyword."""
     import ast
     import inspect
+
     from core.dependencies import check_plan_limit
 
     source = inspect.getsource(check_plan_limit)
@@ -246,6 +248,7 @@ def test_check_plan_limit_ast_no_unconditional_return():
 async def test_check_plan_limit_unit_enforcement_raises_on_excess():
     """Unit test with mock AsyncSession: asserts check_plan_limit raises 403 and never returns None on excess."""
     from unittest.mock import AsyncMock, MagicMock
+
     from core.dependencies import check_plan_limit
 
     mock_db = MagicMock(spec=AsyncSession)

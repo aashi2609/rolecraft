@@ -11,10 +11,11 @@ Comprehensive tests to verify:
 7. No sensitive data in responses
 """
 
-import pytest
 import time
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import httpx
+import pytest
 
 pytestmark = pytest.mark.skip_db_guard
 
@@ -26,9 +27,9 @@ class TestErrorClassification:
     async def test_401_auth_error_fails_immediately(self):
         """401 Unauthorized raises immediately without retry."""
         from services.ai_client import (
-            generate_content,
             AIServiceError,
             _circuit_breaker,
+            generate_content,
         )
 
         # Reset circuit breaker
@@ -66,9 +67,9 @@ class TestErrorClassification:
     async def test_400_bad_request_fails_immediately(self):
         """400 Bad Request (e.g., context length) fails immediately."""
         from services.ai_client import (
-            generate_content,
             AIServiceError,
             _circuit_breaker,
+            generate_content,
         )
 
         _circuit_breaker.failure_count = 0
@@ -103,9 +104,9 @@ class TestErrorClassification:
     async def test_429_rate_limit_retries_with_backoff(self):
         """429 Rate Limit retries with exponential backoff."""
         from services.ai_client import (
-            generate_content,
             AIServiceError,
             _circuit_breaker,
+            generate_content,
         )
 
         _circuit_breaker.failure_count = 0
@@ -147,9 +148,9 @@ class TestErrorClassification:
     async def test_timeout_retries_with_escalating_timeout(self):
         """Timeout errors retry with escalating per-attempt timeout."""
         from services.ai_client import (
-            generate_content,
             AIServiceError,
             _circuit_breaker,
+            generate_content,
         )
 
         _circuit_breaker.failure_count = 0
@@ -181,9 +182,9 @@ class TestCircuitBreaker:
     async def test_circuit_breaker_opens_after_5_failures(self):
         """Circuit breaker opens after 5 consecutive failures."""
         from services.ai_client import (
-            generate_content,
             AIServiceError,
             _circuit_breaker,
+            generate_content,
         )
 
         # Reset circuit breaker
@@ -214,9 +215,9 @@ class TestCircuitBreaker:
     async def test_circuit_breaker_blocks_requests_when_open(self):
         """Circuit breaker blocks requests immediately when open."""
         from services.ai_client import (
-            generate_content,
             AIServiceError,
             _circuit_breaker,
+            generate_content,
         )
 
         # Manually open circuit breaker
@@ -240,9 +241,9 @@ class TestCircuitBreaker:
     async def test_circuit_breaker_closes_after_cooldown(self):
         """Circuit breaker allows retry after 30s cooldown."""
         from services.ai_client import (
-            generate_content,
             AIServiceError,
             _circuit_breaker,
+            generate_content,
         )
 
         # Open circuit breaker 31 seconds ago
@@ -276,9 +277,9 @@ class TestRequestDeadline:
     async def test_deadline_stops_retries(self):
         """Request stops retrying when deadline is reached."""
         from services.ai_client import (
-            generate_content,
             AIServiceError,
             _circuit_breaker,
+            generate_content,
         )
 
         _circuit_breaker.failure_count = 0
@@ -352,9 +353,10 @@ class TestErrorCodesToClient:
     @pytest.mark.asyncio
     async def test_error_response_includes_error_code(self):
         """AIServiceError with error_code is returned to client."""
-        from services.ai_client import AIServiceError
-        from main import ai_service_error_handler
         from fastapi import Request
+
+        from main import ai_service_error_handler
+        from services.ai_client import AIServiceError
 
         # Create mock request
         mock_request = MagicMock(spec=Request)
@@ -378,9 +380,10 @@ class TestErrorCodesToClient:
     @pytest.mark.asyncio
     async def test_no_sensitive_data_in_error_response(self):
         """Error responses don't leak API keys or provider details."""
-        from services.ai_client import AIServiceError
-        from main import ai_service_error_handler
         from fastapi import Request
+
+        from main import ai_service_error_handler
+        from services.ai_client import AIServiceError
 
         mock_request = MagicMock(spec=Request)
         mock_request.state = MagicMock()

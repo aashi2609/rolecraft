@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
+
 from core.database import asyncpg_engine_kwargs
 
 # ── Test Configuration ────────────────────────────────────────────────────
