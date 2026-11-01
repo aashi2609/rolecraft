@@ -16,9 +16,7 @@ class TicketStore:
     """Simple in-memory ticket store (single worker only)."""
 
     def __init__(self):
-        self._tickets: dict[
-            str, dict
-        ] = {}  # ticket -> {user_id, issued_at, expires_at}
+        self._tickets: dict[str, dict] = {}  # ticket -> {user_id, issued_at, expires_at}
 
     def issue(self, user_id: str) -> str:
         """Issue a one-time WebSocket ticket (valid for 5 seconds)."""

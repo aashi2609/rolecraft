@@ -60,9 +60,7 @@ class TestEmbedTextNoMockVectors:
         """When API succeeds, embed_text returns real 512-dim vector."""
         from services.embedding_service import embed_text
 
-        fake_vector = [
-            0.1 * (i % 10) for i in range(512)
-        ]  # Real-looking 512-dim vector
+        fake_vector = [0.1 * (i % 10) for i in range(512)]  # Real-looking 512-dim vector
 
         with (
             patch("services.embedding_service.settings") as mock_settings,
@@ -298,9 +296,7 @@ class TestFitmentScoringMethodTracking:
         """FitmentResult created from embedding has scoring_method='embedding'."""
         from models import FitmentResult
 
-        fr = FitmentResult(
-            job_id="j1", candidate_id="c1", score=85.0, scoring_method="embedding"
-        )
+        fr = FitmentResult(job_id="j1", candidate_id="c1", score=85.0, scoring_method="embedding")
 
         assert fr.scoring_method == "embedding"
 
@@ -308,9 +304,7 @@ class TestFitmentScoringMethodTracking:
         """FitmentResult from heuristic fallback has scoring_method='heuristic'."""
         from models import FitmentResult
 
-        fr = FitmentResult(
-            job_id="j1", candidate_id="c1", score=60.0, scoring_method="heuristic"
-        )
+        fr = FitmentResult(job_id="j1", candidate_id="c1", score=60.0, scoring_method="heuristic")
 
         assert fr.scoring_method == "heuristic"
 

@@ -1,0 +1,7 @@
+# git blame ignore file
+# Configure git to use this file:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Ruff auto-formatting (style: apply Ruff formatting to all Python files)
+# Get the commit hash with: git log --oneline --grep="style: apply Ruff formatting" -1
+# Then add it below this comment when available

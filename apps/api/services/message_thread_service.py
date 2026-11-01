@@ -86,9 +86,7 @@ async def batch_load_participants(db, user_ids: list[UUID]) -> tuple[dict, dict,
         return {}, {}, {}
 
     # Fetch all companies
-    companies_result = await db.execute(
-        select(Company).where(Company.user_id.in_(user_ids))
-    )
+    companies_result = await db.execute(select(Company).where(Company.user_id.in_(user_ids)))
     companies_dict = {c.user_id: c for c in companies_result.scalars().all()}
 
     # Fetch all candidate profiles

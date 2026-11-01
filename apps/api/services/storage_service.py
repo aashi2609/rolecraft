@@ -44,9 +44,7 @@ async def upload_file(
     ``file_id`` is None only when ``db`` is not provided (should not happen
     in production).
     """
-    data, ext, detected_mime = await validate_upload(
-        file, category, content_length=content_length
-    )
+    data, ext, detected_mime = await validate_upload(file, category, content_length=content_length)
 
     # Never use client filename in storage path — uuid + validated extension only.
     object_name = f"{prefix}/{uuid.uuid4().hex}{ext}"
@@ -66,9 +64,7 @@ async def upload_file(
         is_logo = object_name.startswith(LOGO_PREFIX + "/")
         fr = FileRecord(
             owner_id=owner_id,
-            category=FileCategory.logo
-            if is_logo
-            else cat_map.get(category, FileCategory.document),
+            category=FileCategory.logo if is_logo else cat_map.get(category, FileCategory.document),
             storage_path=object_name,
             original_filename=file.filename,
             mime_type=detected_mime,
@@ -105,16 +101,12 @@ def _upload_gcs(object_name: str, data: bytes, content_type: str | None) -> None
     try:
         from google.cloud import storage
     except ImportError as exc:
-        raise HTTPException(
-            status_code=500, detail="google-cloud-storage not installed"
-        ) from exc
+        raise HTTPException(status_code=500, detail="google-cloud-storage not installed") from exc
 
     client = storage.Client(project=settings.gcs_project_id or None)
     bucket = client.bucket(settings.gcs_bucket_name)
     blob = bucket.blob(object_name)
-    blob.upload_from_string(
-        data, content_type=content_type or "application/octet-stream"
-    )
+    blob.upload_from_string(data, content_type=content_type or "application/octet-stream")
     # NEVER call blob.make_public() — files are private.
     # Signed URLs are generated at request time in the /files/ endpoint.
 
@@ -133,9 +125,7 @@ def generate_signed_url(storage_path: str, expiration_seconds: int = 300) -> str
     try:
         from google.cloud import storage
     except ImportError as exc:
-        raise HTTPException(
-            status_code=500, detail="google-cloud-storage not installed"
-        ) from exc
+        raise HTTPException(status_code=500, detail="google-cloud-storage not installed") from exc
 
     client = storage.Client(project=settings.gcs_project_id or None)
     bucket = client.bucket(settings.gcs_bucket_name)

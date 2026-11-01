@@ -26,9 +26,7 @@ def run_alembic_command(
     args: list[str], cwd: Path, extra_env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess:
     """Run an Alembic command and return the result."""
-    alembic_exe = Path(sys.executable).parent / (
-        "alembic.exe" if os.name == "nt" else "alembic"
-    )
+    alembic_exe = Path(sys.executable).parent / ("alembic.exe" if os.name == "nt" else "alembic")
     cmd = (
         [str(alembic_exe)] + args
         if alembic_exe.exists()
@@ -56,9 +54,7 @@ def get_table_count(table_name: str) -> int:
         connect_args["statement_cache_size"] = 0
         engine = create_async_engine(db_url, connect_args=connect_args)
         async with engine.connect() as conn:
-            cnt = (
-                await conn.execute(text(f"SELECT COUNT(*) FROM {table_name};"))
-            ).scalar()
+            cnt = (await conn.execute(text(f"SELECT COUNT(*) FROM {table_name};"))).scalar()
         await engine.dispose()
         return cnt or 0
 
@@ -208,9 +204,7 @@ class TestConversationMigration:
 
         # Verify conversations table was created
         conversations_count = get_table_count("conversations")
-        assert conversations_count > 0, (
-            "Conversations table should have at least one conversation"
-        )
+        assert conversations_count > 0, "Conversations table should have at least one conversation"
 
     def test_upgrade_to_head(self, api_root: Path) -> None:
         """Test upgrading from conversation migration to head."""
@@ -220,13 +214,8 @@ class TestConversationMigration:
     def test_downgrade_requires_flag(self, api_root: Path) -> None:
         """Test that downgrade requires ALLOW_DESTRUCTIVE_DOWNGRADE flag."""
         result = run_alembic_command(["downgrade", "-1"], api_root)
-        assert result.returncode != 0, (
-            "Downgrade should fail without ALLOW_DESTRUCTIVE_DOWNGRADE"
-        )
-        assert (
-            "ALLOW_DESTRUCTIVE_DOWNGRADE" in result.stderr
-            or "Refusing" in result.stderr
-        )
+        assert result.returncode != 0, "Downgrade should fail without ALLOW_DESTRUCTIVE_DOWNGRADE"
+        assert "ALLOW_DESTRUCTIVE_DOWNGRADE" in result.stderr or "Refusing" in result.stderr
 
     def test_downgrade_with_flag(self, api_root: Path) -> None:
         """Test that downgrade succeeds with ALLOW_DESTRUCTIVE_DOWNGRADE flag."""
@@ -303,9 +292,7 @@ class TestEnumMigration:
             "corporate_lifetime",
         ]
         for value in new_values:
-            assert value in enum_values, (
-                f"Enum value {value} not found in plan_tier: {enum_values}"
-            )
+            assert value in enum_values, f"Enum value {value} not found in plan_tier: {enum_values}"
 
         # Re-upgrade to head
         run_alembic_command(["upgrade", "head"], api_root)

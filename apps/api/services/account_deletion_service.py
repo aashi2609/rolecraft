@@ -39,9 +39,7 @@ async def delete_user_account(db: AsyncSession, user_id: UUID) -> bool:
                 try:
                     delete_stored_file(fr.storage_path)
                 except Exception as exc:
-                    logger.warning(
-                        "Failed to delete stored file %s: %s", fr.storage_path, exc
-                    )
+                    logger.warning("Failed to delete stored file %s: %s", fr.storage_path, exc)
     except Exception as exc:
         logger.error("Error querying file records for user %s: %s", user_id, exc)
 

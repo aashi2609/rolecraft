@@ -58,15 +58,11 @@ async def _sync_candidate_embeddings(db: DbSession, candidate_id: UUID) -> None:
 
 
 # Initialize profile item services
-_education_service = ProfileItemService(
-    Education, EducationIn, EducationIn, EducationOut
-)
+_education_service = ProfileItemService(Education, EducationIn, EducationIn, EducationOut)
 _certification_service = ProfileItemService(
     Certification, CertificationIn, CertificationIn, CertificationOut
 )
-_experience_service = ProfileItemService(
-    Experience, ExperienceIn, ExperienceIn, ExperienceOut
-)
+_experience_service = ProfileItemService(Experience, ExperienceIn, ExperienceIn, ExperienceOut)
 _project_service = ProfileItemService(Project, ProjectIn, ProjectIn, ProjectOut)
 
 
@@ -120,9 +116,7 @@ def _to_out(profile: CandidateProfile) -> CandidateProfileOut:
         annual_family_income=profile.annual_family_income,
         skills=[cs.skill.name for cs in profile.skills if cs.skill],
         education=[EducationOut.model_validate(e) for e in profile.education],
-        certifications=[
-            CertificationOut.model_validate(c) for c in profile.certifications
-        ],
+        certifications=[CertificationOut.model_validate(c) for c in profile.certifications],
         experience=[ExperienceOut.model_validate(e) for e in profile.experience],
         projects=[ProjectOut.model_validate(p) for p in profile.projects],
         profile_updated_at=profile.profile_updated_at,
@@ -152,9 +146,7 @@ def _to_public_out(profile: CandidateProfile) -> CandidatePublicProfileOut:
         strengths=profile.strengths or [],
         weblinks=_public_weblinks(profile.weblinks or {}),
         education=[EducationOut.model_validate(e) for e in profile.education],
-        certifications=[
-            CertificationOut.model_validate(c) for c in profile.certifications
-        ],
+        certifications=[CertificationOut.model_validate(c) for c in profile.certifications],
         experience=[ExperienceOut.model_validate(e) for e in profile.experience],
         projects=[ProjectOut.model_validate(p) for p in profile.projects],
     )
@@ -200,9 +192,7 @@ async def add_education(body: EducationIn, user: CandidateUser, db: DbSession):
 
 
 @router.put("/me/education/{item_id}", response_model=EducationOut)
-async def update_education(
-    item_id: UUID, body: EducationIn, user: CandidateUser, db: DbSession
-):
+async def update_education(item_id: UUID, body: EducationIn, user: CandidateUser, db: DbSession):
     out = await _education_service.update_item(db, item_id, user.id, body)
     await _sync_candidate_embeddings(db, user.id)
     return out
@@ -229,9 +219,7 @@ async def add_cert(body: CertificationIn, user: CandidateUser, db: DbSession):
 
 
 @router.put("/me/certifications/{item_id}", response_model=CertificationOut)
-async def update_cert(
-    item_id: UUID, body: CertificationIn, user: CandidateUser, db: DbSession
-):
+async def update_cert(item_id: UUID, body: CertificationIn, user: CandidateUser, db: DbSession):
     out = await _certification_service.update_item(db, item_id, user.id, body)
     await _sync_candidate_embeddings(db, user.id)
     return out
@@ -258,9 +246,7 @@ async def add_exp(body: ExperienceIn, user: CandidateUser, db: DbSession):
 
 
 @router.put("/me/experience/{item_id}", response_model=ExperienceOut)
-async def update_exp(
-    item_id: UUID, body: ExperienceIn, user: CandidateUser, db: DbSession
-):
+async def update_exp(item_id: UUID, body: ExperienceIn, user: CandidateUser, db: DbSession):
     out = await _experience_service.update_item(db, item_id, user.id, body)
     await _sync_candidate_embeddings(db, user.id)
     return out
@@ -287,9 +273,7 @@ async def add_project(body: ProjectIn, user: CandidateUser, db: DbSession):
 
 
 @router.put("/me/projects/{item_id}", response_model=ProjectOut)
-async def update_project(
-    item_id: UUID, body: ProjectIn, user: CandidateUser, db: DbSession
-):
+async def update_project(item_id: UUID, body: ProjectIn, user: CandidateUser, db: DbSession):
     out = await _project_service.update_item(db, item_id, user.id, body)
     await _sync_candidate_embeddings(db, user.id)
     return out
@@ -321,16 +305,12 @@ async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
             seen.add(key)
             unique_names.append(name)
 
-    await db.execute(
-        delete(CandidateSkill).where(CandidateSkill.candidate_id == candidate_id)
-    )
+    await db.execute(delete(CandidateSkill).where(CandidateSkill.candidate_id == candidate_id))
     await db.flush()
 
     linked: set[UUID] = set()
     for name in unique_names:
-        skill = await db.scalar(
-            select(Skill).where(func.lower(Skill.name) == name.lower())
-        )
+        skill = await db.scalar(select(Skill).where(func.lower(Skill.name) == name.lower()))
         if not skill:
             stmt = (
                 insert(Skill)
@@ -338,9 +318,7 @@ async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
                 .on_conflict_do_nothing(index_elements=["name"])
             )
             await db.execute(stmt)
-            skill = await db.scalar(
-                select(Skill).where(func.lower(Skill.name) == name.lower())
-            )
+            skill = await db.scalar(select(Skill).where(func.lower(Skill.name) == name.lower()))
         if not skill:
             continue
         skill_id = skill.id
@@ -420,17 +398,13 @@ async def search_candidates_endpoint(
 
 
 @router.get("/{candidate_id}/public-profile", response_model=CandidatePublicProfileOut)
-async def get_candidate_public_profile(
-    candidate_id: UUID, user: CompanyUser, db: DbSession
-):
+async def get_candidate_public_profile(candidate_id: UUID, user: CompanyUser, db: DbSession):
     """Employer-facing profile — no PII (address, income, DOB, family, etc.)."""
     return _to_public_out(await _load_profile(db, candidate_id))
 
 
 @router.get("/{candidate_id}/resume.pdf")
-async def download_candidate_resume_pdf(
-    candidate_id: UUID, user: CompanyUser, db: DbSession
-):
+async def download_candidate_resume_pdf(candidate_id: UUID, user: CompanyUser, db: DbSession):
     """Employer download of the candidate's latest/default generated resume as PDF."""
     profile = await _load_profile(db, candidate_id)
     resume = (
@@ -442,9 +416,7 @@ async def download_candidate_resume_pdf(
         )
     ).scalar_one_or_none()
     if not resume:
-        raise HTTPException(
-            status_code=404, detail="No resume available for this candidate"
-        )
+        raise HTTPException(status_code=404, detail="No resume available for this candidate")
 
     email = profile.user.email if profile.user else ""
     weblinks = profile.weblinks or {}
@@ -455,9 +427,7 @@ async def download_candidate_resume_pdf(
         weblinks=weblinks,
         filename=filename,
         candidate_name=resolve_candidate_name(weblinks=weblinks, email=email),
-        location=(profile.preferred_locations or [None])[0]
-        or profile.present_address
-        or "",
+        location=(profile.preferred_locations or [None])[0] or profile.present_address or "",
     )
 
 

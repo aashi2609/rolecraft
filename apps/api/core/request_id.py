@@ -35,14 +35,8 @@ logging.getLogger().addFilter(_filter)
 class RequestIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Check incoming header, sanitize if valid ascii/alphanumeric, otherwise generate uuid
-        incoming_id = request.headers.get("x-request-id") or request.headers.get(
-            "X-Request-ID"
-        )
-        if (
-            incoming_id
-            and len(incoming_id) <= 64
-            and incoming_id.replace("-", "").isalnum()
-        ):
+        incoming_id = request.headers.get("x-request-id") or request.headers.get("X-Request-ID")
+        if incoming_id and len(incoming_id) <= 64 and incoming_id.replace("-", "").isalnum():
             req_id = incoming_id
         else:
             req_id = uuid.uuid4().hex

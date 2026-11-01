@@ -297,9 +297,7 @@ async def handle_webhook(
 
         if transaction:
             await db.commit()
-            logger.info(
-                f"Webhook processed: {event_type} for transaction {transaction.id}"
-            )
+            logger.info(f"Webhook processed: {event_type} for transaction {transaction.id}")
 
         return WebhookResponse(ok=True, message="Webhook processed")
 

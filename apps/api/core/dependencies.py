@@ -25,16 +25,12 @@ async def get_current_user(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
     if credentials is None or not credentials.credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     try:
         payload = decode_access_token(credentials.credentials)
         user_id = UUID(payload["sub"])
     except (ValueError, KeyError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
     token_version = payload.get("token_version")
 
@@ -43,9 +39,7 @@ async def get_current_user(
     )
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     # Check token_version revocation: if token_version claim doesn't match DB, token was revoked
     if token_version is not None and user.token_version != token_version:
         raise HTTPException(
@@ -82,9 +76,7 @@ async def get_optional_current_user(
 def require_role(*roles: UserRole) -> Callable:
     async def _checker(user: Annotated[User, Depends(get_current_user)]) -> User:
         if user.role not in roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role"
-            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role")
         return user
 
     return _checker
@@ -115,9 +107,7 @@ async def get_user_plan(user: User, db: AsyncSession) -> Optional[PlanTier]:
     return None
 
 
-async def check_plan_limit(
-    user: User, db: AsyncSession, resource: str, extra: int = 1
-) -> None:
+async def check_plan_limit(user: User, db: AsyncSession, resource: str, extra: int = 1) -> None:
     """Validate feature category permissions based on user's active plan."""
     plan = await get_user_plan(user, db)
 
@@ -130,9 +120,7 @@ async def check_plan_limit(
         from models import Resume
 
         count = await db.scalar(
-            select(func.count())
-            .select_from(Resume)
-            .where(Resume.candidate_id == user.id)
+            select(func.count()).select_from(Resume).where(Resume.candidate_id == user.id)
         )
         if (plan is None or plan in FREE_CANDIDATE_PLANS) and (count or 0) >= 1:
             raise HTTPException(

@@ -84,9 +84,7 @@ class TestConversationAuthorization:
             "/conversations", json={"candidate_id": str(candidate_user.id)}
         )
         # Should either return existing conversation or 409 (conflict)
-        assert resp2.status_code in [200, 409], (
-            f"Expected 200 or 409, got {resp2.status_code}"
-        )
+        assert resp2.status_code in [200, 409], f"Expected 200 or 409, got {resp2.status_code}"
 
         if resp2.status_code == 200:
             # Should be the same conversation
@@ -191,9 +189,7 @@ class TestMessagingAndNotifications:
         notifications = (
             (
                 await db_session.execute(
-                    select(Notification).where(
-                        Notification.user_id == candidate_user.id
-                    )
+                    select(Notification).where(Notification.user_id == candidate_user.id)
                 )
             )
             .scalars()
@@ -204,8 +200,7 @@ class TestMessagingAndNotifications:
         notification = notifications[0]
         assert notification.notification_type == "message"
         assert (
-            "message" in notification.content.lower()
-            or "replied" in notification.content.lower()
+            "message" in notification.content.lower() or "replied" in notification.content.lower()
         )
 
     async def test_unread_count_increments(
@@ -267,9 +262,7 @@ class TestMessagingAndNotifications:
         )
 
         # Candidate marks as read
-        response = await candidate_client.post(
-            f"/conversations/{conversation.id}/mark-as-read"
-        )
+        response = await candidate_client.post(f"/conversations/{conversation.id}/mark-as-read")
         assert response.status_code == 200
 
         # Unread count should be 0
@@ -306,9 +299,7 @@ class TestMessageRetrievalAndOrdering:
                 content=f"Message {i + 1}",
             )
 
-        response = await company_client.get(
-            f"/conversations/{conversation.id}/messages"
-        )
+        response = await company_client.get(f"/conversations/{conversation.id}/messages")
         assert response.status_code == 200
         messages = response.json()
         assert len(messages) >= 3, f"Expected at least 3 messages, got {len(messages)}"
@@ -334,9 +325,7 @@ class TestMessageRetrievalAndOrdering:
                 content=f"Message {i}",
             )
 
-        response = await company_client.get(
-            f"/conversations/{conversation.id}/messages"
-        )
+        response = await company_client.get(f"/conversations/{conversation.id}/messages")
         assert response.status_code == 200
         messages = response.json()
 
@@ -395,9 +384,7 @@ class TestConversationListing:
     ):
         """Candidate sees list of their conversations."""
         # Create 2 conversations with different companies
-        conv1 = await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        conv1 = await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         response = await candidate_client.get("/conversations")
         assert response.status_code == 200
@@ -410,9 +397,7 @@ class TestConversationListing:
         self, company_client, make_conversation, candidate_user, company_user
     ):
         """Company sees list of their conversations."""
-        conv1 = await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        conv1 = await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         response = await company_client.get("/conversations")
         assert response.status_code == 200

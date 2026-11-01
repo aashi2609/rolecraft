@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import os
 import sys
-import uuid  # Added for fixtures
-from datetime import datetime
 from pathlib import Path
 
 # Ensure apps/api root is in sys.path
@@ -15,6 +13,18 @@ if api_root not in sys.path:
 
 # Load .env file explicitly so TEST_DATABASE_URL is populated
 from dotenv import load_dotenv
+
+load_dotenv(Path(api_root) / ".env")
+
+# ── CRITICAL: Set DATABASE_URL to TEST_DATABASE_URL BEFORE any app imports ──
+_test_db_url = os.getenv("TEST_DATABASE_URL", "").strip()
+if _test_db_url:
+    os.environ["DATABASE_URL"] = _test_db_url
+
+# Now safe to import modules that depend on DATABASE_URL
+import uuid  # Added for fixtures
+from datetime import datetime
+
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
@@ -23,7 +33,12 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 
 from core.config import get_settings
 from core.database import asyncpg_engine_kwargs
-from core.db_guard import enforce_isolated_test_database, extract_db_identity, is_primary_endpoint, PRIMARY_DB_NAME
+from core.db_guard import (
+    enforce_isolated_test_database,
+    extract_db_identity,
+    is_primary_endpoint,
+    PRIMARY_DB_NAME,
+)
 from core.rate_limit import reset_rate_limit_backends, limiter
 from main import app
 from models import (
@@ -36,13 +51,6 @@ from models import (
     SubscriptionStatus,
 )
 from core.security import create_access_token
-
-load_dotenv(Path(api_root) / ".env")
-
-# ── CRITICAL: Set DATABASE_URL to TEST_DATABASE_URL BEFORE any app imports ──
-_test_db_url = os.getenv("TEST_DATABASE_URL", "").strip()
-if _test_db_url:
-    os.environ["DATABASE_URL"] = _test_db_url
 
 # Fail loudly if run on the wrong interpreter.
 # Deploy target (Render runtime.txt / render.yaml): Python 3.11.9
@@ -83,6 +91,7 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     settings.rate_limit_enabled = False
     reset_rate_limit_backends()
     limiter.enabled = False
+
 
 @pytest.fixture(autouse=True)
 def _enforce_test_database_guard(request) -> None:
@@ -146,9 +155,7 @@ async def candidate_user(db_session):
     )
     db_session.add(user)
 
-    profile = CandidateProfile(
-        user_id=user.id, weblinks={"full_name": "Test Candidate"}
-    )
+    profile = CandidateProfile(user_id=user.id, weblinks={"full_name": "Test Candidate"})
     db_session.add(profile)
     await db_session.commit()
     await db_session.refresh(user)
@@ -312,15 +319,9 @@ async def grant_plan(db_session):
         from models import Subscription, SubscriptionStatus
 
         # Remove existing subscription if any
-        await db_session.execute(
-            select(Subscription).where(Subscription.user_id == user_id)
-        )
+        await db_session.execute(select(Subscription).where(Subscription.user_id == user_id))
         existing = (
-            (
-                await db_session.execute(
-                    select(Subscription).where(Subscription.user_id == user_id)
-                )
-            )
+            (await db_session.execute(select(Subscription).where(Subscription.user_id == user_id)))
             .scalars()
             .all()
         )
@@ -469,9 +470,7 @@ def mock_ai_service(monkeypatch):
     """
 
     class MockAIService:
-        async def generate_resume(
-            self, candidate_id: uuid.UUID, force_deterministic: bool = False
-        ):
+        async def generate_resume(self, candidate_id: uuid.UUID, force_deterministic: bool = False):
             return {
                 "id": uuid.uuid4(),
                 "candidate_id": candidate_id,
@@ -497,9 +496,7 @@ def mock_ai_service(monkeypatch):
                 "missing_skills": [],
             }
 
-        async def get_fitment_rationale(
-            self, candidate_id: uuid.UUID, job_id: uuid.UUID
-        ):
+        async def get_fitment_rationale(self, candidate_id: uuid.UUID, job_id: uuid.UUID):
             return {
                 "rationale": "Mock rationale: Candidate has strong Python skills matching job requirements",
                 "source": "template",

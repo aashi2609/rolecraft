@@ -96,9 +96,7 @@ class ProfileItemService(Generic[T, CreateSchema, UpdateSchema, OutSchema]):
         """
         del profile_loader  # kept for backward-compatible call sites
         items = await db.execute(
-            select(self.model).where(
-                getattr(self.model, self.candidate_id_field) == candidate_id
-            )
+            select(self.model).where(getattr(self.model, self.candidate_id_field) == candidate_id)
         )
         return [self.out_schema.model_validate(item) for item in items.scalars().all()]
 

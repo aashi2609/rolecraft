@@ -124,10 +124,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         # Never echo back the raw submitted values (such as passwords, tokens, or PII)
         e.pop("input", None)
         if "ctx" in e and isinstance(e["ctx"], dict):
-            e["ctx"] = {
-                k: str(v) if isinstance(v, Exception) else v
-                for k, v in e["ctx"].items()
-            }
+            e["ctx"] = {k: str(v) if isinstance(v, Exception) else v for k, v in e["ctx"].items()}
         clean_errors.append(e)
 
     req_id = _get_request_id(request)
@@ -170,11 +167,7 @@ async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError):
         request.url.path,
         exc,
     )
-    detail = (
-        "Internal database error"
-        if not settings.is_production
-        else "Internal server error"
-    )
+    detail = "Internal database error" if not settings.is_production else "Internal server error"
     return JSONResponse(
         status_code=500,
         content={"detail": detail, "request_id": req_id},
@@ -275,11 +268,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         request.url.path,
     )
     # In production, never leak internal traceback or exception messages to callers
-    detail = (
-        "Internal server error"
-        if settings.is_production
-        else f"{type(exc).__name__}: {exc}"
-    )
+    detail = "Internal server error" if settings.is_production else f"{type(exc).__name__}: {exc}"
     return JSONResponse(
         status_code=500,
         content={"detail": detail, "request_id": req_id},

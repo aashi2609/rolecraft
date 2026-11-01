@@ -21,9 +21,7 @@ from sqlalchemy.engine import Engine
 logger = logging.getLogger(__name__)
 
 # Context variable to store profiler state per request/task
-_profiler_context: ContextVar[Optional["RequestProfiler"]] = ContextVar(
-    "db_profiler", default=None
-)
+_profiler_context: ContextVar[Optional["RequestProfiler"]] = ContextVar("db_profiler", default=None)
 
 
 class RequestProfiler:
@@ -63,10 +61,7 @@ class RequestProfiler:
         }
 
     def __repr__(self) -> str:
-        return (
-            f"RequestProfiler(queries={self.query_count}, "
-            f"db_time_ms={self.db_time_ms:.2f})"
-        )
+        return f"RequestProfiler(queries={self.query_count}, db_time_ms={self.db_time_ms:.2f})"
 
 
 def get_current_profiler() -> Optional[RequestProfiler]:
@@ -93,18 +88,14 @@ def install_profiler(engine: Engine, enabled: bool = True) -> None:
     logger.info("Installing query profiler")
 
     @event.listens_for(engine, "before_cursor_execute")
-    def receive_before_cursor_execute(
-        conn, cursor, statement, parameters, context, executemany
-    ):
+    def receive_before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
         """Called before each SQL statement is executed."""
         conn.info.setdefault("query_start_time", []).append(time.time())
         # Log statement at debug level
         logger.debug(f"SQL: {statement[:100]}")
 
     @event.listens_for(engine, "after_cursor_execute")
-    def receive_after_cursor_execute(
-        conn, cursor, statement, parameters, context, executemany
-    ):
+    def receive_after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
         """Called after each SQL statement is executed."""
         try:
             # Get start time
@@ -154,9 +145,7 @@ class ProfilerMiddleware:
             if message["type"] == "http.response.start":
                 headers = list(message.get("headers", []))
                 # Add profiler headers
-                headers.extend(
-                    [(k.encode(), v.encode()) for k, v in profiler.to_headers().items()]
-                )
+                headers.extend([(k.encode(), v.encode()) for k, v in profiler.to_headers().items()])
                 message["headers"] = headers
             await send(message)
 

@@ -53,9 +53,7 @@ def get_client_ip(request: Request) -> str:
     """Return client IP; trust X-Forwarded-For only when TRUSTED_PROXY is set."""
     settings = get_settings()
     if settings.trusted_proxy:
-        forwarded = request.headers.get("x-forwarded-for") or request.headers.get(
-            "X-Forwarded-For"
-        )
+        forwarded = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
         if forwarded:
             # Left-most is the original client when proxies append.
             return forwarded.split(",")[0].strip() or "unknown"

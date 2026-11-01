@@ -58,10 +58,7 @@ async def fetch_embedding(text: str, *, retries: int = 3) -> list[float]:
                 logger.warning("Rate limit hit, skipping retries for embedding API")
                 break
             # Bad/expired key — fail fast instead of retrying into a browser timeout
-            if (
-                400 <= exc.response.status_code < 500
-                and exc.response.status_code != 429
-            ):
+            if 400 <= exc.response.status_code < 500 and exc.response.status_code != 429:
                 logger.warning(
                     "Embedding API client error %s, skipping retries",
                     exc.response.status_code,

@@ -81,9 +81,7 @@ async def validate_plan_tier(tier_str: str, user_role: UserRole) -> PlanTier:
     return tier
 
 
-async def cancel_active_subscriptions(
-    db, user_id: UUID, admin_id: Optional[UUID] = None
-) -> None:
+async def cancel_active_subscriptions(db, user_id: UUID, admin_id: Optional[UUID] = None) -> None:
     """Cancel all active subscriptions for a user."""
     existing = (
         (

@@ -16,23 +16,24 @@ from models import PlanTier, Subscription, SubscriptionStatus, User, UserRole
 
 class PlanFeatures(NamedTuple):
     """Features and quotas for a plan."""
+
     plan_tier: Optional[PlanTier]
     status: str  # active, pending, cancelled
     is_active: bool
     valid_until: Optional[datetime]
-    
+
     # Candidate plan features
     resume_generation: int  # Unlimited = 9999
     resume_tailoring: int  # Per application
     ats_score_checks: int
     pdf_downloads: int
     target_roles: int  # Concurrent roles to optimize for
-    
+
     # Job search features
     job_search: bool
     job_applications_per_day: int
     saved_jobs: int
-    
+
     # Company plan features
     job_postings: int
     active_jobs_concurrent: int
@@ -64,7 +65,6 @@ PLAN_FEATURES: dict[str, PlanFeatures] = {
         candidate_messaging=False,
         candidate_profiles_viewable=0,
     ),
-    
     # Candidate plans
     "resume_builder": PlanFeatures(
         plan_tier=PlanTier.resume_builder,
@@ -85,7 +85,6 @@ PLAN_FEATURES: dict[str, PlanFeatures] = {
         candidate_messaging=False,
         candidate_profiles_viewable=0,
     ),
-    
     "job_search": PlanFeatures(
         plan_tier=PlanTier.job_search,
         status="active",
@@ -105,7 +104,6 @@ PLAN_FEATURES: dict[str, PlanFeatures] = {
         candidate_messaging=True,
         candidate_profiles_viewable=0,
     ),
-    
     "complete": PlanFeatures(
         plan_tier=PlanTier.complete,
         status="active",
@@ -125,7 +123,6 @@ PLAN_FEATURES: dict[str, PlanFeatures] = {
         candidate_messaging=True,
         candidate_profiles_viewable=0,
     ),
-    
     # Company plans
     "corporate_annual": PlanFeatures(
         plan_tier=PlanTier.corporate_annual,
@@ -146,7 +143,6 @@ PLAN_FEATURES: dict[str, PlanFeatures] = {
         candidate_messaging=True,
         candidate_profiles_viewable=9999,  # Unlimited view depth
     ),
-    
     "corporate_lifetime": PlanFeatures(
         plan_tier=PlanTier.corporate_lifetime,
         status="active",
@@ -172,10 +168,10 @@ PLAN_FEATURES: dict[str, PlanFeatures] = {
 async def get_entitlements(user: User, db) -> PlanFeatures:
     """
     Get entitlements for a user - single source of truth.
-    
+
     Returns:
         PlanFeatures object with all feature flags and quotas
-    
+
     Logic:
     - If no subscription or status != active → return free tier
     - If subscription expired (renews_at < now) → return free tier
@@ -183,7 +179,7 @@ async def get_entitlements(user: User, db) -> PlanFeatures:
     """
     if not user:
         return PLAN_FEATURES["free"]
-    
+
     # Get active subscription (if any)
     sub = await db.scalar(
         select(Subscription).where(
@@ -191,20 +187,20 @@ async def get_entitlements(user: User, db) -> PlanFeatures:
             Subscription.status == SubscriptionStatus.active,
         )
     )
-    
+
     if not sub:
         return PLAN_FEATURES["free"]
-    
+
     # Check expiry (if renews_at is past, subscription is expired)
     now = datetime.now(timezone.utc)
     if sub.renews_at and sub.renews_at < now:
         # Expired; would normally mark as cancelled via background job
         return PLAN_FEATURES["free"]
-    
+
     # Return features for this plan
     plan_key = sub.plan_tier.value
     features = PLAN_FEATURES.get(plan_key, PLAN_FEATURES["free"])
-    
+
     # Adjust valid_until based on subscription
     if sub.renews_at:
         return features._replace(valid_until=sub.renews_at)
@@ -218,6 +214,7 @@ async def get_entitlements(user: User, db) -> PlanFeatures:
 
 class EntitlementError(Exception):
     """Raised when user lacks entitlement for a feature."""
+
     def __init__(self, code: str, message: str, plan_required: Optional[str] = None):
         self.code = code  # plan_required, quota_exceeded, plan_expired
         self.message = message
@@ -232,12 +229,12 @@ async def require_feature(
 ) -> None:
     """
     Check if user has access to a feature.
-    
+
     Raises:
         EntitlementError with code='plan_required' if feature not in plan
     """
     entitlements = await get_entitlements(user, db)
-    
+
     # Feature mapping to entitlements
     feature_checks = {
         "resume_generation": entitlements.resume_generation > 0,
@@ -248,17 +245,17 @@ async def require_feature(
         "messaging": entitlements.candidate_messaging,
         "ats_score": entitlements.ats_score_checks > 0,
     }
-    
+
     if feature not in feature_checks:
         raise ValueError(f"Unknown feature: {feature}")
-    
+
     if not feature_checks[feature]:
         # Suggest appropriate plan
         if user.role == UserRole.candidate:
             suggestion = "complete"  # Full access plan for candidates
         else:
             suggestion = "corporate_annual"  # Standard company plan
-        
+
         raise EntitlementError(
             code="plan_required",
             message=f"Feature '{feature}' requires a paid plan",
@@ -274,12 +271,12 @@ async def require_quota(
 ) -> None:
     """
     Check if user has quota remaining for an action.
-    
+
     Raises:
         EntitlementError with code='quota_exceeded' if limit reached
     """
     entitlements = await get_entitlements(user, db)
-    
+
     quota_map = {
         "resume_generation": entitlements.resume_generation,
         "resume_tailoring": entitlements.resume_tailoring,
@@ -292,16 +289,16 @@ async def require_quota(
         "active_jobs_concurrent": entitlements.active_jobs_concurrent,
         "candidate_profiles_viewable": entitlements.candidate_profiles_viewable,
     }
-    
+
     if quota_name not in quota_map:
         raise ValueError(f"Unknown quota: {quota_name}")
-    
+
     limit = quota_map[quota_name]
-    
+
     # 9999 means unlimited
     if limit >= 9999:
         return
-    
+
     if current_usage >= limit:
         raise EntitlementError(
             code="quota_exceeded",
@@ -312,11 +309,11 @@ async def require_quota(
 async def check_plan_expired(user: User, db) -> bool:
     """Check if user's subscription has expired."""
     entitlements = await get_entitlements(user, db)
-    
+
     if not entitlements.is_active:
         return True
-    
+
     if entitlements.valid_until and entitlements.valid_until < datetime.now(timezone.utc):
         return True
-    
+
     return False

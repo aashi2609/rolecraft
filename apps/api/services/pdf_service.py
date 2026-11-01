@@ -41,9 +41,7 @@ def _ensure_url(url: str) -> str:
     return u
 
 
-def _extract_contact(
-    content: dict[str, Any], weblinks: Optional[dict] = None
-) -> dict[str, str]:
+def _extract_contact(content: dict[str, Any], weblinks: Optional[dict] = None) -> dict[str, str]:
     info: dict[str, str] = {}
     merged: dict[str, Any] = {}
     if isinstance(content.get("weblinks"), dict):
@@ -77,9 +75,7 @@ def _normalise_skills(skills_data) -> dict[str, list[str]]:
         out: dict[str, list[str]] = {"technical": [], "soft": []}
         for k, v in skills_data.items():
             items = (
-                [str(s).strip() for s in (v or []) if str(s).strip()]
-                if isinstance(v, list)
-                else []
+                [str(s).strip() for s in (v or []) if str(s).strip()] if isinstance(v, list) else []
             )
             if not items:
                 continue
@@ -190,11 +186,7 @@ def generate_pdf(
     contact = _extract_contact(resume_content, weblinks)
     phone = phone or contact.get("phone") or ""
     skills = _normalise_skills(resume_content.get("skills", {}))
-    summary = (
-        resume_content.get("professional_summary")
-        or resume_content.get("summary")
-        or ""
-    )
+    summary = resume_content.get("professional_summary") or resume_content.get("summary") or ""
     location = location or _safe(resume_content.get("location") or "")
 
     pdf = _ResumePDF(format="A4", unit="mm")
@@ -284,9 +276,7 @@ def generate_pdf(
             title = _safe(exp.get("title"))
             company = _safe(exp.get("company"))
             dates = _safe(exp.get("dates"))
-            location_exp = _safe(
-                exp.get("location") or exp.get("employment_type") or ""
-            )
+            location_exp = _safe(exp.get("location") or exp.get("employment_type") or "")
             _row_left_right(pdf, title or "Role", dates)
             if company or location_exp:
                 pdf.set_font("Helvetica", "I", 9)
@@ -321,9 +311,7 @@ def generate_pdf(
             if gpa:
                 pdf.set_font("Helvetica", "", 9)
                 pdf.set_text_color(70, 70, 70)
-                pdf.multi_cell(
-                    usable, 4.5, f"CGPA: {gpa}" if "cgpa" not in gpa.lower() else gpa
-                )
+                pdf.multi_cell(usable, 4.5, f"CGPA: {gpa}" if "cgpa" not in gpa.lower() else gpa)
             highlights = edu.get("highlights") or []
             if isinstance(highlights, str):
                 highlights = [highlights]
@@ -419,9 +407,7 @@ def generate_pdf(
         pdf.set_font("Helvetica", "", 10)
         pdf.set_text_color(40, 40, 40)
         for a in achievements:
-            text = _safe(
-                a if not isinstance(a, dict) else a.get("title") or a.get("name") or ""
-            )
+            text = _safe(a if not isinstance(a, dict) else a.get("title") or a.get("name") or "")
             if text:
                 pdf.multi_cell(usable, 5, f"- {text}")
 

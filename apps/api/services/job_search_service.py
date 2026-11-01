@@ -178,9 +178,9 @@ async def get_job_stats(db, job_ids: list) -> dict:
         select(
             Application.job_id,
             func.count(Application.id).label("matched"),
-            func.count(
-                case((Application.status == ApplicationStatus.shortlisted, 1))
-            ).label("shortlisted"),
+            func.count(case((Application.status == ApplicationStatus.shortlisted, 1))).label(
+                "shortlisted"
+            ),
         )
         .where(Application.job_id.in_(job_ids))
         .group_by(Application.job_id)
@@ -201,9 +201,7 @@ async def get_job_stats(db, job_ids: list) -> dict:
     return stats
 
 
-async def enrich_job(
-    job: JobPosting, company: Company = None, stats: dict = None
-) -> JobOut:
+async def enrich_job(job: JobPosting, company: Company = None, stats: dict = None) -> JobOut:
     """Enrich job with company name and application pipeline counts.
 
     matched     = total applications for this job (pipeline size)

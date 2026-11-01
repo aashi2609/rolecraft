@@ -29,9 +29,7 @@ _PLACEHOLDER_DB_URLS: set[str] = {
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # Override via DATABASE_URL in .env — prefer Neon pooled URL (see .env.example).
     database_url: str = ""
@@ -65,9 +63,7 @@ class Settings(BaseSettings):
     # ── Messaging Policy ────────────────────────────────────────────────
     # "applicants_only": Company can only message candidates who applied to their jobs or shortlisted
     # "any_candidate_with_plan": Company can message any candidate if they have active plan (requires active subscription)
-    messaging_policy: str = (
-        "applicants_only"  # applicants_only | any_candidate_with_plan
-    )
+    messaging_policy: str = "applicants_only"  # applicants_only | any_candidate_with_plan
 
     # ── Razorpay Payment Configuration (Step 6D) ────────────────────────────
     razorpay_key_id: str = ""
@@ -81,9 +77,7 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> List[str]:
-        return [
-            o.strip(" \"'") for o in self.cors_origins.split(",") if o.strip(" \"'")
-        ]
+        return [o.strip(" \"'") for o in self.cors_origins.split(",") if o.strip(" \"'")]
 
     @property
     def is_production(self) -> bool:
@@ -158,9 +152,7 @@ class Settings(BaseSettings):
         if errors:
             msg = (
                 "\n\n🚨 FATAL: Critical configuration errors — "
-                "the application CANNOT start.\n\n"
-                + "\n".join(f"  • {e}" for e in errors)
-                + "\n"
+                "the application CANNOT start.\n\n" + "\n".join(f"  • {e}" for e in errors) + "\n"
             )
             raise ValueError(msg)
 

@@ -44,9 +44,7 @@ def _set_cached(user_id: UUID, role: str, days: int, payload: dict[str, Any]) ->
     _cache[key] = (time.monotonic() + _CACHE_TTL_SECONDS, payload)
 
 
-async def get_candidate_analytics(
-    user: User, db: AsyncSession, days: int = 30
-) -> dict[str, Any]:
+async def get_candidate_analytics(user: User, db: AsyncSession, days: int = 30) -> dict[str, Any]:
     cached = _get_cached(user.id, "candidate", days)
     if cached is not None:
         return cached
@@ -93,9 +91,7 @@ async def get_candidate_analytics(
         .group_by(func.date(Application.applied_at))
         .order_by(func.date(Application.applied_at))
     )
-    trend_data = [
-        {"date": str(date), "count": count} for date, count in application_trend.all()
-    ]
+    trend_data = [{"date": str(date), "count": count} for date, count in application_trend.all()]
 
     payload = {
         "period_days": days,
@@ -109,9 +105,7 @@ async def get_candidate_analytics(
     return payload
 
 
-async def get_company_analytics(
-    user: User, db: AsyncSession, days: int = 30
-) -> dict[str, Any]:
+async def get_company_analytics(user: User, db: AsyncSession, days: int = 30) -> dict[str, Any]:
     cached = _get_cached(user.id, "company", days)
     if cached is not None:
         return cached
@@ -165,9 +159,7 @@ async def get_company_analytics(
             Application.status != ApplicationStatus.applied,
         )
     )
-    response_rate = (
-        (responded_count / total_applications * 100) if total_applications else 0
-    )
+    response_rate = (responded_count / total_applications * 100) if total_applications else 0
 
     application_trend = await db.execute(
         select(
@@ -181,9 +173,7 @@ async def get_company_analytics(
         .group_by(func.date(Application.applied_at))
         .order_by(func.date(Application.applied_at))
     )
-    trend_data = [
-        {"date": str(date), "count": count} for date, count in application_trend.all()
-    ]
+    trend_data = [{"date": str(date), "count": count} for date, count in application_trend.all()]
 
     payload = {
         "period_days": days,

@@ -22,9 +22,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -88,9 +86,7 @@ async def backfill_resume_embeddings(db: AsyncSession) -> dict:
     await db.flush()
     await db.commit()
 
-    logger.info(
-        f"Resume backfill complete: {success_count} success, {failed_count} failed"
-    )
+    logger.info(f"Resume backfill complete: {success_count} success, {failed_count} failed")
 
     return {
         "type": "resumes",
@@ -160,9 +156,7 @@ async def backfill_job_embeddings(db: AsyncSession) -> dict:
     await db.flush()
     await db.commit()
 
-    logger.info(
-        f"Job backfill complete: {success_count} success, {failed_count} failed"
-    )
+    logger.info(f"Job backfill complete: {success_count} success, {failed_count} failed")
 
     return {
         "type": "jobs",
@@ -246,12 +240,8 @@ async def main():
             logger.info("=" * 70)
             logger.info("BACKFILL SUMMARY")
             logger.info("=" * 70)
-            logger.info(
-                f"Resumes: {resume_stats['success']}/{resume_stats['total']} succeeded"
-            )
-            logger.info(
-                f"Jobs:    {job_stats['success']}/{job_stats['total']} succeeded"
-            )
+            logger.info(f"Resumes: {resume_stats['success']}/{resume_stats['total']} succeeded")
+            logger.info(f"Jobs:    {job_stats['success']}/{job_stats['total']} succeeded")
 
             if resume_stats["samples"]:
                 logger.info("\nSample Resume Embeddings:")

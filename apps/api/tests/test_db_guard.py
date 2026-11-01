@@ -67,13 +67,9 @@ def test_enforce_guard_blocks_same_endpoint_different_db_name():
 
 
 def test_enforce_guard_refuses_empty_url():
-    with pytest.raises(
-        RuntimeError, match="FATAL: TEST_DATABASE_URL is not set or empty"
-    ):
+    with pytest.raises(RuntimeError, match="FATAL: TEST_DATABASE_URL is not set or empty"):
         enforce_isolated_test_database("", PRIMARY_POOLED)
-    with pytest.raises(
-        RuntimeError, match="FATAL: TEST_DATABASE_URL is not set or empty"
-    ):
+    with pytest.raises(RuntimeError, match="FATAL: TEST_DATABASE_URL is not set or empty"):
         enforce_isolated_test_database(None, PRIMARY_POOLED)
 
 
@@ -105,6 +101,4 @@ def test_is_primary_endpoint():
     """Test the is_primary_endpoint function."""
     assert is_primary_endpoint("ep-fragrant-salad-aybt4nuh") is True
     assert is_primary_endpoint("ep-cool-breeze-12345678") is False
-    assert (
-        is_primary_endpoint("ep-fragrant-salad-aybt4nuh-pooler") is False
-    )  # normalized version
+    assert is_primary_endpoint("ep-fragrant-salad-aybt4nuh-pooler") is False  # normalized version

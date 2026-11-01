@@ -96,18 +96,10 @@ async def _generate_deterministic(
             {
                 "name": p.project_name or "Project",
                 "description": p.responsibilities or "",
-                "bullets": [
-                    b.strip() for b in (p.achievements or "").split("\n") if b.strip()
-                ]
+                "bullets": [b.strip() for b in (p.achievements or "").split("\n") if b.strip()]
                 or ([p.responsibilities] if p.responsibilities else []),
-                "technologies": [
-                    t.strip() for t in (p.tools_used or "").split(",") if t.strip()
-                ],
-                "url": (
-                    p.org
-                    if p.org and ("http" in p.org or p.org.startswith("www."))
-                    else ""
-                ),
+                "technologies": [t.strip() for t in (p.tools_used or "").split(",") if t.strip()],
+                "url": (p.org if p.org and ("http" in p.org or p.org.startswith("www.")) else ""),
             }
             for p in (profile.projects or [])[:3]
         ],
@@ -117,9 +109,7 @@ async def _generate_deterministic(
         ],
     }
     # No fake ATS score - Step 5A
-    embedding_text = (
-        f"{vertical} {' '.join(highlighted)} {content['summary']} {mapping_notes}"
-    )
+    embedding_text = f"{vertical} {' '.join(highlighted)} {content['summary']} {mapping_notes}"
     try:
         embedding = await embed_text(embedding_text)
         embedding_status = EmbeddingStatus.scored.value
@@ -269,9 +259,7 @@ def _build_profile_prompt(cleaned: CleanedProfile, vertical: str) -> str:
                 line += f" ({exp['from_date']} – {exp.get('to_date', 'Present')})"
             sections.append(line)
             if exp.get("responsibilities"):
-                sections.append(
-                    f"    Responsibilities: {exp['responsibilities'][:500]}"
-                )
+                sections.append(f"    Responsibilities: {exp['responsibilities'][:500]}")
 
     if cleaned.projects:
         sections.append("\n### Projects:")
@@ -421,9 +409,7 @@ async def generate_resume_for_vertical(
     # Try AI path
     if settings.groq_api_key:
         try:
-            logger.info(
-                "Attempting AI-powered resume generation for vertical: %s", vertical
-            )
+            logger.info("Attempting AI-powered resume generation for vertical: %s", vertical)
             return await generate_with_autofix(
                 profile, vertical, skill_names, user_email=user_email
             )
@@ -463,9 +449,7 @@ async def generate_with_autofix(
 
     # CRITICAL: If scoring fails, return immediately without consuming more quota
     if ats_result.overall_score is None:
-        logger.error(
-            "Initial ATS scoring failed: %s. Returning error state.", ats_result.error
-        )
+        logger.error("Initial ATS scoring failed: %s. Returning error state.", ats_result.error)
         return {
             "content": content,
             "ats_score": None,
@@ -562,9 +546,7 @@ async def generate_with_autofix(
     # Step 5: Generate embedding (with error handling)
     highlighted = best_content.get("highlightedSkills", skill_names[:8])
     summary = best_content.get("summary", best_content.get("professional_summary", ""))
-    mapping_notes = best_content.get(
-        "mappingNotes", best_content.get("mapping_notes", "")
-    )
+    mapping_notes = best_content.get("mappingNotes", best_content.get("mapping_notes", ""))
     embedding_text = f"{vertical} {' '.join(highlighted)} {summary} {mapping_notes}"
 
     embedding = None
