@@ -12,10 +12,9 @@ Step 5A: Replace fake fallback scores with explicit status tracking.
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
-revision = 'h9i0j1k2l3m4'
-down_revision = '43b4f33a0dcf'  # After merge migration
+revision = "h9i0j1k2l3m4"
+down_revision = "43b4f33a0dcf"  # After merge migration
 branch_labels = None
 depends_on = None
 
@@ -28,18 +27,18 @@ def upgrade() -> None:
         EXCEPTION WHEN duplicate_object THEN null;
         END $$;
     """)
-    
+
     # Add the column with default 'unavailable'
     op.add_column(
-        'resumes',
+        "resumes",
         sa.Column(
-            'ats_status',
-            sa.Enum('scored', 'unavailable', 'error', name='ats_score_status'),
+            "ats_status",
+            sa.Enum("scored", "unavailable", "error", name="ats_score_status"),
             nullable=False,
-            server_default='unavailable'
-        )
+            server_default="unavailable",
+        ),
     )
-    
+
     # Migrate existing data: if ats_score exists, mark as 'scored', else 'unavailable'
     op.execute("""
         UPDATE resumes 
@@ -52,14 +51,15 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     import os
+
     if os.getenv("ALLOW_DESTRUCTIVE_DOWNGRADE", "").lower() not in ("1", "true", "yes"):
         raise RuntimeError(
             "Refusing to execute destructive downgrade: dropping ats_status column from resumes table. "
             "If this is intentional in a local test, set ALLOW_DESTRUCTIVE_DOWNGRADE=1. "
             "In production, rollback must be performed via database snapshot restore."
         )
-    
-    op.drop_column('resumes', 'ats_status')
-    
+
+    op.drop_column("resumes", "ats_status")
+
     # Drop the enum type
-    op.execute('DROP TYPE IF EXISTS ats_score_status CASCADE')
+    op.execute("DROP TYPE IF EXISTS ats_score_status CASCADE")

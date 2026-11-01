@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.security import hash_password
 from models import (
@@ -11,8 +10,11 @@ from models import (
     Company,
 )
 
+
 def parse_plan(plan: str | None, role: UserRole) -> PlanTier:
-    default_tier = PlanTier.free if role == UserRole.candidate else PlanTier.corporate_annual
+    default_tier = (
+        PlanTier.free if role == UserRole.candidate else PlanTier.corporate_annual
+    )
     if not plan:
         return default_tier
     raw = plan.strip().lower()
@@ -20,6 +22,7 @@ def parse_plan(plan: str | None, role: UserRole) -> PlanTier:
         return PlanTier(raw)
     except ValueError:
         return default_tier
+
 
 async def create_user_with_profile(
     db: AsyncSession,

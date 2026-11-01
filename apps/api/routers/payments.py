@@ -8,9 +8,8 @@ Endpoints:
 
 import logging
 from typing import Any, Optional
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
 from core.dependencies import DbSession, get_current_user
@@ -24,7 +23,6 @@ from models import (
     PaymentStatus,
 )
 from services.payment_service import PaymentService
-from services.subscription_service import log_subscription_change
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -223,7 +221,9 @@ async def verify_payment(
             return PaymentVerifyResponse(
                 ok=True,
                 transaction_id=str(transaction.id),
-                subscription_id=str(transaction.subscription_id) if transaction.subscription_id else None,
+                subscription_id=str(transaction.subscription_id)
+                if transaction.subscription_id
+                else None,
                 status="completed",
                 message="Payment already verified",
             )
@@ -238,7 +238,9 @@ async def verify_payment(
         return PaymentVerifyResponse(
             ok=True,
             transaction_id=str(transaction.id),
-            subscription_id=str(transaction.subscription_id) if transaction.subscription_id else None,
+            subscription_id=str(transaction.subscription_id)
+            if transaction.subscription_id
+            else None,
             status="completed",
             message="Payment verified successfully",
         )

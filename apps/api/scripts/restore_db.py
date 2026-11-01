@@ -57,7 +57,7 @@ def download_from_gcs(bucket_name: str, remote_name: str, local_file: Path) -> b
     ]
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             cmd,
             check=True,
             capture_output=True,
@@ -90,15 +90,17 @@ def run_pg_restore(database_url: str, backup_file: Path) -> bool:
 
     cmd = [
         "pg_restore",
-        "-d", pg_url,
-        "-F", "c",  # custom format
+        "-d",
+        pg_url,
+        "-F",
+        "c",  # custom format
         "--clean",  # drop existing database objects
         "--if-exists",  # don't error if objects don't exist
         str(backup_file),
     ]
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             cmd,
             check=True,
             capture_output=True,

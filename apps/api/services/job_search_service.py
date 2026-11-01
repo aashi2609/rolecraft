@@ -166,42 +166,44 @@ async def get_job_stats(db, job_ids: list) -> dict:
     """
     Fetch matched and shortlisted application counts for all jobs in a single query.
     Uses GROUP BY to aggregate per job_id.
-    
+
     Returns: { job_id: { 'matched': int, 'shortlisted': int }, ... }
     """
     from sqlalchemy import func, case
-    
+
     if not job_ids:
         return {}
-    
+
     result = await db.execute(
         select(
             Application.job_id,
-            func.count(Application.id).label('matched'),
+            func.count(Application.id).label("matched"),
             func.count(
                 case((Application.status == ApplicationStatus.shortlisted, 1))
-            ).label('shortlisted')
+            ).label("shortlisted"),
         )
         .where(Application.job_id.in_(job_ids))
         .group_by(Application.job_id)
     )
-    
+
     stats = {}
     for row in result.all():
         stats[row.job_id] = {
-            'matched': int(row.matched or 0),
-            'shortlisted': int(row.shortlisted or 0),
+            "matched": int(row.matched or 0),
+            "shortlisted": int(row.shortlisted or 0),
         }
-    
+
     # Ensure all job_ids have an entry (even if 0 applications)
     for job_id in job_ids:
         if job_id not in stats:
-            stats[job_id] = {'matched': 0, 'shortlisted': 0}
-    
+            stats[job_id] = {"matched": 0, "shortlisted": 0}
+
     return stats
 
 
-async def enrich_job(job: JobPosting, company: Company = None, stats: dict = None) -> JobOut:
+async def enrich_job(
+    job: JobPosting, company: Company = None, stats: dict = None
+) -> JobOut:
     """Enrich job with company name and application pipeline counts.
 
     matched     = total applications for this job (pipeline size)
@@ -209,26 +211,30 @@ async def enrich_job(job: JobPosting, company: Company = None, stats: dict = Non
 
     These are real aggregates from `applications`, not stubs. FitmentResult
     rankings are separate (GET /jobs/{id}/candidates) and are not included here.
-    
+
     Args:
         job: JobPosting model instance
         company: Pre-loaded Company instance (from eager load). If None, uses job.company.
         stats: Pre-computed stats dict from get_job_stats(). If None, uses defaults.
     """
     # Use pre-loaded company if available (from eager load), otherwise try lazy load
-    company_obj = company or (job.company if hasattr(job, 'company') else None)
-    
+    company_obj = company or (job.company if hasattr(job, "company") else None)
+
     # Use pre-computed stats if available, otherwise defaults
-    job_stats = stats.get(job.id, {'matched': 0, 'shortlisted': 0}) if stats else {'matched': 0, 'shortlisted': 0}
-    
+    job_stats = (
+        stats.get(job.id, {"matched": 0, "shortlisted": 0})
+        if stats
+        else {"matched": 0, "shortlisted": 0}
+    )
+
     data = JobOut.model_validate(job)
     data.company_name = company_obj.name if company_obj else None
     # Enum values already coerced by JobOut validators; keep explicit .value for clarity
     if job.job_type is not None:
         data.job_type = job.job_type.value
     data.status = job.status.value if job.status else "draft"
-    data.matched = job_stats['matched']
-    data.shortlisted = job_stats['shortlisted']
+    data.matched = job_stats["matched"]
+    data.shortlisted = job_stats["shortlisted"]
     return data
 
 
@@ -257,7 +263,7 @@ async def search_jobs(
     """
     Search jobs with advanced filtering.
     Returns list of enriched JobOut objects.
-    
+
     OPTIMIZED: Fetches application counts in a single grouped query,
     not per-job. Query count is constant regardless of result set size.
     """
@@ -290,18 +296,18 @@ async def search_jobs(
 
     # Execute query (1 query to fetch jobs with eager-loaded company)
     jobs = (await db.execute(query)).scalars().all()
-    
+
     if not jobs:
         return []
-    
+
     # Fetch all application stats in a single grouped query (1 query for all jobs)
     job_ids = [j.id for j in jobs]
     stats = await get_job_stats(db, job_ids)
-    
+
     # Serialize with pre-loaded data (no additional queries)
     out = []
     for job in jobs:
         enriched = await enrich_job(job, company=job.company, stats=stats)
         out.append(enriched)
-    
+
     return out

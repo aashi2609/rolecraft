@@ -29,7 +29,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import select
 
 from core.config import get_settings
-from core.dependencies import CurrentUser, DbSession, get_optional_current_user
+from core.dependencies import CurrentUser, DbSession
 from models import (
     Application,
     FileCategory,
@@ -39,7 +39,6 @@ from models import (
     UserRole,
 )
 from services.storage_service import (
-    LOGO_PREFIX,
     generate_signed_url,
     get_local_file_path,
 )
@@ -66,9 +65,7 @@ async def _company_has_candidate_relationship(
     return result.scalar_one_or_none() is not None
 
 
-async def _check_file_access(
-    db, file_record: FileRecord, user: User
-) -> None:
+async def _check_file_access(db, file_record: FileRecord, user: User) -> None:
     """Raise HTTPException(404) if the user may NOT access this file.
 
     Returns None on success.  Uses 404 (not 403) for unauthorized access to

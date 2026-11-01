@@ -27,14 +27,27 @@ from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sqlalchemy import text, select, func
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from core.database import asyncpg_engine_kwargs
 from models import (
-    User, UserRole, Company, CandidateProfile, Experience,
-    JobPosting, JobStatus, Skill, Application, ApplicationStatus,
-    Conversation, Message, Notification, NotificationType,
-    Subscription, SubscriptionStatus, PlanTier
+    User,
+    UserRole,
+    Company,
+    CandidateProfile,
+    Experience,
+    JobPosting,
+    JobStatus,
+    Skill,
+    Application,
+    ApplicationStatus,
+    Conversation,
+    Message,
+    Notification,
+    NotificationType,
+    Subscription,
+    SubscriptionStatus,
+    PlanTier,
 )
 
 SEED_GROUP = "perf_test"
@@ -56,9 +69,15 @@ async def get_session() -> AsyncSession:
 async def check_counts(session: AsyncSession):
     """Display current row counts."""
     tables = [
-        "users", "companies", "candidate_profiles", "job_postings",
-        "applications", "conversations", "messages", "notifications",
-        "subscriptions"
+        "users",
+        "companies",
+        "candidate_profiles",
+        "job_postings",
+        "applications",
+        "conversations",
+        "messages",
+        "notifications",
+        "subscriptions",
     ]
     print("\n--- Current Row Counts ---")
     for table in tables:
@@ -72,85 +91,75 @@ async def check_counts(session: AsyncSession):
 async def cleanup(session: AsyncSession):
     """Remove all seeded data (marked with seed_group='perf_test')."""
     print("\n--- Cleaning up seeded data ---")
-    
+
     # Delete in order of dependencies
     # Messages first (FK to conversations)
     result = await session.execute(
-        text("DELETE FROM messages WHERE seed_group = :sg"),
-        {"sg": SEED_GROUP}
+        text("DELETE FROM messages WHERE seed_group = :sg"), {"sg": SEED_GROUP}
     )
     print(f"  Deleted {result.rowcount} messages")
-    
+
     # Conversations
     result = await session.execute(
-        text("DELETE FROM conversations WHERE seed_group = :sg"),
-        {"sg": SEED_GROUP}
+        text("DELETE FROM conversations WHERE seed_group = :sg"), {"sg": SEED_GROUP}
     )
     print(f"  Deleted {result.rowcount} conversations")
-    
+
     # Notifications
     result = await session.execute(
-        text("DELETE FROM notifications WHERE seed_group = :sg"),
-        {"sg": SEED_GROUP}
+        text("DELETE FROM notifications WHERE seed_group = :sg"), {"sg": SEED_GROUP}
     )
     print(f"  Deleted {result.rowcount} notifications")
-    
+
     # Applications
     result = await session.execute(
-        text("DELETE FROM applications WHERE seed_group = :sg"),
-        {"sg": SEED_GROUP}
+        text("DELETE FROM applications WHERE seed_group = :sg"), {"sg": SEED_GROUP}
     )
     print(f"  Deleted {result.rowcount} applications")
-    
+
     # Subscriptions
     result = await session.execute(
-        text("DELETE FROM subscriptions WHERE seed_group = :sg"),
-        {"sg": SEED_GROUP}
+        text("DELETE FROM subscriptions WHERE seed_group = :sg"), {"sg": SEED_GROUP}
     )
     print(f"  Deleted {result.rowcount} subscriptions")
-    
+
     # Job postings
     result = await session.execute(
-        text("DELETE FROM job_postings WHERE seed_group = :sg"),
-        {"sg": SEED_GROUP}
+        text("DELETE FROM job_postings WHERE seed_group = :sg"), {"sg": SEED_GROUP}
     )
     print(f"  Deleted {result.rowcount} job_postings")
-    
+
     # Skills
     result = await session.execute(
-        text("DELETE FROM skills WHERE seed_group = :sg"),
-        {"sg": SEED_GROUP}
+        text("DELETE FROM skills WHERE seed_group = :sg"), {"sg": SEED_GROUP}
     )
     print(f"  Deleted {result.rowcount} skills")
-    
+
     # Experience
     result = await session.execute(
-        text("DELETE FROM experience WHERE seed_group = :sg"),
-        {"sg": SEED_GROUP}
+        text("DELETE FROM experience WHERE seed_group = :sg"), {"sg": SEED_GROUP}
     )
     print(f"  Deleted {result.rowcount} experience")
-    
+
     # Candidate profiles
     result = await session.execute(
         text("DELETE FROM candidate_profiles WHERE seed_group = :sg"),
-        {"sg": SEED_GROUP}
+        {"sg": SEED_GROUP},
     )
     print(f"  Deleted {result.rowcount} candidate_profiles")
-    
+
     # Companies
     result = await session.execute(
-        text("DELETE FROM companies WHERE seed_group = :sg"),
-        {"sg": SEED_GROUP}
+        text("DELETE FROM companies WHERE seed_group = :sg"), {"sg": SEED_GROUP}
     )
     print(f"  Deleted {result.rowcount} companies")
-    
+
     # Users
     result = await session.execute(
-        text("DELETE FROM users WHERE seed_group = :sg"),
-        {"sg": SEED_GROUP}
+        text("DELETE FROM users WHERE seed_group = :sg"), {"sg": SEED_GROUP}
     )
     print(f"  Deleted {result.rowcount} users")
-    
+
     await session.commit()
     print("\nCleanup complete")
 
@@ -158,18 +167,17 @@ async def cleanup(session: AsyncSession):
 async def seed_data(session: AsyncSession):
     """Seed realistic test data."""
     print("\n--- Seeding Performance Test Data ---")
-    
+
     now = datetime.now(timezone.utc)
-    
+
     # Skip if already seeded
     existing = await session.scalar(
-        text("SELECT COUNT(*) FROM users WHERE seed_group = :sg"),
-        {"sg": SEED_GROUP}
+        text("SELECT COUNT(*) FROM users WHERE seed_group = :sg"), {"sg": SEED_GROUP}
     )
     if existing and existing > 0:
         print(f"WARNING: {existing} seeded users already exist. Skipping seed.")
         return
-    
+
     # 1. Create 300 companies
     print("  Creating 300 companies...")
     companies = []
@@ -184,7 +192,7 @@ async def seed_data(session: AsyncSession):
         )
         session.add(company_user)
         await session.flush()
-        
+
         company = Company(
             user_id=company_user.id,
             name=f"Company {i}",
@@ -192,17 +200,17 @@ async def seed_data(session: AsyncSession):
         )
         session.add(company)
         companies.append((company_user.id, company))
-    
+
     await session.commit()
     print(f"    Created {len(companies)} companies")
-    
+
     # 2. Create 20,000 candidates with profiles/skills/experience
     print("  Creating 20,000 candidates with profiles...")
     candidates = []
     for i in range(20000):
         if i % 2000 == 0:
             print(f"    {i}/20000...")
-        
+
         user = User(
             id=uuid4(),
             email=f"candidate_perf_{i}@test.com",
@@ -213,14 +221,14 @@ async def seed_data(session: AsyncSession):
         )
         session.add(user)
         await session.flush()
-        
+
         profile = CandidateProfile(
             user_id=user.id,
             weblinks={"linkedin": f"https://linkedin.com/{i}"},
             seed_group=SEED_GROUP,
         )
         session.add(profile)
-        
+
         # Add 2-3 skills
         for j in range(2 + (i % 2)):
             skill = Skill(
@@ -229,7 +237,7 @@ async def seed_data(session: AsyncSession):
                 seed_group=SEED_GROUP,
             )
             session.add(skill)
-        
+
         # Add 1-2 experience entries
         for j in range(1 + (i % 2)):
             start = now - timedelta(days=365 * (5 - j))
@@ -242,7 +250,7 @@ async def seed_data(session: AsyncSession):
                 seed_group=SEED_GROUP,
             )
             session.add(exp)
-        
+
         # Add subscription
         sub = Subscription(
             user_id=user.id,
@@ -252,12 +260,12 @@ async def seed_data(session: AsyncSession):
             seed_group=SEED_GROUP,
         )
         session.add(sub)
-        
+
         candidates.append(user)
-    
+
     await session.commit()
     print(f"    Created {len(candidates)} candidates with skills/experience")
-    
+
     # 3. Create 5,000 jobs (mixed statuses)
     print("  Creating 5,000 jobs...")
     jobs = []
@@ -265,9 +273,9 @@ async def seed_data(session: AsyncSession):
     for i in range(5000):
         if i % 500 == 0:
             print(f"    {i}/5000...")
-        
+
         company_user_id, _ = companies[i % len(companies)]
-        
+
         job = JobPosting(
             company_id=company_user_id,
             title=f"Job_{i}",
@@ -278,21 +286,25 @@ async def seed_data(session: AsyncSession):
         )
         session.add(job)
         jobs.append(job)
-    
+
     await session.commit()
     print(f"    Created {len(jobs)} jobs")
-    
+
     # 4. Create 30,000 applications
     print("  Creating 30,000 applications...")
-    app_statuses = [ApplicationStatus.applied, ApplicationStatus.rejected, 
-                    ApplicationStatus.shortlisted, ApplicationStatus.accepted]
+    app_statuses = [
+        ApplicationStatus.applied,
+        ApplicationStatus.rejected,
+        ApplicationStatus.shortlisted,
+        ApplicationStatus.accepted,
+    ]
     for i in range(30000):
         if i % 3000 == 0:
             print(f"    {i}/30000...")
-        
+
         candidate = candidates[i % len(candidates)]
         job = jobs[i % len(jobs)]
-        
+
         app = Application(
             candidate_id=candidate.id,
             job_id=job.id,
@@ -301,10 +313,10 @@ async def seed_data(session: AsyncSession):
             seed_group=SEED_GROUP,
         )
         session.add(app)
-    
+
     await session.commit()
-    print(f"    Created 30,000 applications")
-    
+    print("    Created 30,000 applications")
+
     # 5. Create 2,000 conversations with 50,000 messages (25 per conversation avg)
     print("  Creating 2,000 conversations with ~50,000 messages...")
     conversations = []
@@ -312,10 +324,10 @@ async def seed_data(session: AsyncSession):
     for i in range(2000):
         if i % 200 == 0:
             print(f"    {i}/2000 conversations...")
-        
+
         candidate = candidates[i % len(candidates)]
         company_user_id, _ = companies[i % len(companies)]
-        
+
         conv = Conversation(
             candidate_id=candidate.id,
             company_id=company_user_id,
@@ -324,7 +336,7 @@ async def seed_data(session: AsyncSession):
         session.add(conv)
         await session.flush()
         conversations.append(conv)
-        
+
         # Add 25 messages per conversation
         for j in range(25):
             sender_id = candidate.id if j % 2 == 0 else company_user_id
@@ -337,20 +349,30 @@ async def seed_data(session: AsyncSession):
             )
             session.add(msg)
             message_count += 1
-    
+
     await session.commit()
-    print(f"    Created {len(conversations)} conversations with {message_count} messages")
-    
+    print(
+        f"    Created {len(conversations)} conversations with {message_count} messages"
+    )
+
     # 6. Create 20,000 notifications
     print("  Creating 20,000 notifications...")
-    notif_types = [NotificationType.application_status, NotificationType.message,
-                   NotificationType.job_match, NotificationType.subscription_expiry]
+    notif_types = [
+        NotificationType.application_status,
+        NotificationType.message,
+        NotificationType.job_match,
+        NotificationType.subscription_expiry,
+    ]
     for i in range(20000):
         if i % 2000 == 0:
             print(f"    {i}/20000...")
-        
-        user = candidates[i % len(candidates)] if i % 2 == 0 else User(id=companies[i % len(companies)][0])
-        
+
+        user = (
+            candidates[i % len(candidates)]
+            if i % 2 == 0
+            else User(id=companies[i % len(companies)][0])
+        )
+
         notif = Notification(
             user_id=user.id,
             type=notif_types[i % len(notif_types)],
@@ -361,10 +383,10 @@ async def seed_data(session: AsyncSession):
             seed_group=SEED_GROUP,
         )
         session.add(notif)
-    
+
     await session.commit()
-    print(f"    Created 20,000 notifications")
-    
+    print("    Created 20,000 notifications")
+
     print("\n--- Seed Complete ---")
     await check_counts(session)
 
@@ -374,9 +396,9 @@ async def main():
     parser.add_argument("--cleanup", action="store_true", help="Remove seeded data")
     parser.add_argument("--check", action="store_true", help="Show current counts")
     args = parser.parse_args()
-    
+
     session, engine = await get_session()
-    
+
     try:
         if args.check:
             await check_counts(session)

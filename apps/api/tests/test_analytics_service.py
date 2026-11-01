@@ -1,13 +1,14 @@
-﻿"""Unit tests for analytics_service cache."""
+"""Unit tests for analytics_service cache."""
 
 from __future__ import annotations
 
-import pytest
-pytestmark = pytest.mark.skip_db_guard
-
 from uuid import uuid4
 
+import pytest
+
 from services import analytics_service
+
+pytestmark = pytest.mark.skip_db_guard
 
 
 def test_analytics_cache_round_trip() -> None:

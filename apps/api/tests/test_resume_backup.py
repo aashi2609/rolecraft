@@ -1,4 +1,4 @@
-﻿"""Unit tests for resume API-key backup paths (deterministic force + mark-current)."""
+"""Unit tests for resume API-key backup paths (deterministic force + mark-current)."""
 
 from __future__ import annotations
 
@@ -7,10 +7,10 @@ from uuid import uuid4
 
 import pytest
 
-pytestmark = pytest.mark.skip_db_guard
-
 from routers import resumes as resumes_router
 from services import resume_service
+
+pytestmark = pytest.mark.skip_db_guard
 
 
 @pytest.mark.asyncio
@@ -27,7 +27,11 @@ async def test_force_deterministic_skips_ai():
             resume_service,
             "_generate_deterministic",
             new_callable=AsyncMock,
-            return_value={"content": {"summary": "stub"}, "ats_score": 80, "embedding": []},
+            return_value={
+                "content": {"summary": "stub"},
+                "ats_score": 80,
+                "embedding": [],
+            },
         ) as det,
         patch.object(
             resume_service,

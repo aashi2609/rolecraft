@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-pytestmark = pytest.mark.skip_db_guard
-
 from datetime import date
 
 import pytest
@@ -17,6 +14,8 @@ from schemas import (
     JobCreate,
     SignupRequest,
 )
+
+pytestmark = pytest.mark.skip_db_guard
 
 
 def test_password_rejects_short_and_weak() -> None:
@@ -135,4 +134,3 @@ def test_validation_error_never_leaks_password() -> None:
     assert secret_password not in r.text
     for err in r.json().get("detail", []):
         assert "input" not in err
-

@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30  # 30 minutes
-    refresh_token_expire_days: int = 14     # 14 days
+    refresh_token_expire_days: int = 14  # 14 days
     gcs_bucket_name: str = "rolecraft-uploads"
     gcs_project_id: str = ""
     groq_api_key: str = ""
@@ -65,7 +65,9 @@ class Settings(BaseSettings):
     # ── Messaging Policy ────────────────────────────────────────────────
     # "applicants_only": Company can only message candidates who applied to their jobs or shortlisted
     # "any_candidate_with_plan": Company can message any candidate if they have active plan (requires active subscription)
-    messaging_policy: str = "applicants_only"  # applicants_only | any_candidate_with_plan
+    messaging_policy: str = (
+        "applicants_only"  # applicants_only | any_candidate_with_plan
+    )
 
     # ── Razorpay Payment Configuration (Step 6D) ────────────────────────────
     razorpay_key_id: str = ""
@@ -79,7 +81,9 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> List[str]:
-        return [o.strip(' "\'') for o in self.cors_origins.split(",") if o.strip(' "\'')]
+        return [
+            o.strip(" \"'") for o in self.cors_origins.split(",") if o.strip(" \"'")
+        ]
 
     @property
     def is_production(self) -> bool:
@@ -145,9 +149,7 @@ class Settings(BaseSettings):
                     "Set it to a comma-separated list of allowed origins."
                 )
             elif "*" in self.cors_origin_list:
-                errors.append(
-                    "CORS_ORIGINS must not contain '*' in production."
-                )
+                errors.append("CORS_ORIGINS must not contain '*' in production.")
         else:
             if not self.cors_origins:
                 self.cors_origins = "http://localhost:3000,http://127.0.0.1:3000"

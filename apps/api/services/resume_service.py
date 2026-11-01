@@ -12,7 +12,13 @@ from typing import Any
 from uuid import UUID
 
 from core.config import get_settings
-from models import CandidateProfile, CandidateSkill, Resume, ATSScoreStatus, EmbeddingStatus
+from models import (
+    CandidateProfile,
+    CandidateSkill,
+    Resume,
+    ATSScoreStatus,
+    EmbeddingStatus,
+)
 from services.ai_client import AIServiceError, generate_content
 from services.ats_scorer import ATSResult, score_resume
 from services.data_cleaner import CleanedProfile, clean_profile
@@ -120,7 +126,7 @@ async def _generate_deterministic(
     except Exception:
         embedding = None
         embedding_status = EmbeddingStatus.failed.value
-    
+
     return {
         "content": content,
         "ats_score": None,  # No fake score
@@ -217,7 +223,7 @@ def _build_profile_prompt(cleaned: CleanedProfile, vertical: str) -> str:
     sections = [
         f"## Target Vertical: {vertical}",
         "",
-        f"## Vertical-Specific Guidance:",
+        "## Vertical-Specific Guidance:",
         f"- Tone: {vp.resume_tone}",
         f"- Emphasis: {vp.emphasis_rules}",
         f"- De-emphasis: {vp.de_emphasis_rules}",
@@ -454,10 +460,12 @@ async def generate_with_autofix(
 
     # Step 3: Score it
     ats_result = await score_resume(content, vertical)
-    
+
     # CRITICAL: If scoring fails, return immediately without consuming more quota
     if ats_result.overall_score is None:
-        logger.error("Initial ATS scoring failed: %s. Returning error state.", ats_result.error)
+        logger.error(
+            "Initial ATS scoring failed: %s. Returning error state.", ats_result.error
+        )
         return {
             "content": content,
             "ats_score": None,
@@ -467,18 +475,20 @@ async def generate_with_autofix(
             "generation_metadata": {
                 "method": "ai",
                 "model": settings.groq_model,
-                "iterations": [{
-                    "iteration": 1,
-                    "score": None,
-                    "error": ats_result.error,
-                }],
+                "iterations": [
+                    {
+                        "iteration": 1,
+                        "score": None,
+                        "error": ats_result.error,
+                    }
+                ],
                 "final_score": None,
                 "cleaning_warnings": cleaned.warnings,
                 "started_at": started_at,
                 "completed_at": datetime.now(timezone.utc).isoformat(),
             },
         }
-    
+
     best_content = content
     best_score = ats_result.overall_score
     best_breakdown = ats_result.breakdown
@@ -504,15 +514,21 @@ async def generate_with_autofix(
         try:
             fixed_content = await _fix_with_ai(current_content, current_ats, vertical)
             fixed_ats = await score_resume(fixed_content, vertical)
-            
+
             # CRITICAL: Stop loop immediately if scoring fails
             if fixed_ats.overall_score is None:
-                logger.error("Auto-fix iteration %d: ATS scoring failed: %s. Halting loop.", i, fixed_ats.error)
-                iterations.append({
-                    "iteration": i,
-                    "score": None,
-                    "error": fixed_ats.error,
-                })
+                logger.error(
+                    "Auto-fix iteration %d: ATS scoring failed: %s. Halting loop.",
+                    i,
+                    fixed_ats.error,
+                )
+                iterations.append(
+                    {
+                        "iteration": i,
+                        "score": None,
+                        "error": fixed_ats.error,
+                    }
+                )
                 break
 
             iterations.append(
@@ -550,15 +566,19 @@ async def generate_with_autofix(
         "mappingNotes", best_content.get("mapping_notes", "")
     )
     embedding_text = f"{vertical} {' '.join(highlighted)} {summary} {mapping_notes}"
-    
+
     embedding = None
     embedding_status = "pending"
     try:
         from services.embedding_service import embed_text, EmbeddingError
+
         embedding = await embed_text(embedding_text)
         embedding_status = "scored"
     except EmbeddingError as exc:
-        logger.warning("Embedding generation failed: %s. Resume will be stored without embedding.", exc)
+        logger.warning(
+            "Embedding generation failed: %s. Resume will be stored without embedding.",
+            exc,
+        )
         embedding_status = "failed"
 
     return {
@@ -757,12 +777,11 @@ async def parse_resume_pdf(
         from fastapi import HTTPException as HTTPExc
 
         raise HTTPExc(
-            status_code=502, detail="AI service is currently unavailable. Please try again later."
+            status_code=502,
+            detail="AI service is currently unavailable. Please try again later.",
         ) from exc
     except Exception as exc:
         logger.error("Failed to parse resume with AI: %s", exc)
         from fastapi import HTTPException as HTTPExc
 
-        raise HTTPExc(
-            status_code=500, detail="Failed to parse resume with AI"
-        ) from exc
+        raise HTTPExc(status_code=500, detail="Failed to parse resume with AI") from exc

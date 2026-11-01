@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import asyncio
 
 import pytest
 from fastapi.testclient import TestClient
 
-from core.database import engine
 from main import app
 
 

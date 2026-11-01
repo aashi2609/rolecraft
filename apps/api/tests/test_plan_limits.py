@@ -3,7 +3,6 @@
 import uuid
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import check_plan_limit, get_user_plan
@@ -39,7 +38,9 @@ async def test_get_user_plan_no_subscription_returns_none(db_session: AsyncSessi
 
 
 @pytest.mark.asyncio
-async def test_get_user_plan_cancelled_subscription_returns_none(db_session: AsyncSession):
+async def test_get_user_plan_cancelled_subscription_returns_none(
+    db_session: AsyncSession,
+):
     """A user with only cancelled subscriptions receives no entitlement (None)."""
     user = User(
         id=uuid.uuid4(),
@@ -222,18 +223,21 @@ def test_check_plan_limit_ast_no_unconditional_return():
     source = inspect.getsource(check_plan_limit)
     # 1. No bypass keywords in source
     for kw in ["bypass", "temporarily", "return none"]:
-        assert kw not in source.lower(), f"Forbidden short-circuit keyword '{kw}' found in check_plan_limit source!"
+        assert kw not in source.lower(), (
+            f"Forbidden short-circuit keyword '{kw}' found in check_plan_limit source!"
+        )
 
     # 2. Parse AST: ensure no top-level Return statement precedes plan gating logic
     tree = ast.parse(source)
     func_def = tree.body[0]
     # Filter out docstring
     body_nodes = [
-        n for n in func_def.body
+        n
+        for n in func_def.body
         if not (isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant))
     ]
     assert not isinstance(body_nodes[0], ast.Return), (
-        f"check_plan_limit has an unconditional early return at top of function!"
+        "check_plan_limit has an unconditional early return at top of function!"
     )
 
 
@@ -266,4 +270,3 @@ async def test_check_plan_limit_unit_enforcement_raises_on_excess():
         await check_plan_limit(user, mock_db, "resume_verticals", extra=1)
     assert exc_info.value.status_code == 403
     assert "Free plan resume cap reached" in exc_info.value.detail
-

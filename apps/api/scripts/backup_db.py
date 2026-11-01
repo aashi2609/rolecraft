@@ -50,13 +50,15 @@ def run_pg_dump(database_url: str, output_file: Path) -> bool:
 
     cmd = [
         "pg_dump",
-        "-F", "c",  # custom format (compressed, allows selective restore)
-        "-f", str(output_file),
+        "-F",
+        "c",  # custom format (compressed, allows selective restore)
+        "-f",
+        str(output_file),
         pg_url,
     ]
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             cmd,
             check=True,
             capture_output=True,
@@ -86,7 +88,7 @@ def upload_to_gcs(local_file: Path, bucket_name: str, remote_name: str) -> bool:
     ]
 
     try:
-        result = subprocess.run(
+        subprocess.run(
             cmd,
             check=True,
             capture_output=True,
@@ -132,6 +134,7 @@ def main() -> int:
 
     # Create temporary local file (cross-platform)
     import tempfile
+
     temp_dir = Path(tempfile.gettempdir())
     local_file = temp_dir / backup_filename
 

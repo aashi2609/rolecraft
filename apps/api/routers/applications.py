@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, WebSocket
 from sqlalchemy import exc, select
+from sqlalchemy.orm import selectinload
 
 from core.dependencies import (
     CandidateUser,
@@ -49,7 +50,7 @@ async def _app_out(
     """
     Serialize application to ApplicationOut.
     All supporting entities should be pre-loaded to avoid N+1 queries.
-    
+
     Args:
         app: Application model instance
         job: Pre-loaded JobPosting (from eager load or batch)
@@ -64,22 +65,27 @@ async def _app_out(
         if profile and profile.weblinks:
             # Check for name variations in weblinks (from resume parsing or profile)
             candidate_name = (
-                profile.weblinks.get('full_name') or 
-                profile.weblinks.get('name') or 
-                profile.weblinks.get('display_name') or
-                profile.weblinks.get('linkedin')
+                profile.weblinks.get("full_name")
+                or profile.weblinks.get("name")
+                or profile.weblinks.get("display_name")
+                or profile.weblinks.get("linkedin")
             )
-        
+
         # If still no name, try to get from resume metadata (if available)
         if not candidate_name and resume:
             # Resume might have parsed candidate name in metadata
             pass  # Resume model doesn't have candidate_name field currently
-        
+
         # Final fallback: use email prefix and clean it up
         if not candidate_name:
             email_prefix = user.email.split("@")[0]
-            candidate_name = email_prefix.replace(".", " ").replace("_", " ").replace("-", " ").title()
-    
+            candidate_name = (
+                email_prefix.replace(".", " ")
+                .replace("_", " ")
+                .replace("-", " ")
+                .title()
+            )
+
     return ApplicationOut(
         id=app.id,
         candidate_id=app.candidate_id,
@@ -124,21 +130,15 @@ async def apply(body: ApplicationCreate, user: CandidateUser, db: DbSession):
             if not resume_id:
                 raise HTTPException(
                     status_code=400,
-                    detail=(
-                        "Failed to generate resume and no fallback available"
-                    ),
+                    detail=("Failed to generate resume and no fallback available"),
                 )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
         except Exception as exc:
             logger.error("Failed to get or generate resume: %s", exc)
-            raise HTTPException(
-                status_code=500, detail="Resume generation failed"
-            )
+            raise HTTPException(status_code=500, detail="Resume generation failed")
 
-    app = Application(
-        candidate_id=user.id, job_id=body.job_id, resume_id=resume_id
-    )
+    app = Application(candidate_id=user.id, job_id=body.job_id, resume_id=resume_id)
     db.add(app)
     try:
         await db.flush()
@@ -146,7 +146,7 @@ async def apply(body: ApplicationCreate, user: CandidateUser, db: DbSession):
         raise HTTPException(
             status_code=400, detail="You have already applied for this job"
         )
-    
+
     # Refresh to load relationships and convert to output
     await db.refresh(app)
     return await _app_out(
@@ -154,7 +154,9 @@ async def apply(body: ApplicationCreate, user: CandidateUser, db: DbSession):
         job=job,
         company=await db.get(Company, job.company_id) if job else None,
         user=user,
-        profile=await db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == user.id)),
+        profile=await db.scalar(
+            select(CandidateProfile).where(CandidateProfile.user_id == user.id)
+        ),
         resume=await db.get(Resume, app.resume_id) if app.resume_id else None,
     )
 
@@ -163,12 +165,12 @@ async def apply(body: ApplicationCreate, user: CandidateUser, db: DbSession):
 async def my_applications(user: CandidateUser, db: DbSession):
     """
     Get candidate's applications with optimized batch loading.
-    
+
     Fetches all related data (jobs, companies, profiles) in fixed 3 queries:
     1. Applications (with eager-loaded Job.Company and Resume)
     2. CandidateProfiles for candidates
     3. Users for candidates
-    
+
     Query count is constant regardless of result set size.
     """
     # Query 1: Fetch applications with eager-loaded relationships
@@ -188,40 +190,40 @@ async def my_applications(user: CandidateUser, db: DbSession):
         .unique()
         .all()
     )
-    
+
     if not apps:
         return []
-    
+
     # Extract candidate IDs (all should be same user, but batch for completeness)
     candidate_ids = list(set([a.candidate_id for a in apps]))
-    
+
     # Query 2: Batch-load candidate profiles
     profiles_result = await db.execute(
         select(CandidateProfile).where(CandidateProfile.user_id.in_(candidate_ids))
     )
     profiles_dict = {p.user_id: p for p in profiles_result.scalars().all()}
-    
+
     # Query 3: Batch-load users
-    users_result = await db.execute(
-        select(User).where(User.id.in_(candidate_ids))
-    )
+    users_result = await db.execute(select(User).where(User.id.in_(candidate_ids)))
     users_dict = {u.id: u for u in users_result.scalars().all()}
-    
+
     # Serialize with pre-loaded data (no additional queries)
     result = []
     for app in apps:
         profile = profiles_dict.get(app.candidate_id)
         app_user = users_dict.get(app.candidate_id)
-        
-        result.append(await _app_out(
-            app,
-            job=app.job,
-            company=app.job.company if app.job else None,
-            user=app_user,
-            profile=profile,
-            resume=app.resume,
-        ))
-    
+
+        result.append(
+            await _app_out(
+                app,
+                job=app.job,
+                company=app.job.company if app.job else None,
+                user=app_user,
+                profile=profile,
+                resume=app.resume,
+            )
+        )
+
     return result
 
 
@@ -229,7 +231,7 @@ async def my_applications(user: CandidateUser, db: DbSession):
 async def job_applications(job_id: UUID, user: CompanyUser, db: DbSession):
     """
     Get applications for a specific job with optimized batch loading.
-    
+
     Fetches all related data in fixed 3 queries:
     1. Applications (with eager-loaded Job and Resume)
     2. CandidateProfiles
@@ -238,7 +240,7 @@ async def job_applications(job_id: UUID, user: CompanyUser, db: DbSession):
     job = await db.get(JobPosting, job_id)
     if not job or job.company_id != user.id:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     # Query 1: Fetch applications with eager-loaded relationships
     apps = (
         (
@@ -256,46 +258,44 @@ async def job_applications(job_id: UUID, user: CompanyUser, db: DbSession):
         .unique()
         .all()
     )
-    
+
     if not apps:
         return []
-    
+
     # Extract candidate IDs for batch loading
     candidate_ids = list(set([a.candidate_id for a in apps]))
-    
+
     # Query 2: Batch-load candidate profiles
     profiles_result = await db.execute(
         select(CandidateProfile).where(CandidateProfile.user_id.in_(candidate_ids))
     )
     profiles_dict = {p.user_id: p for p in profiles_result.scalars().all()}
-    
+
     # Query 3: Batch-load users
-    users_result = await db.execute(
-        select(User).where(User.id.in_(candidate_ids))
-    )
+    users_result = await db.execute(select(User).where(User.id.in_(candidate_ids)))
     users_dict = {u.id: u for u in users_result.scalars().all()}
-    
+
     # Serialize with pre-loaded data
     result = []
     for app in apps:
         profile = profiles_dict.get(app.candidate_id)
         app_user = users_dict.get(app.candidate_id)
-        
-        result.append(await _app_out(
-            app,
-            job=app.job or job,  # Use job from app if present, else the queried job
-            company=job.company,  # Use the company from the job
-            user=app_user,
-            profile=profile,
-            resume=app.resume,
-        ))
-    
+
+        result.append(
+            await _app_out(
+                app,
+                job=app.job or job,  # Use job from app if present, else the queried job
+                company=job.company,  # Use the company from the job
+                user=app_user,
+                profile=profile,
+                resume=app.resume,
+            )
+        )
+
     return result
 
 
-@router.patch(
-    "/applications/{application_id}/status", response_model=ApplicationOut
-)
+@router.patch("/applications/{application_id}/status", response_model=ApplicationOut)
 async def update_status(
     application_id: UUID,
     body: ApplicationStatusUpdate,
@@ -313,9 +313,11 @@ async def update_status(
 
     # Batch load related data for serialization
     app_user = await db.get(User, app.candidate_id)
-    profile = await db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == app.candidate_id))
+    profile = await db.scalar(
+        select(CandidateProfile).where(CandidateProfile.user_id == app.candidate_id)
+    )
     company = await db.get(Company, job.company_id) if job else None
-    
+
     result = await _app_out(
         app,
         job=job,
@@ -366,9 +368,7 @@ async def save_job(job_id: UUID, user: CandidateUser, db: DbSession):
     job = await db.get(JobPosting, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    existing = await db.get(
-        SavedJob, {"candidate_id": user.id, "job_id": job_id}
-    )
+    existing = await db.get(SavedJob, {"candidate_id": user.id, "job_id": job_id})
     if not existing:
         db.add(SavedJob(candidate_id=user.id, job_id=job_id))
         await db.flush()
@@ -386,11 +386,7 @@ async def unsave_job(job_id: UUID, user: CandidateUser, db: DbSession):
 @router.get("/saved-jobs/me")
 async def list_saved(user: CandidateUser, db: DbSession):
     rows = (
-        (
-            await db.execute(
-                select(SavedJob).where(SavedJob.candidate_id == user.id)
-            )
-        )
+        (await db.execute(select(SavedJob).where(SavedJob.candidate_id == user.id)))
         .scalars()
         .all()
     )

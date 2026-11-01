@@ -6,8 +6,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-pytestmark = pytest.mark.skip_db_guard
-
 from core.config import get_settings
 from core.rate_limit import (
     GENERIC_429_DETAIL,
@@ -18,6 +16,7 @@ from core.rate_limit import (
     hit_limit,
     rate_limit_exceeded_handler,
     reset_rate_limit_backends,
+
 )
 
 
@@ -77,7 +76,7 @@ def test_hit_limit_blocks_after_budget():
     key = "signup_ip"
     for i in range(5):
         allowed, _ = hit_limit(key, "test-ip-budget")
-        assert allowed, f"hit {i+1} should be allowed"
+        assert allowed, f"hit {i + 1} should be allowed"
 
     allowed, retry = hit_limit(key, "test-ip-budget")
     assert allowed is False

@@ -26,7 +26,9 @@ def upgrade() -> None:
         ),
     )
     # Backfill existing rows to now() so current resumes aren't all stale
-    op.execute("UPDATE candidate_profiles SET profile_updated_at = NOW() WHERE profile_updated_at IS NULL")
+    op.execute(
+        "UPDATE candidate_profiles SET profile_updated_at = NOW() WHERE profile_updated_at IS NULL"
+    )
 
     # Add generated_from_profile_at to resumes
     op.add_column(
@@ -51,6 +53,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     import os
+
     if os.getenv("ALLOW_DESTRUCTIVE_DOWNGRADE", "").lower() not in ("1", "true", "yes"):
         raise RuntimeError(
             "Refusing to execute destructive downgrade: dropping stale resume tracking columns will "

@@ -80,14 +80,6 @@ async def score_resume(
     Falls back to a deterministic hash-based score when the Groq API key
     is empty or the call fails.
     """
-    skills = resume_content.get("skills", {})
-    if isinstance(skills, dict):
-        all_skills = skills.get("technical", []) + skills.get("soft", [])
-    elif isinstance(skills, list):
-        all_skills = skills
-    else:
-        all_skills = []
-
     # Try AI scoring
     try:
         vp = get_vertical_prompt(target_vertical)

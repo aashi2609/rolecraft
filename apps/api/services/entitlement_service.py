@@ -33,7 +33,6 @@ class PlanFeatures(NamedTuple):
     job_search: bool
     job_applications_per_day: int
     saved_jobs: int
-    candidate_messaging: bool
     
     # Company plan features
     job_postings: int
@@ -60,7 +59,6 @@ PLAN_FEATURES: dict[str, PlanFeatures] = {
         job_search=False,
         job_applications_per_day=0,
         saved_jobs=0,
-        candidate_messaging=False,
         job_postings=0,
         active_jobs_concurrent=0,
         candidate_search=False,
@@ -82,7 +80,6 @@ PLAN_FEATURES: dict[str, PlanFeatures] = {
         job_search=False,  # No job search
         job_applications_per_day=0,
         saved_jobs=0,
-        candidate_messaging=False,
         job_postings=0,
         active_jobs_concurrent=0,
         candidate_search=False,
@@ -103,11 +100,10 @@ PLAN_FEATURES: dict[str, PlanFeatures] = {
         job_search=True,
         job_applications_per_day=5,  # 5 per day
         saved_jobs=9999,  # Unlimited
-        candidate_messaging=True,
         job_postings=0,
         active_jobs_concurrent=0,
         candidate_search=False,
-        candidate_messaging=False,
+        candidate_messaging=True,
         candidate_profiles_viewable=0,
     ),
     
@@ -124,11 +120,10 @@ PLAN_FEATURES: dict[str, PlanFeatures] = {
         job_search=True,
         job_applications_per_day=9999,  # Unlimited
         saved_jobs=9999,  # Unlimited
-        candidate_messaging=True,
         job_postings=0,
         active_jobs_concurrent=0,
         candidate_search=False,
-        candidate_messaging=False,
+        candidate_messaging=True,
         candidate_profiles_viewable=0,
     ),
     
@@ -146,7 +141,6 @@ PLAN_FEATURES: dict[str, PlanFeatures] = {
         job_search=False,
         job_applications_per_day=0,
         saved_jobs=0,
-        candidate_messaging=False,
         job_postings=9999,  # Unlimited
         active_jobs_concurrent=10,  # 10 concurrent postings
         candidate_search=True,
@@ -167,7 +161,6 @@ PLAN_FEATURES: dict[str, PlanFeatures] = {
         job_search=False,
         job_applications_per_day=0,
         saved_jobs=0,
-        candidate_messaging=False,
         job_postings=9999,  # Unlimited
         active_jobs_concurrent=9999,  # Unlimited concurrent
         candidate_search=True,

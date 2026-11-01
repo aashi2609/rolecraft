@@ -13,15 +13,12 @@ Run from apps/api:
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 
 import pytest
 from fastapi.testclient import TestClient
 
-from core.database import engine
 from core.security import create_access_token
-from main import app
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────────
@@ -43,7 +40,12 @@ def admin_token() -> str:
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 
-def _signup(client: TestClient, email: str, role: str = "candidate", password: str = "testpass123A") -> dict:
+def _signup(
+    client: TestClient,
+    email: str,
+    role: str = "candidate",
+    password: str = "testpass123A",
+) -> dict:
     r = client.post(
         "/auth/signup",
         json={"email": email, "password": password, "role": role, "name": "Test User"},
@@ -99,7 +101,9 @@ class TestDeactivatedUserTokenRevocation:
             f"/candidates/{cand_id}",
             headers={"Authorization": f"Bearer {cand_token}"},
         )
-        assert r.status_code == 401, f"post-deactivation: expected 401, got {r.status_code}"
+        assert r.status_code == 401, (
+            f"post-deactivation: expected 401, got {r.status_code}"
+        )
 
     def test_company_token_revoked_on_deactivation(self, client, admin_token):
         uid = uuid.uuid4().hex[:8]
@@ -121,7 +125,9 @@ class TestDeactivatedUserTokenRevocation:
             "/jobs/mine",
             headers={"Authorization": f"Bearer {comp_token}"},
         )
-        assert r.status_code == 401, f"post-deactivation: expected 401, got {r.status_code}"
+        assert r.status_code == 401, (
+            f"post-deactivation: expected 401, got {r.status_code}"
+        )
 
 
 class TestDeactivatedUserSignin:
@@ -143,7 +149,9 @@ class TestDeactivatedUserSignin:
 
         # Signin must fail — same generic message as wrong credentials
         r = client.post("/auth/signin", json={"email": email, "password": password})
-        assert r.status_code == 401, f"post-deactivation signin: expected 401, got {r.status_code}"
+        assert r.status_code == 401, (
+            f"post-deactivation signin: expected 401, got {r.status_code}"
+        )
         assert r.json()["detail"] == "Invalid email or password"
 
 
@@ -192,7 +200,7 @@ class TestDeactivatedUserWebSocket:
 
 class TestForgotPasswordDeactivatedUser:
     """Forgot-password returns a static message for all inputs.
-    
+
     Since it never actually sends an email or resets anything, it cannot
     leak account state. Verify it still returns the same message for a
     deactivated user.

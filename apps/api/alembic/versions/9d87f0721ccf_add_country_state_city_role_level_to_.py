@@ -59,6 +59,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     import os
+
     if os.getenv("ALLOW_DESTRUCTIVE_DOWNGRADE", "").lower() not in ("1", "true", "yes"):
         raise RuntimeError(
             "Refusing to execute destructive downgrade: dropping hidden_jobs table and job location "

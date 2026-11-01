@@ -1,16 +1,17 @@
-﻿"""Unit tests for fitment rationale (template + LLM flag fallback)."""
+"""Unit tests for fitment rationale (template + LLM flag fallback)."""
 
 from __future__ import annotations
 
-import pytest
-pytestmark = pytest.mark.skip_db_guard
-
 import asyncio
+
+import pytest
 
 from services.fitment_rationale_service import (
     generate_fitment_rationale,
     template_rationale,
 )
+
+pytestmark = pytest.mark.skip_db_guard
 
 
 def test_template_rationale_skill_overlap() -> None:

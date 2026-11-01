@@ -1,12 +1,39 @@
 from uuid import UUID
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
-from core.dependencies import CandidateUser, CompanyUser, DbSession, check_plan_limit, get_optional_current_user
+from core.dependencies import (
+    CandidateUser,
+    CompanyUser,
+    DbSession,
+    check_plan_limit,
+    get_optional_current_user,
+    require_role,
+)
 from core.enum_utils import coerce_enum
 from core.rate_limit import RATE_LIMITS, get_user_key, limiter
-from models import EmploymentType, HiddenJob, JobPosting, JobStatus, JobType, User, UserRole
+from core.upload_limits import sanitize_filename, validate_upload
+from models import (
+    EmploymentType,
+    HiddenJob,
+    JobPosting,
+    JobStatus,
+    JobType,
+    User,
+    UserRole,
+)
 from schemas import (
     FitmentCandidateOut,
     JobCreate,
@@ -36,7 +63,6 @@ async def parse_jd(
     file: UploadFile = File(...),
 ):
     """Upload a JD (PDF or TXT) and extract fields for the post-job form."""
-    from core.upload_limits import sanitize_filename, validate_upload
 
     raw_filename = file.filename or "jd.pdf"
     safe_filename = sanitize_filename(raw_filename)
@@ -59,25 +85,30 @@ async def parse_jd(
 from typing import Annotated
 from core.dependencies import require_role
 
+
 @router.post("", response_model=JobOut)
 async def create_job(
-    body: JobCreate, 
-    user: Annotated[User, Depends(require_role(UserRole.company, UserRole.admin))], 
-    db: DbSession
+    body: JobCreate,
+    user: Annotated[User, Depends(require_role(UserRole.company, UserRole.admin))],
+    db: DbSession,
 ):
     # Convert status to enum
     status = coerce_enum(JobStatus, body.status, "status") or JobStatus.draft
 
     if user.role == UserRole.admin:
         if not body.company_id:
-            raise HTTPException(status_code=400, detail="company_id is required for admins")
+            raise HTTPException(
+                status_code=400, detail="company_id is required for admins"
+            )
         company_id = body.company_id
         company_exists = await db.get(User, company_id)
         if not company_exists or company_exists.role != UserRole.company:
             raise HTTPException(status_code=400, detail="Company not found")
     else:
         if body.company_id and body.company_id != user.id:
-            raise HTTPException(status_code=403, detail="Cannot create job for another company")
+            raise HTTPException(
+                status_code=403, detail="Cannot create job for another company"
+            )
         company_id = user.id
 
     if status in (JobStatus.live, JobStatus.draft):
@@ -87,7 +118,11 @@ async def create_job(
         company_id=company_id,
         title=body.title,
         department=body.department,
-        employment_type=(coerce_enum(EmploymentType, body.employment_type, "employment_type").value if body.employment_type else None),
+        employment_type=(
+            coerce_enum(EmploymentType, body.employment_type, "employment_type").value
+            if body.employment_type
+            else None
+        ),
         experience_range=body.experience_range,
         min_salary=body.min_salary,
         max_salary=body.max_salary,
@@ -111,7 +146,7 @@ async def create_job(
     db.add(job)
     await db.flush()
     await refresh_job_embedding(db, job)
-    
+
     # Load company for enrichment
     await db.refresh(job)
     return await enrich_job(job, company=job.company, stats=None)
@@ -195,15 +230,16 @@ async def my_jobs(user: CompanyUser, db: DbSession):
         .scalars()
         .all()
     )
-    
+
     if not jobs:
         return []
-    
+
     # Fetch application stats in single query
     from services.job_search_service import get_job_stats
+
     job_ids = [j.id for j in jobs]
     stats = await get_job_stats(db, job_ids)
-    
+
     # Enrich with pre-loaded data
     return [await enrich_job(j, company=j.company, stats=stats) for j in jobs]
 

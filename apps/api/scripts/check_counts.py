@@ -1,8 +1,10 @@
 """Check row counts on Primary DB and Test DB."""
+
 import asyncio
 import os
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import text
@@ -22,6 +24,7 @@ if not TEST_URL:
 
 TABLES = ["users", "resumes", "subscriptions", "file_records", "job_postings"]
 
+
 async def get_counts(url: str, label: str):
     print(f"\n--- Checking {label} ---")
     db_url, connect_args = asyncpg_engine_kwargs(url)
@@ -39,11 +42,13 @@ async def get_counts(url: str, label: str):
     await engine.dispose()
     return counts
 
+
 async def main():
     print(f"Python: {sys.version}")
     print(f"PWD: {os.getcwd()}")
     await get_counts(PRIMARY_URL, "PRIMARY DATABASE")
     await get_counts(TEST_URL, "TEST DATABASE")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

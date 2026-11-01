@@ -9,7 +9,6 @@ from sqlalchemy.orm import selectinload
 
 from core.dependencies import DbSession, get_current_user
 from core.enum_utils import coerce_enum
-from core.security import hash_password
 from models import (
     Application,
     EmploymentType,
@@ -26,6 +25,7 @@ from services.user_service import create_user_with_profile
 from services.admin_service import get_dashboard_stats
 from services.subscription_service import log_subscription_change
 from schemas import JobCreate, JobUpdate
+
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
@@ -156,7 +156,9 @@ class SubCreate(BaseModel):
     user_id: str
     role: UserRole
     plan_tier: PlanTier
-    status: SubscriptionStatus = SubscriptionStatus.pending  # Step 6A: Default to pending, not active
+    status: SubscriptionStatus = (
+        SubscriptionStatus.pending
+    )  # Step 6A: Default to pending, not active
 
     @field_validator("role", mode="before")
     @classmethod
@@ -172,11 +174,14 @@ class SubCreate(BaseModel):
     @classmethod
     def validate_status(cls, v: Any) -> SubscriptionStatus:
         res = coerce_enum(SubscriptionStatus, v, "status")
-        return res if res is not None else SubscriptionStatus.pending  # Default to pending
+        return (
+            res if res is not None else SubscriptionStatus.pending
+        )  # Default to pending
 
 
 class SubscriptionGrant(BaseModel):
     """Step 6C: Manual admin grant of subscription (payment mode disabled only)."""
+
     user_id: str
     plan_tier: PlanTier
     reason: str  # Required: why admin is granting this
@@ -237,18 +242,13 @@ async def get_all_users(
             # Try to get name from weblinks first
             if u.candidate_profile.weblinks:
                 name = (
-                    u.candidate_profile.weblinks.get('full_name') or
-                    u.candidate_profile.weblinks.get('display_name') or
-                    u.candidate_profile.weblinks.get('name')
+                    u.candidate_profile.weblinks.get("full_name")
+                    or u.candidate_profile.weblinks.get("display_name")
+                    or u.candidate_profile.weblinks.get("name")
                 )
             # Fallback to parsing email if no name in weblinks
             if not name:
-                name = (
-                    u.email.split("@")[0]
-                    .replace(".", " ")
-                    .replace("_", " ")
-                    .title()
-                )
+                name = u.email.split("@")[0].replace(".", " ").replace("_", " ").title()
         plan_tier = None
         sub_status = None
         if u.subscription:
@@ -297,9 +297,7 @@ async def update_user(
     return {
         "ok": True,
         "id": str(user.id),
-        "role": str(
-            user.role.value if hasattr(user.role, "value") else user.role
-        ),
+        "role": str(user.role.value if hasattr(user.role, "value") else user.role),
     }
 
 
@@ -330,7 +328,9 @@ async def delete_user(
 ) -> Any:
     from services.account_deletion_service import delete_user_account
 
-    deleted = await delete_user_account(db, UUID(user_id) if isinstance(user_id, str) else user_id)
+    deleted = await delete_user_account(
+        db, UUID(user_id) if isinstance(user_id, str) else user_id
+    )
     if not deleted:
         raise HTTPException(status_code=404, detail="User not found")
     await db.commit()
@@ -347,20 +347,14 @@ async def get_all_subscriptions(
     limit: int = 100,
 ) -> Any:
     query = select(Subscription).options(
-        selectinload(Subscription.user)
-        .selectinload(User.company),
-        selectinload(Subscription.user)
-        .selectinload(User.candidate_profile)
+        selectinload(Subscription.user).selectinload(User.company),
+        selectinload(Subscription.user).selectinload(User.candidate_profile),
     )
     if status_filter:
         query = query.where(Subscription.status == status_filter)
     if plan:
         query = query.where(Subscription.plan_tier == plan)
-    query = (
-        query.order_by(Subscription.started_at.desc())
-        .offset(skip)
-        .limit(limit)
-    )
+    query = query.order_by(Subscription.started_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     subs = result.scalars().all()
 
@@ -376,11 +370,9 @@ async def get_all_subscriptions(
                 # Try to get name from weblinks first
                 if s.user.candidate_profile.weblinks:
                     user_name = (
-                        s.user.candidate_profile.weblinks.get('full_name')
-                        or s.user.candidate_profile.weblinks.get(
-                            'display_name'
-                        )
-                        or s.user.candidate_profile.weblinks.get('name')
+                        s.user.candidate_profile.weblinks.get("full_name")
+                        or s.user.candidate_profile.weblinks.get("display_name")
+                        or s.user.candidate_profile.weblinks.get("name")
                     )
                 # Fallback to parsing email if no name in weblinks
                 if not user_name:
@@ -398,13 +390,9 @@ async def get_all_subscriptions(
                 user_name=user_name,
                 role=str(s.role.value if hasattr(s.role, "value") else s.role),
                 plan_tier=str(
-                    s.plan_tier.value
-                    if hasattr(s.plan_tier, "value")
-                    else s.plan_tier
+                    s.plan_tier.value if hasattr(s.plan_tier, "value") else s.plan_tier
                 ),
-                status=str(
-                    s.status.value if hasattr(s.status, "value") else s.status
-                ),
+                status=str(s.status.value if hasattr(s.status, "value") else s.status),
                 started_at=s.started_at.isoformat(),
                 renews_at=s.renews_at.isoformat() if s.renews_at else None,
             )
@@ -420,24 +408,26 @@ async def update_subscription(
     current_admin: User = Depends(get_current_admin),
 ) -> Any:
     """Step 6A: Update subscription with audit logging.
-    
+
     Restrictions:
     - status can only be changed to 'active' if payment is verified (require reason with transaction ID)
     - Admins must provide reason for any status change to active
     """
     from services.subscription_service import log_subscription_change
-    
+
     sub = await db.get(Subscription, sub_id)
     if not sub:
         raise HTTPException(status_code=404, detail="Subscription not found")
-    
+
     # Track changes for audit log
     old_plan_tier = sub.plan_tier.value if sub.plan_tier else None
     old_status = sub.status.value if sub.status else None
-    
+
     # If changing status to active, require explicit reason with payment proof
     if update_data.status is not None:
-        new_status = coerce_enum(SubscriptionStatus, update_data.status, "status", allow_none=False)
+        new_status = coerce_enum(
+            SubscriptionStatus, update_data.status, "status", allow_none=False
+        )
         if new_status == SubscriptionStatus.active and old_status != "active":
             # Reject: must go through payment verification flow
             raise HTTPException(
@@ -445,19 +435,21 @@ async def update_subscription(
                 detail="Cannot manually activate subscription. Use payment gateway webhook instead.",
             )
         sub.status = new_status
-    
+
     if update_data.plan_tier is not None:
-        sub.plan_tier = coerce_enum(PlanTier, update_data.plan_tier, "plan_tier", allow_none=False)
-    
+        sub.plan_tier = coerce_enum(
+            PlanTier, update_data.plan_tier, "plan_tier", allow_none=False
+        )
+
     if update_data.role is not None:
         sub.role = coerce_enum(UserRole, update_data.role, "role", allow_none=False)
-    
+
     await db.flush()
-    
+
     # Log the change
     new_plan_tier = sub.plan_tier.value if sub.plan_tier else None
     new_status = sub.status.value if sub.status else None
-    
+
     await log_subscription_change(
         db,
         subscription_id=sub.id,
@@ -470,7 +462,7 @@ async def update_subscription(
         new_status=new_status,
         reason="Admin override (manual update)",
     )
-    
+
     await db.commit()
     await db.refresh(sub)
     return {"ok": True}
@@ -483,19 +475,23 @@ async def create_subscription(
     current_admin: User = Depends(get_current_admin),
 ) -> Any:
     """Step 6A: Create subscription with audit logging.
-    
+
     - Always creates with status=pending (default in SubCreate)
     - Must transition to active via payment gateway webhook only
     """
     sub = Subscription(
         user_id=UUID(create_data.user_id),
         role=coerce_enum(UserRole, create_data.role, "role", allow_none=False),
-        plan_tier=coerce_enum(PlanTier, create_data.plan_tier, "plan_tier", allow_none=False),
-        status=coerce_enum(SubscriptionStatus, create_data.status, "status", allow_none=False),
+        plan_tier=coerce_enum(
+            PlanTier, create_data.plan_tier, "plan_tier", allow_none=False
+        ),
+        status=coerce_enum(
+            SubscriptionStatus, create_data.status, "status", allow_none=False
+        ),
     )
     db.add(sub)
     await db.flush()
-    
+
     # Log the creation
     await log_subscription_change(
         db,
@@ -507,7 +503,7 @@ async def create_subscription(
         new_status=sub.status.value,
         reason="Admin creation",
     )
-    
+
     await db.commit()
     await db.refresh(sub)
     return {"ok": True, "id": str(sub.id)}
@@ -520,32 +516,34 @@ async def grant_subscription(
     current_admin: User = Depends(get_current_admin),
 ) -> Any:
     """Step 6C: Admin grant of active subscription (manual override, payments disabled mode).
-    
+
     This endpoint activates a subscription immediately without payment verification.
     Use cases:
     - Manual grants during disabled payment mode
     - Special promotions or trial grants
     - Administrative overrides
-    
+
     The subscription is created with status=active and audit-logged with admin_id.
     """
     # Get user
     user = await db.get(User, grant_data.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Validate plan tier matches user role
     from services.subscription_service import validate_plan_tier
+
     plan_tier = await validate_plan_tier(grant_data.plan_tier.value, user.role)
-    
+
     # Cancel any existing active subscriptions
     from services.subscription_service import cancel_active_subscriptions
+
     await cancel_active_subscriptions(db, user.id, admin_id=current_admin.id)
-    
+
     # Set default dates
     started_at = grant_data.started_at or datetime.now(timezone.utc)
     ends_at = grant_data.ends_at or (started_at + timedelta(days=30))
-    
+
     # Create active subscription directly (grant bypasses payment)
     sub = Subscription(
         user_id=user.id,
@@ -557,7 +555,7 @@ async def grant_subscription(
     )
     db.add(sub)
     await db.flush()
-    
+
     # Log the grant with admin_id
     await log_subscription_change(
         db,
@@ -569,10 +567,10 @@ async def grant_subscription(
         new_status=SubscriptionStatus.active.value,
         reason=grant_data.reason,  # Admin-provided reason
     )
-    
+
     await db.commit()
     await db.refresh(sub)
-    
+
     return {
         "ok": True,
         "id": str(sub.id),
@@ -591,7 +589,7 @@ async def delete_subscription(
     current_admin: User = Depends(get_current_admin),
 ) -> Any:
     """Step 6A: Soft-delete subscription (mark as cancelled).
-    
+
     Hard deletion disabled for audit trail preservation.
     Use PATCH with status=cancelled for controlled cancellation.
     """
@@ -615,11 +613,7 @@ async def get_all_jobs(
         query = query.where(JobPosting.title.ilike(f"%{search}%"))
     if status_filter:
         query = query.where(JobPosting.status == status_filter)
-    query = (
-        query.order_by(JobPosting.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-    )
+    query = query.order_by(JobPosting.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     jobs = result.scalars().all()
 
@@ -640,9 +634,7 @@ async def get_all_jobs(
                 title=j.title,
                 company_name=j.company.name if j.company else None,
                 company_id=str(j.company_id),
-                status=str(
-                    j.status.value if hasattr(j.status, "value") else j.status
-                ),
+                status=str(j.status.value if hasattr(j.status, "value") else j.status),
                 location=j.location
                 or ", ".join(filter(None, [j.city, j.state, j.country])),
                 employment_type=j.employment_type,
@@ -658,10 +650,14 @@ async def get_all_jobs(
                 country=j.country,
                 state=j.state,
                 city=j.city,
-                job_type=str(j.job_type.value) if hasattr(j.job_type, "value") else j.job_type,
+                job_type=str(j.job_type.value)
+                if hasattr(j.job_type, "value")
+                else j.job_type,
                 required_skills=j.required_skills,
                 num_openings=j.num_openings,
-                application_deadline=j.application_deadline.isoformat() if j.application_deadline else None,
+                application_deadline=j.application_deadline.isoformat()
+                if j.application_deadline
+                else None,
                 description=j.description,
                 responsibilities=j.responsibilities,
                 requirements=j.requirements,
@@ -682,7 +678,7 @@ async def update_job_status(
     job = await db.get(JobPosting, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     update_dict = update_data.model_dump(exclude_unset=True)
     for key, value in update_dict.items():
         if key == "status":
@@ -694,7 +690,7 @@ async def update_job_status(
             job.employment_type = emp.value if emp else None
         else:
             setattr(job, key, value)
-        
+
     await db.commit()
     await db.refresh(job)
     return {"ok": True}
@@ -708,11 +704,17 @@ async def create_job(
 ) -> Any:
     create_dict = create_data.model_dump(exclude_unset=True)
     if "status" in create_dict:
-        create_dict["status"] = coerce_enum(JobStatus, create_dict["status"], "status", allow_none=False)
+        create_dict["status"] = coerce_enum(
+            JobStatus, create_dict["status"], "status", allow_none=False
+        )
     if "job_type" in create_dict:
-        create_dict["job_type"] = coerce_enum(JobType, create_dict["job_type"], "job_type")
+        create_dict["job_type"] = coerce_enum(
+            JobType, create_dict["job_type"], "job_type"
+        )
     if "employment_type" in create_dict:
-        emp = coerce_enum(EmploymentType, create_dict["employment_type"], "employment_type")
+        emp = coerce_enum(
+            EmploymentType, create_dict["employment_type"], "employment_type"
+        )
         create_dict["employment_type"] = emp.value if emp else None
 
     job = JobPosting(**create_dict)

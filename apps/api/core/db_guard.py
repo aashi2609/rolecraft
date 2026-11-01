@@ -24,7 +24,7 @@ def extract_db_identity(url_str: str) -> tuple[str, str, int | None, str]:
     """Extract (endpoint_or_normalized_host, database_name, port, host_type) from a DB URL."""
     if not url_str or not url_str.strip():
         return ("", "", None, "empty")
-    
+
     url = make_url(url_str.strip())
     host = (url.host or "").lower().strip()
     db_name = (url.database or "").strip()
@@ -47,7 +47,7 @@ def extract_db_identity(url_str: str) -> tuple[str, str, int | None, str]:
 
 def is_same_database(url1_str: str, url2_str: str) -> bool:
     """Check if two connection strings resolve to the exact same database.
-    
+
     Handles:
     - Neon pooled vs direct URLs (ep-*-pooler vs ep-*)
     - localhost vs 127.0.0.1

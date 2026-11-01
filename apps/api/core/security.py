@@ -102,5 +102,3 @@ def decode_refresh_token(token: str) -> dict[str, Any]:
         return payload
     except JWTError as exc:
         raise ValueError("Invalid or expired refresh token") from exc
-
-

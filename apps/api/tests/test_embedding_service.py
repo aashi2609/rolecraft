@@ -1,9 +1,6 @@
-﻿"""Unit tests for embedding_service and embedding_client."""
+"""Unit tests for embedding_service and embedding_client."""
 
 from __future__ import annotations
-
-import pytest
-pytestmark = pytest.mark.skip_db_guard
 
 import asyncio
 from unittest.mock import AsyncMock, patch
@@ -11,7 +8,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from services.embedding_client import EmbeddingServiceError, fetch_embedding
-from services.embedding_service import embed_text, EmbeddingError
+from services.embedding_service import EmbeddingError
+
+pytestmark = pytest.mark.skip_db_guard
 
 
 def test_embed_text_requires_api_key() -> None:
@@ -21,7 +20,7 @@ def test_embed_text_requires_api_key() -> None:
     with patch.object(es.settings, "embedding_api_key", ""):
         with pytest.raises(EmbeddingError) as exc_info:
             asyncio.run(es.embed_text("software engineer python"))
-        
+
         assert "key not configured" in str(exc_info.value).lower()
 
 

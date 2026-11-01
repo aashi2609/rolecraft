@@ -5,6 +5,7 @@ Revises: l3m4n5o6p7q8
 Create Date: 2026-10-31
 
 """
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -165,9 +166,7 @@ def upgrade() -> None:
             sa.DateTime(timezone=True),
             nullable=True,
         ),
-        sa.ForeignKeyConstraint(
-            ["user_id"], ["users.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(
             ["subscription_id"], ["subscriptions.id"], ondelete="SET NULL"
         ),
@@ -218,9 +217,8 @@ def downgrade() -> None:
         op.execute("DROP TYPE IF EXISTS payment_status CASCADE")
     except Exception:
         pass
-    
+
     try:
         op.execute("DROP TYPE IF EXISTS billing_period CASCADE")
     except Exception:
         pass
-

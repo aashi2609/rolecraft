@@ -1,15 +1,22 @@
 """Step 5E: Experience calculation from date ranges with interval merging."""
 
-import pytest
 from datetime import date
-from unittest.mock import MagicMock
 
 from services.experience_calculator import total_experience_years, experience_in_role
 
 
 class MockExperience:
     """Mock Experience ORM object for testing."""
-    def __init__(self, from_date, to_date=None, is_current=False, employment_type=None, role=None, designation=None):
+
+    def __init__(
+        self,
+        from_date,
+        to_date=None,
+        is_current=False,
+        employment_type=None,
+        role=None,
+        designation=None,
+    ):
         self.from_date = from_date
         self.to_date = to_date
         self.is_current = is_current
@@ -23,10 +30,12 @@ class TestTotalExperienceYears:
 
     def test_single_job(self):
         """Single job: Jan 2020 to Jan 2023 = 3.0 years."""
-        exp = [MockExperience(
-            from_date=date(2020, 1, 1),
-            to_date=date(2023, 1, 1),
-        )]
+        exp = [
+            MockExperience(
+                from_date=date(2020, 1, 1),
+                to_date=date(2023, 1, 1),
+            )
+        ]
         total, internship = total_experience_years(exp, as_of=date(2023, 1, 1))
         assert total == 3.0
         assert internship == 0.0
@@ -80,11 +89,13 @@ class TestTotalExperienceYears:
         - Still current (as_of: Jan 2024)
         Total: 4.0 years
         """
-        exp = [MockExperience(
-            from_date=date(2020, 1, 1),
-            to_date=None,
-            is_current=True,
-        )]
+        exp = [
+            MockExperience(
+                from_date=date(2020, 1, 1),
+                to_date=None,
+                is_current=True,
+            )
+        ]
         total, internship = total_experience_years(exp, as_of=date(2024, 1, 1))
         assert abs(total - 4.0) < 0.1
 
@@ -92,11 +103,13 @@ class TestTotalExperienceYears:
         """Role with null to_date but is_current=False:
         Should treat null to_date as as_of (current).
         """
-        exp = [MockExperience(
-            from_date=date(2022, 1, 1),
-            to_date=None,
-            is_current=False,
-        )]
+        exp = [
+            MockExperience(
+                from_date=date(2022, 1, 1),
+                to_date=None,
+                is_current=False,
+            )
+        ]
         total, internship = total_experience_years(exp, as_of=date(2024, 1, 1))
         assert abs(total - 2.0) < 0.1
 
@@ -106,28 +119,34 @@ class TestTotalExperienceYears:
         - as_of: Jan 2024
         - Counted: Jan 2020 - Jan 2024 = 4.0 years
         """
-        exp = [MockExperience(
-            from_date=date(2020, 1, 1),
-            to_date=date(2030, 1, 1),
-        )]
+        exp = [
+            MockExperience(
+                from_date=date(2020, 1, 1),
+                to_date=date(2030, 1, 1),
+            )
+        ]
         total, internship = total_experience_years(exp, as_of=date(2024, 1, 1))
         assert abs(total - 4.0) < 0.1
 
     def test_missing_from_date_skipped(self):
         """Row with no from_date should be skipped (not counted)."""
-        exp = [MockExperience(
-            from_date=None,
-            to_date=date(2023, 1, 1),
-        )]
+        exp = [
+            MockExperience(
+                from_date=None,
+                to_date=date(2023, 1, 1),
+            )
+        ]
         total, internship = total_experience_years(exp)
         assert total == 0.0
 
     def test_to_date_before_from_date_skipped(self):
         """Row with to_date < from_date should be skipped (invalid interval)."""
-        exp = [MockExperience(
-            from_date=date(2023, 1, 1),
-            to_date=date(2020, 1, 1),
-        )]
+        exp = [
+            MockExperience(
+                from_date=date(2023, 1, 1),
+                to_date=date(2020, 1, 1),
+            )
+        ]
         total, internship = total_experience_years(exp)
         assert total == 0.0
 
@@ -138,10 +157,20 @@ class TestTotalExperienceYears:
         - Included by default: total = 1.2 years, internship = 0.2
         """
         exp = [
-            MockExperience(from_date=date(2020, 1, 1), to_date=date(2021, 1, 1), employment_type="Full-time"),
-            MockExperience(from_date=date(2021, 7, 1), to_date=date(2021, 9, 1), employment_type="Internship"),
+            MockExperience(
+                from_date=date(2020, 1, 1),
+                to_date=date(2021, 1, 1),
+                employment_type="Full-time",
+            ),
+            MockExperience(
+                from_date=date(2021, 7, 1),
+                to_date=date(2021, 9, 1),
+                employment_type="Internship",
+            ),
         ]
-        total, internship = total_experience_years(exp, as_of=date(2021, 9, 1), include_internships=True)
+        total, internship = total_experience_years(
+            exp, as_of=date(2021, 9, 1), include_internships=True
+        )
         assert abs(total - 1.2) < 0.1
         assert abs(internship - 0.2) < 0.1
 
@@ -152,10 +181,20 @@ class TestTotalExperienceYears:
         - Total (exclude internship): 1.0 year, internship_years = 0.2
         """
         exp = [
-            MockExperience(from_date=date(2020, 1, 1), to_date=date(2021, 1, 1), employment_type="Full-time"),
-            MockExperience(from_date=date(2021, 7, 1), to_date=date(2021, 9, 1), employment_type="Internship"),
+            MockExperience(
+                from_date=date(2020, 1, 1),
+                to_date=date(2021, 1, 1),
+                employment_type="Full-time",
+            ),
+            MockExperience(
+                from_date=date(2021, 7, 1),
+                to_date=date(2021, 9, 1),
+                employment_type="Internship",
+            ),
         ]
-        total, internship = total_experience_years(exp, as_of=date(2021, 9, 1), include_internships=False)
+        total, internship = total_experience_years(
+            exp, as_of=date(2021, 9, 1), include_internships=False
+        )
         assert abs(total - 1.0) < 0.1
         assert abs(internship - 0.17) < 0.1  # Jul-Sep = ~2 months = 0.17 years
 
@@ -169,10 +208,12 @@ class TestTotalExperienceYears:
         """Leap year edge case:
         - Jan 1, 2020 (leap year) to Jan 1, 2021 = 366 days ≈ 1.0 years
         """
-        exp = [MockExperience(
-            from_date=date(2020, 1, 1),
-            to_date=date(2021, 1, 1),
-        )]
+        exp = [
+            MockExperience(
+                from_date=date(2020, 1, 1),
+                to_date=date(2021, 1, 1),
+            )
+        ]
         total, internship = total_experience_years(exp, as_of=date(2021, 1, 1))
         assert abs(total - 1.0) < 0.1
 
@@ -180,10 +221,12 @@ class TestTotalExperienceYears:
         """Years should be rounded to 1 decimal place:
         - 1 year 182 days ≈ 1.5 years
         """
-        exp = [MockExperience(
-            from_date=date(2020, 1, 1),
-            to_date=date(2021, 7, 1),
-        )]
+        exp = [
+            MockExperience(
+                from_date=date(2020, 1, 1),
+                to_date=date(2021, 7, 1),
+            )
+        ]
         total, internship = total_experience_years(exp, as_of=date(2021, 7, 1))
         # Should be rounded to 1 decimal
         assert isinstance(total, float)
@@ -198,11 +241,13 @@ class TestExperienceInRole:
         - Software Engineer: Jan 2020 - Jan 2023 (3 years, matches 'Software')
         - Total: 3.0 years
         """
-        exp = [MockExperience(
-            from_date=date(2020, 1, 1),
-            to_date=date(2023, 1, 1),
-            role="Software Engineer",
-        )]
+        exp = [
+            MockExperience(
+                from_date=date(2020, 1, 1),
+                to_date=date(2023, 1, 1),
+                role="Software Engineer",
+            )
+        ]
         years = experience_in_role(exp, target_job_role="Software")
         assert abs(years - 3.0) < 0.1
 
@@ -212,11 +257,13 @@ class TestExperienceInRole:
         - Looking for: 'Software'
         - Total: 0.0 years (no match)
         """
-        exp = [MockExperience(
-            from_date=date(2020, 1, 1),
-            to_date=date(2023, 1, 1),
-            role="Sales Manager",
-        )]
+        exp = [
+            MockExperience(
+                from_date=date(2020, 1, 1),
+                to_date=date(2023, 1, 1),
+                role="Sales Manager",
+            )
+        ]
         years = experience_in_role(exp, target_job_role="Software")
         assert years == 0.0
 
@@ -226,20 +273,26 @@ class TestExperienceInRole:
         - Looking for: 'Data'
         - Total: matched (0.5 years)
         """
-        exp = [MockExperience(
-            from_date=date(2023, 1, 1),
-            to_date=date(2023, 7, 1),
-            role="Engineer",
-            designation="Data Science Engineer",
-        )]
+        exp = [
+            MockExperience(
+                from_date=date(2023, 1, 1),
+                to_date=date(2023, 7, 1),
+                role="Engineer",
+                designation="Data Science Engineer",
+            )
+        ]
         years = experience_in_role(exp, target_job_role="Data")
         assert abs(years - 0.5) < 0.1
 
     def test_no_matching_roles(self):
         """No roles match returns 0.0."""
         exp = [
-            MockExperience(from_date=date(2020, 1, 1), to_date=date(2021, 1, 1), role="Sales"),
-            MockExperience(from_date=date(2021, 1, 1), to_date=date(2022, 1, 1), role="Marketing"),
+            MockExperience(
+                from_date=date(2020, 1, 1), to_date=date(2021, 1, 1), role="Sales"
+            ),
+            MockExperience(
+                from_date=date(2021, 1, 1), to_date=date(2022, 1, 1), role="Marketing"
+            ),
         ]
         years = experience_in_role(exp, target_job_role="Engineering")
         assert years == 0.0

@@ -10,7 +10,12 @@ import asyncio
 import os
 import sys
 
+import asyncpg
 from dotenv import load_dotenv
+from sqlalchemy import select
+
+from core.database import AsyncSessionLocal
+from models import User, UserRole
 
 # Ensure apps/api is on path when run as scripts/make_admin.py
 _API_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -18,12 +23,6 @@ if _API_ROOT not in sys.path:
     sys.path.insert(0, _API_ROOT)
 
 load_dotenv(os.path.join(_API_ROOT, ".env"))
-
-import asyncpg
-from sqlalchemy import select
-
-from core.database import AsyncSessionLocal
-from models import User, UserRole
 
 
 async def add_admin_to_enum() -> None:
@@ -54,17 +53,20 @@ async def make_admin(email: str) -> None:
         result = await db.execute(select(User).where(User.email == email.lower()))
         user = result.scalar_one_or_none()
         if not user:
-            print(f"User {email} not found. Creating a new admin account with password 'admin123'...")
+            print(
+                f"User {email} not found. Creating a new admin account with password 'admin123'..."
+            )
             from core.security import hash_password
+
             user = User(
                 email=email.lower(),
                 password_hash=hash_password("admin123"),
-                role=UserRole.admin
+                role=UserRole.admin,
             )
             db.add(user)
         else:
             user.role = UserRole.admin
-        
+
         await db.commit()
         print(f"User {email} is now an admin.")
 

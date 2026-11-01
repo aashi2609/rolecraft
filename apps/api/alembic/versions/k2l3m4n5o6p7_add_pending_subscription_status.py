@@ -5,13 +5,11 @@ Signup no longer creates active paid subscriptions automatically.
 """
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
-revision = 'k2l3m4n5o6p7'
-down_revision = 'j1k2l3m4n5o6'
+revision = "k2l3m4n5o6p7"
+down_revision = "j1k2l3m4n5o6"
 branch_labels = None
 depends_on = None
 

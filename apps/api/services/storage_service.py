@@ -66,7 +66,9 @@ async def upload_file(
         is_logo = object_name.startswith(LOGO_PREFIX + "/")
         fr = FileRecord(
             owner_id=owner_id,
-            category=FileCategory.logo if is_logo else cat_map.get(category, FileCategory.document),
+            category=FileCategory.logo
+            if is_logo
+            else cat_map.get(category, FileCategory.document),
             storage_path=object_name,
             original_filename=file.filename,
             mime_type=detected_mime,
@@ -99,9 +101,7 @@ def _upload_local(object_name: str, data: bytes) -> None:
     dest.write_bytes(data)
 
 
-def _upload_gcs(
-    object_name: str, data: bytes, content_type: str | None
-) -> None:
+def _upload_gcs(object_name: str, data: bytes, content_type: str | None) -> None:
     try:
         from google.cloud import storage
     except ImportError as exc:
@@ -153,6 +153,7 @@ def delete_stored_file(storage_path: str) -> bool:
     if settings.storage_backend == "gcs":
         try:
             from google.cloud import storage
+
             client = storage.Client(project=settings.gcs_project_id or None)
             bucket = client.bucket(settings.gcs_bucket_name)
             blob = bucket.blob(storage_path)

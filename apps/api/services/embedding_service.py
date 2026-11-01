@@ -27,27 +27,27 @@ class EmbeddingError(Exception):
 
 def validate_embedding(vector: list[float], text: str) -> None:
     """Validate embedding vector: correct dimension, finite, non-zero norm, non-empty text.
-    
+
     Raises EmbeddingError if validation fails.
     """
     if not text or not text.strip():
         raise EmbeddingError("Cannot embed empty text")
-    
+
     if not isinstance(vector, list):
         raise EmbeddingError(f"Embedding must be a list, got {type(vector)}")
-    
+
     if len(vector) != EMBED_DIM:
         raise EmbeddingError(
             f"Embedding dimension mismatch: expected {EMBED_DIM}, got {len(vector)}"
         )
-    
+
     # Check all values are finite (not NaN or inf)
     for i, v in enumerate(vector):
         if not isinstance(v, (int, float)):
             raise EmbeddingError(f"Embedding[{i}] is not numeric: {type(v)}")
         if not math.isfinite(v):
             raise EmbeddingError(f"Embedding[{i}] is not finite: {v}")
-    
+
     # Check vector norm is above epsilon (reject all-zero vectors)
     norm = math.sqrt(sum(x * x for x in vector))
     if norm < EPSILON:
@@ -56,7 +56,7 @@ def validate_embedding(vector: list[float], text: str) -> None:
 
 async def embed_text(text: str) -> list[float]:
     """Generate a real 512-dimensional embedding via OpenAI, or raise EmbeddingError.
-    
+
     Never returns fake/mock vectors. On API failure, raises EmbeddingError with
     descriptive message. Caller must handle the error and decide whether to:
     - Store NULL embedding with status='failed'
@@ -68,20 +68,20 @@ async def embed_text(text: str) -> list[float]:
             "Embedding API key not configured. "
             "Set EMBEDDING_API_KEY in .env to use real embeddings."
         )
-    
+
     try:
         vector = await fetch_embedding(text)
     except EmbeddingServiceError as exc:
         logger.error("Embedding API failed: %s", exc)
         raise EmbeddingError(f"Embedding API unavailable: {str(exc)}") from exc
-    
+
     # Validate the returned vector
     try:
         validate_embedding(vector, text)
     except EmbeddingError as exc:
         logger.error("Embedding validation failed: %s", exc)
         raise
-    
+
     return vector
 
 
@@ -119,12 +119,12 @@ def build_resume_embedding_text(resume: Resume) -> str:
 
 async def refresh_job_embedding(db: AsyncSession, job: JobPosting) -> None:
     """Re-embed job posting when title/description/skills change.
-    
+
     On failure: stores NULL embedding and sets status='failed' (caller must surface this).
     On success: stores vector and sets status='scored'.
     """
     embedding_text = build_job_embedding_text(job) or job.title
-    
+
     try:
         job.embedding = await embed_text(embedding_text)
         job.embedding_status = EmbeddingStatus.scored.value
@@ -133,7 +133,7 @@ async def refresh_job_embedding(db: AsyncSession, job: JobPosting) -> None:
         logger.warning("Job embedding failed for job %s: %s", job.id, exc)
         job.embedding = None
         job.embedding_status = EmbeddingStatus.failed.value
-    
+
     await db.flush()
 
 
@@ -141,7 +141,7 @@ async def refresh_resume_embeddings_for_candidate(
     db: AsyncSession, candidate_id: UUID
 ) -> int:
     """Re-embed all resumes for a candidate after profile update.
-    
+
     Returns count of successfully embedded resumes.
     Failed embeddings are stored as NULL with status='failed'.
     """
@@ -150,11 +150,11 @@ async def refresh_resume_embeddings_for_candidate(
         .scalars()
         .all()
     )
-    
+
     success_count = 0
     for resume in resumes:
         embedding_text = build_resume_embedding_text(resume) or "resume"
-        
+
         try:
             resume.embedding = await embed_text(embedding_text)
             resume.embedding_status = EmbeddingStatus.scored.value
@@ -164,8 +164,8 @@ async def refresh_resume_embeddings_for_candidate(
             logger.warning("Resume embedding failed for resume %s: %s", resume.id, exc)
             resume.embedding = None
             resume.embedding_status = EmbeddingStatus.failed.value
-    
+
     if resumes:
         await db.flush()
-    
+
     return success_count

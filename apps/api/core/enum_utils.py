@@ -13,7 +13,9 @@ class EnumValidationError(HTTPException, ValueError):
     """
 
     def __init__(self, detail: str):
-        super().__init__(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail)
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail
+        )
 
     def __str__(self) -> str:
         return self.detail
@@ -32,14 +34,14 @@ def coerce_enum(
 ) -> Optional[E]:
     """
     Converts a value to an Enum instance case-insensitively and returns it.
-    
+
     If val is None:
       - returns None if allow_none is True
       - raises EnumValidationError (422) if allow_none is False
-      
+
     If val matches an enum value or name (case-insensitively, ignoring hyphens/underscores/spaces):
       - returns the Enum member
-      
+
     If val is invalid:
       - raises EnumValidationError (HTTP 422) listing the allowed values.
     """
@@ -49,9 +51,7 @@ def coerce_enum(
     if val is None:
         if allow_none:
             return None
-        raise EnumValidationError(
-            f"Invalid {name}: None. Allowed values: {allowed}"
-        )
+        raise EnumValidationError(f"Invalid {name}: None. Allowed values: {allowed}")
 
     if isinstance(val, enum_cls):
         return val
@@ -77,6 +77,4 @@ def coerce_enum(
         if normalize_key(member.name) == norm_val:
             return member
 
-    raise EnumValidationError(
-        f"Invalid {name}: '{val}'. Allowed values: {allowed}"
-    )
+    raise EnumValidationError(f"Invalid {name}: '{val}'. Allowed values: {allowed}")

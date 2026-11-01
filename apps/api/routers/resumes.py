@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
@@ -21,6 +22,9 @@ from schemas import ResumeGenerateRequest, ResumeOut
 from services.pdf_service import build_resume_pdf_response, resolve_candidate_name
 from services.resume_service import generate_resume_for_vertical, parse_resume_pdf
 
+router = APIRouter(prefix="/resumes", tags=["resumes"])
+logger = logging.getLogger(__name__)
+
 _GENERATION_TIERS = {
     PlanTier.free,
     PlanTier.basic,
@@ -31,6 +35,7 @@ _GENERATION_TIERS = {
 }
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
+logger = logging.getLogger(__name__)
 
 
 async def _profile_with_skills(db, user_id: UUID) -> CandidateProfile:
@@ -89,10 +94,16 @@ async def _can_generate(db, user_id: UUID) -> tuple[bool, str | None]:
         )
     ).scalar_one_or_none()
     if not sub:
-        return True, None  # Free tier (no active subscription): allow generation within check_plan_limit caps
+        return (
+            True,
+            None,
+        )  # Free tier (no active subscription): allow generation within check_plan_limit caps
     if sub.plan_tier in _GENERATION_TIERS:
         return True, None
-    return False, "Your current plan doesn't include resume generation. Upgrade to Resume Builder or Complete."
+    return (
+        False,
+        "Your current plan doesn't include resume generation. Upgrade to Resume Builder or Complete.",
+    )
 
 
 @router.post("/generate", response_model=list[ResumeOut])
@@ -279,14 +290,14 @@ async def download_pdf(resume_id: UUID, user: CurrentUser, db: DbSession):
     row = await db.get(Resume, resume_id)
     if not row:
         raise HTTPException(status_code=404, detail="Resume not found")
-        
+
     if user.role == UserRole.company:
         from models import Application, JobPosting
+
         app = await db.scalar(
-            select(Application).join(JobPosting).where(
-                Application.resume_id == resume_id,
-                JobPosting.company_id == user.id
-            )
+            select(Application)
+            .join(JobPosting)
+            .where(Application.resume_id == resume_id, JobPosting.company_id == user.id)
         )
         if not app:
             raise HTTPException(status_code=403, detail="Resume not found")
@@ -298,7 +309,7 @@ async def download_pdf(resume_id: UUID, user: CurrentUser, db: DbSession):
             select(CandidateProfile).where(CandidateProfile.user_id == row.candidate_id)
         )
     ).scalar_one_or_none()
-    
+
     # Need candidate user to get email
     candidate_user = await db.get(User, row.candidate_id)
     email = candidate_user.email if candidate_user else ""

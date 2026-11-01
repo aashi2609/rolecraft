@@ -11,14 +11,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import (
     BillingPeriod,
@@ -76,7 +73,7 @@ class PaymentService:
             select(PricePoint).where(
                 PricePoint.plan_tier == plan_tier,
                 PricePoint.billing_period == billing_period,
-                PricePoint.active == True,
+                PricePoint.active.is_(True),
             )
         )
         if not price_point:
@@ -200,7 +197,9 @@ class PaymentService:
         self, db, webhook_data: dict
     ) -> PaymentTransaction:
         """Handle payment.authorized webhook."""
-        payment_data = webhook_data.get("payload", {}).get("payment", {}).get("entity", {})
+        payment_data = (
+            webhook_data.get("payload", {}).get("payment", {}).get("entity", {})
+        )
 
         razorpay_payment_id = payment_data.get("id")
         razorpay_order_id = payment_data.get("order_id")
@@ -288,7 +287,9 @@ class PaymentService:
         self, db, webhook_data: dict
     ) -> PaymentTransaction:
         """Handle payment.failed webhook."""
-        payment_data = webhook_data.get("payload", {}).get("payment", {}).get("entity", {})
+        payment_data = (
+            webhook_data.get("payload", {}).get("payment", {}).get("entity", {})
+        )
 
         razorpay_payment_id = payment_data.get("id")
         razorpay_order_id = payment_data.get("order_id")
@@ -309,7 +310,9 @@ class PaymentService:
 
         # Idempotency: if already failed, return
         if transaction.status == PaymentStatus.failed:
-            logger.info(f"Transaction {razorpay_order_id} already marked failed, skipping")
+            logger.info(
+                f"Transaction {razorpay_order_id} already marked failed, skipping"
+            )
             return transaction
 
         # Update transaction status
@@ -319,9 +322,7 @@ class PaymentService:
         transaction.webhook_data = webhook_data
         transaction.webhook_received_at = datetime.now(timezone.utc)
 
-        logger.warning(
-            f"Payment failed for order {razorpay_order_id}: {error_reason}"
-        )
+        logger.warning(f"Payment failed for order {razorpay_order_id}: {error_reason}")
 
         await db.flush()
         return transaction

@@ -15,11 +15,13 @@ from uuid import uuid4
 from sqlalchemy import select, func
 
 from models import (
-    User, UserRole, CandidateProfile, Company,
-    Subscription, SubscriptionStatus, SubscriptionAuditLog,
-    PlanTier
+    UserRole,
+    Subscription,
+    SubscriptionStatus,
+    SubscriptionAuditLog,
+    PlanTier,
 )
-from routers.admin import SubCreate, SubStatusUpdate
+from routers.admin import SubCreate
 from services.user_service import create_user_with_profile
 from services.subscription_service import log_subscription_change
 
@@ -83,7 +85,7 @@ class TestSignupCreatesPendingSubscription:
 
     async def test_pending_subscription_blocks_paid_features(self, db_session):
         """Pending subscription should not grant access to paid features.
-        
+
         (Enforced by entitlement service in Step 6B)
         """
         user = await create_user_with_profile(
@@ -105,8 +107,7 @@ class TestAuditLogging:
 
     async def test_signup_creates_audit_log_entry(self, db_session):
         """Signup should create an audit log entry."""
-        from sqlalchemy import select
-        
+
         user = await create_user_with_profile(
             db=db_session,
             email="audit1@test.com",
@@ -130,8 +131,7 @@ class TestAuditLogging:
 
     async def test_manual_audit_log_entry(self, db_session):
         """Manual subscription change can be logged."""
-        from sqlalchemy import select
-        
+
         user_id = uuid4()
         sub_id = uuid4()
 
@@ -164,7 +164,9 @@ class TestAuditLogging:
 class TestAdminCannotManuallyActivate:
     """Admin routes should prevent manual activation."""
 
-    async def test_patch_endpoint_rejects_status_to_active(self, db_session, candidate_user, current_admin):
+    async def test_patch_endpoint_rejects_status_to_active(
+        self, db_session, candidate_user, current_admin
+    ):
         """PATCH /admin/subscriptions/{id} rejects status=active."""
         # This test requires a proper admin user and route setup
         # Placeholder for integration test - skip for now
@@ -217,8 +219,7 @@ class TestSoftDelete:
 
     async def test_mark_as_cancelled_preserves_audit(self, db_session):
         """Cancelling a subscription preserves audit history."""
-        from sqlalchemy import select
-        
+
         user = await create_user_with_profile(
             db=db_session,
             email="cancel@test.com",
@@ -232,9 +233,9 @@ class TestSoftDelete:
 
         # Record initial creation
         initial_audit_count = await db_session.scalar(
-            select(func.count()).select_from(SubscriptionAuditLog).where(
-                SubscriptionAuditLog.subscription_id == sub_id
-            )
+            select(func.count())
+            .select_from(SubscriptionAuditLog)
+            .where(SubscriptionAuditLog.subscription_id == sub_id)
         )
 
         # Soft-delete (mark as cancelled)
@@ -253,9 +254,9 @@ class TestSoftDelete:
 
         # Verify audit trail preserved
         final_audit_count = await db_session.scalar(
-            select(func.count()).select_from(SubscriptionAuditLog).where(
-                SubscriptionAuditLog.subscription_id == sub_id
-            )
+            select(func.count())
+            .select_from(SubscriptionAuditLog)
+            .where(SubscriptionAuditLog.subscription_id == sub_id)
         )
         assert final_audit_count > initial_audit_count
 
@@ -277,8 +278,8 @@ class TestSubscriptionTransitions:
         assert user.subscription.status == SubscriptionStatus.pending
 
         # Simulate payment verification (would come from webhook)
-        from datetime import datetime, timedelta, timezone
-        
+        from datetime import timedelta, timezone
+
         user.subscription.status = SubscriptionStatus.active
         user.subscription.renews_at = datetime.now(timezone.utc) + timedelta(days=30)
 
@@ -379,7 +380,6 @@ class TestAuditLogIntegrity:
         )
         await db_session.commit()
 
-        from sqlalchemy import select
         audit = await db_session.scalar(
             select(SubscriptionAuditLog).where(
                 SubscriptionAuditLog.subscription_id == sub_id

@@ -24,6 +24,7 @@ from models import (
 
 class MessagingAuthError(Exception):
     """Exception raised when messaging authorization fails."""
+
     def __init__(self, reason: str):
         self.reason = reason
         super().__init__(reason)
@@ -31,6 +32,7 @@ class MessagingAuthError(Exception):
 
 class MessagingPolicy(str, Enum):
     """Messaging policies."""
+
     APPLICANTS_ONLY = "applicants_only"
     ANY_CANDIDATE_WITH_PLAN = "any_candidate_with_plan"
 
@@ -87,7 +89,9 @@ async def _check_applicants_only(
     # Check if candidate has an application to any of company's jobs
     # in an active state (applied, shortlisted, interview)
     app = await db.scalar(
-        select(Application).join(JobPosting).where(
+        select(Application)
+        .join(JobPosting)
+        .where(
             Application.candidate_id == candidate_id,
             JobPosting.company_id == company_id,
             or_(
@@ -133,11 +137,18 @@ async def _check_any_candidate_with_plan(
     )
 
     if not subscription:
-        return False, "You need an active subscription to message candidates. Upgrade your plan."
+        return (
+            False,
+            "You need an active subscription to message candidates. Upgrade your plan.",
+        )
 
     # Check if candidate exists and is active
     candidate_user = await db.get(User, candidate_id)
-    if not candidate_user or candidate_user.role != UserRole.candidate or not candidate_user.is_active:
+    if (
+        not candidate_user
+        or candidate_user.role != UserRole.candidate
+        or not candidate_user.is_active
+    ):
         return False, "This candidate is not available."
 
     return True, ""
@@ -180,9 +191,8 @@ async def get_conversation_permission(
     if not conv:
         return False, "Conversation not found."
 
-    is_participant = (
-        (user_role == UserRole.company and conv.company_id == user_id)
-        or (user_role == UserRole.candidate and conv.candidate_id == user_id)
+    is_participant = (user_role == UserRole.company and conv.company_id == user_id) or (
+        user_role == UserRole.candidate and conv.candidate_id == user_id
     )
 
     if not is_participant:

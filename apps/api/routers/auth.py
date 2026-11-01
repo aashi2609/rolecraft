@@ -81,9 +81,7 @@ async def signin(
 ):
     email = body.email.lower()
     result = await db.execute(
-        select(User)
-        .options(selectinload(User.subscription))
-        .where(User.email == email)
+        select(User).options(selectinload(User.subscription)).where(User.email == email)
     )
     user = result.scalar_one_or_none()
     if not user or not verify_password(body.password, user.password_hash):
@@ -117,17 +115,17 @@ async def signin(
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_access_token(
-    body: RefreshTokenRequest, db: DbSession
-):
+async def refresh_access_token(body: RefreshTokenRequest, db: DbSession):
     """Rotate access token and refresh token using a valid refresh token."""
     try:
         payload = decode_refresh_token(body.refresh_token)
         from uuid import UUID
+
         user_id = UUID(payload["sub"])
     except (ValueError, KeyError):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
         )
 
     token_version = payload.get("token_version")
@@ -137,12 +135,14 @@ async def refresh_access_token(
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User account is inactive or deleted"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account is inactive or deleted",
         )
 
     if token_version is not None and user.token_version != token_version:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token has been revoked"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has been revoked",
         )
 
     # Issue new access and rotated refresh token
@@ -181,37 +181,43 @@ async def forgot_password(
     from datetime import datetime, timedelta
     from secrets import token_urlsafe
     import hashlib
-    from models import PasswordResetToken
     from services.email_service import send_password_reset_email
-    
+
     email = body.email.lower()
     enforce_limit("forgot_password_email", email)
-    
+
     # Find active user
-    user = await db.scalar(select(User).where(User.email == email, User.is_active == True))
-    
+    user = await db.scalar(
+        select(User).where(User.email == email, User.is_active.is_(True))
+    )
+
     if user:
         # Invalidate earlier unused tokens
         await db.execute(
-            select(PasswordResetToken)
-            .where(
-                PasswordResetToken.user_id == user.id,
-                PasswordResetToken.used_at == None
-            )
-        )
-        old_tokens = (await db.execute(
             select(PasswordResetToken).where(
                 PasswordResetToken.user_id == user.id,
-                PasswordResetToken.used_at == None
+                PasswordResetToken.used_at.is_(None),
             )
-        )).scalars().all()
+        )
+        old_tokens = (
+            (
+                await db.execute(
+                    select(PasswordResetToken).where(
+                        PasswordResetToken.user_id == user.id,
+                        PasswordResetToken.used_at.is_(None),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
         for t in old_tokens:
             await db.delete(t)
-        
+
         # Generate new token (raw)
         raw_token = token_urlsafe(32)
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        
+
         # Store token (hashed)
         reset_token = PasswordResetToken(
             user_id=user.id,
@@ -221,13 +227,14 @@ async def forgot_password(
         )
         db.add(reset_token)
         await db.flush()
-        
+
         # Send email in background
-        from fastapi import BackgroundTasks
         # Note: need to inject this at route level for full impl
         await send_password_reset_email(user.email, raw_token)
-    
-    return {"message": "If an account exists for that email, password reset instructions have been sent."}
+
+    return {
+        "message": "If an account exists for that email, password reset instructions have been sent."
+    }
 
 
 @router.post("/reset-password")
@@ -241,36 +248,39 @@ async def reset_password(
     """Reset password using token. Generic error for security."""
     from datetime import datetime
     import hashlib
-    from models import PasswordResetToken
     from core.security import hash_password
-    
+
     email = request.headers.get("x-user-email", "").lower() or ""
     enforce_reset_password_limits(request, email)
-    
+
     # Hash the token from request
     token_hash = hashlib.sha256(body.token.encode()).hexdigest()
-    
+
     # Look up by hash
     reset_token = await db.scalar(
         select(PasswordResetToken)
         .where(PasswordResetToken.token_hash == token_hash)
         .options(selectinload(PasswordResetToken.user))
     )
-    
-    if not reset_token or reset_token.used_at or reset_token.expires_at < datetime.utcnow():
+
+    if (
+        not reset_token
+        or reset_token.used_at
+        or reset_token.expires_at < datetime.utcnow()
+    ):
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
-    
+
     user = await db.get(User, reset_token.user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
-    
+
     # Update password
     user.password_hash = hash_password(body.new_password)
     user.token_version += 1  # Invalidate all existing tokens
-    
+
     # Mark token as used
     reset_token.used_at = datetime.utcnow()
-    
+
     await db.commit()
     return {"message": "Password reset successfully"}
 

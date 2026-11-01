@@ -10,8 +10,6 @@ from sqlalchemy.orm import selectinload
 from core.database import get_db
 from core.security import decode_access_token
 from models import (
-    JobPosting,
-    JobStatus,
     PlanTier,
     Subscription,
     SubscriptionStatus,

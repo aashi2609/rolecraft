@@ -6,7 +6,15 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from main import app
-from models import CandidateProfile, Company, JobPosting, JobStatus, JobType, User, UserRole
+from models import (
+    CandidateProfile,
+    Company,
+    JobPosting,
+    JobStatus,
+    JobType,
+    User,
+    UserRole,
+)
 from core.security import create_access_token
 
 
@@ -60,10 +68,14 @@ async def test_jobs_hidden_route_and_filtering(db_session: AsyncSession):
     token = create_access_token(user_id=candidate_id, role="candidate", token_version=1)
     headers = {"Authorization": f"Bearer {token}"}
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         # 3. Initially, GET /jobs/hidden returns empty list
         resp = await client.get("/jobs/hidden", headers=headers)
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+        assert resp.status_code == 200, (
+            f"Expected 200, got {resp.status_code}: {resp.text}"
+        )
         data = resp.json()
         assert "job_ids" in data
         assert str(job_id) not in data["job_ids"]
@@ -77,7 +89,9 @@ async def test_jobs_hidden_route_and_filtering(db_session: AsyncSession):
 
         # 5. Hide the job: POST /jobs/{job_id}/hide
         resp = await client.post(f"/jobs/{job_id}/hide", headers=headers)
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+        assert resp.status_code == 200, (
+            f"Expected 200, got {resp.status_code}: {resp.text}"
+        )
         assert resp.json() == {"status": "ok"}
 
         # 6. GET /jobs/hidden now returns the hidden job ID
@@ -100,7 +114,9 @@ async def test_jobs_hidden_route_and_filtering(db_session: AsyncSession):
 
         # 9. Unhide the job: DELETE /jobs/{job_id}/hide
         resp = await client.delete(f"/jobs/{job_id}/hide", headers=headers)
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+        assert resp.status_code == 200, (
+            f"Expected 200, got {resp.status_code}: {resp.text}"
+        )
         assert resp.json() == {"status": "ok"}
 
         # 10. GET /jobs/hidden no longer returns the job

@@ -17,7 +17,6 @@ from typing import Optional
 
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from sqlalchemy.pool import Pool
 
 logger = logging.getLogger(__name__)
 
@@ -94,14 +93,18 @@ def install_profiler(engine: Engine, enabled: bool = True) -> None:
     logger.info("Installing query profiler")
 
     @event.listens_for(engine, "before_cursor_execute")
-    def receive_before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    def receive_before_cursor_execute(
+        conn, cursor, statement, parameters, context, executemany
+    ):
         """Called before each SQL statement is executed."""
         conn.info.setdefault("query_start_time", []).append(time.time())
         # Log statement at debug level
         logger.debug(f"SQL: {statement[:100]}")
 
     @event.listens_for(engine, "after_cursor_execute")
-    def receive_after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    def receive_after_cursor_execute(
+        conn, cursor, statement, parameters, context, executemany
+    ):
         """Called after each SQL statement is executed."""
         try:
             # Get start time
@@ -121,9 +124,7 @@ def install_profiler(engine: Engine, enabled: bool = True) -> None:
 
             # Log slow queries (> 100ms)
             if duration_ms > 100:
-                logger.warning(
-                    f"Slow query ({duration_ms:.1f}ms): {statement[:80]}..."
-                )
+                logger.warning(f"Slow query ({duration_ms:.1f}ms): {statement[:80]}...")
 
         except Exception as e:
             logger.debug(f"Error in query profiler: {e}")
@@ -154,10 +155,7 @@ class ProfilerMiddleware:
                 headers = list(message.get("headers", []))
                 # Add profiler headers
                 headers.extend(
-                    [
-                        (k.encode(), v.encode())
-                        for k, v in profiler.to_headers().items()
-                    ]
+                    [(k.encode(), v.encode()) for k, v in profiler.to_headers().items()]
                 )
                 message["headers"] = headers
             await send(message)

@@ -13,7 +13,7 @@ from core.rate_limit import RateLimited, limiter, rate_limit_exceeded_handler
 from core.request_id import RequestIdMiddleware
 from core.timeout_middleware import TimeoutMiddleware
 from services.ai_client import AIServiceError
-from sqlalchemy.exc import DBAPIError, IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from routers import (
     admin,
     analytics,
@@ -58,13 +58,14 @@ app.add_middleware(TimeoutMiddleware)
 if not settings.is_production:
     from core.query_profiler import ProfilerMiddleware, install_profiler
     from core.database import engine
-    
+
     app.add_middleware(ProfilerMiddleware, enabled=True)
     install_profiler(engine, enabled=True)
     logger.info("Query profiler enabled (dev/test mode)")
 
 # Request ID middleware
 app.add_middleware(RequestIdMiddleware)
+
 
 # Security headers middleware
 @app.middleware("http")
@@ -75,6 +76,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     return response
+
 
 # CORS configuration:
 # In production: strict explicit allow_origins only from env, no regex, no wildcards, no cookies (allow_credentials=False).
@@ -106,7 +108,11 @@ else:
 
 
 def _get_request_id(request: Request) -> str:
-    return getattr(request.state, "request_id", None) or request.headers.get("X-Request-ID") or "unknown"
+    return (
+        getattr(request.state, "request_id", None)
+        or request.headers.get("X-Request-ID")
+        or "unknown"
+    )
 
 
 @app.exception_handler(RequestValidationError)
@@ -164,7 +170,11 @@ async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError):
         request.url.path,
         exc,
     )
-    detail = "Internal database error" if not settings.is_production else "Internal server error"
+    detail = (
+        "Internal database error"
+        if not settings.is_production
+        else "Internal server error"
+    )
     return JSONResponse(
         status_code=500,
         content={"detail": detail, "request_id": req_id},
@@ -176,16 +186,16 @@ async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError):
 async def ai_service_error_handler(request: Request, exc: AIServiceError):
     """Upstream AI / Groq failure: structured error response with error code and retry guidance."""
     req_id = _get_request_id(request)
-    
+
     # Map error codes to HTTP status codes
     status_code_map = {
-        "ai_unavailable": 502,      # Bad Gateway - provider down
-        "ai_rate_limited": 429,     # Too Many Requests
-        "ai_timeout": 504,          # Gateway Timeout
-        "ai_auth_failed": 502,      # Bad Gateway - don't expose auth details
-        "ai_bad_output": 502,       # Bad Gateway - malformed response
+        "ai_unavailable": 502,  # Bad Gateway - provider down
+        "ai_rate_limited": 429,  # Too Many Requests
+        "ai_timeout": 504,  # Gateway Timeout
+        "ai_auth_failed": 502,  # Bad Gateway - don't expose auth details
+        "ai_bad_output": 502,  # Bad Gateway - malformed response
     }
-    
+
     # Map error codes to user-friendly messages
     message_map = {
         "ai_unavailable": "AI service is temporarily unavailable. Please try again later.",
@@ -194,35 +204,37 @@ async def ai_service_error_handler(request: Request, exc: AIServiceError):
         "ai_auth_failed": "AI service configuration error. Please contact support.",
         "ai_bad_output": "AI service returned invalid response. Please try again.",
     }
-    
+
     error_code = getattr(exc, "error_code", "ai_unavailable")
     retry_after = getattr(exc, "retry_after", None)
-    
+
     status_code = status_code_map.get(error_code, 502)
-    detail = message_map.get(error_code, "AI service is currently unavailable. Please try again later.")
-    
+    detail = message_map.get(
+        error_code, "AI service is currently unavailable. Please try again later."
+    )
+
     logger.warning(
         "Upstream AI service failure [request_id=%s] on %s %s: %s (code=%s)",
         req_id,
         request.method,
         request.url.path,
         exc,
-        error_code
+        error_code,
     )
-    
+
     response_content = {
         "detail": detail,
         "error_code": error_code,
         "request_id": req_id,
     }
-    
+
     if retry_after:
         response_content["retry_after_seconds"] = retry_after
-    
+
     headers = {"X-Request-ID": req_id}
     if retry_after and status_code == 429:
         headers["Retry-After"] = str(retry_after)
-    
+
     return JSONResponse(
         status_code=status_code,
         content=response_content,
@@ -263,7 +275,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         request.url.path,
     )
     # In production, never leak internal traceback or exception messages to callers
-    detail = "Internal server error" if settings.is_production else f"{type(exc).__name__}: {exc}"
+    detail = (
+        "Internal server error"
+        if settings.is_production
+        else f"{type(exc).__name__}: {exc}"
+    )
     return JSONResponse(
         status_code=500,
         content={"detail": detail, "request_id": req_id},

@@ -15,7 +15,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from core.config import get_settings
-from main import app
 
 settings = get_settings()
 
@@ -183,9 +182,9 @@ def test_plan_limit_before_groq(client: TestClient) -> None:
                         f"/resumes/{rid}/regenerate",
                         headers={"Authorization": f"Bearer {token}"},
                     )
-                    assert (
-                        r.status_code == 200
-                    ), f"status={r.status_code} body={r.text[:200]}"
+                    assert r.status_code == 200, (
+                        f"status={r.status_code} body={r.text[:200]}"
+                    )
                     assert mock_resume.await_count >= 1
 
                     r = client.post(

@@ -1,4 +1,5 @@
 import asyncio
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -9,6 +10,7 @@ import models  # noqa: F401 — register all models
 from alembic import context
 from core.config import get_settings
 from core.database import Base, asyncpg_engine_kwargs
+from core.db_guard import enforce_isolated_test_database
 
 config = context.config
 if config.config_file_name is not None:
@@ -17,12 +19,13 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 settings = get_settings()
 
-import os
-from core.db_guard import enforce_isolated_test_database
-
 # ── 3A/3B Safety Guard: Prevent running migrations against primary DB without explicit opt-in ──
 _test_db_url = os.getenv("TEST_DATABASE_URL", "").strip()
-_allow_primary = os.getenv("ALLOW_PRIMARY_MIGRATIONS", "").lower() in ("1", "true", "yes")
+_allow_primary = os.getenv("ALLOW_PRIMARY_MIGRATIONS", "").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 if _test_db_url:
     _primary_snapshot = os.getenv("PRIMARY_DATABASE_URL", "").strip() or None

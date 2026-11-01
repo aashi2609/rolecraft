@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -82,7 +81,9 @@ async def validate_plan_tier(tier_str: str, user_role: UserRole) -> PlanTier:
     return tier
 
 
-async def cancel_active_subscriptions(db, user_id: UUID, admin_id: Optional[UUID] = None) -> None:
+async def cancel_active_subscriptions(
+    db, user_id: UUID, admin_id: Optional[UUID] = None
+) -> None:
     """Cancel all active subscriptions for a user."""
     existing = (
         (
@@ -130,7 +131,7 @@ async def create_subscription(
     )
     db.add(sub)
     await db.flush()
-    
+
     # Log the creation
     await log_subscription_change(
         db,
@@ -142,7 +143,7 @@ async def create_subscription(
         new_status=SubscriptionStatus.pending.value,
         reason=reason or "User registration",
     )
-    
+
     await db.refresh(sub)
     return sub
 

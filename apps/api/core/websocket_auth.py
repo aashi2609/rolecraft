@@ -17,7 +17,9 @@ from models import User
 logger = logging.getLogger(__name__)
 
 
-async def _verify_user_active_and_version(user_id: UUID, token_version: int | None) -> bool:
+async def _verify_user_active_and_version(
+    user_id: UUID, token_version: int | None
+) -> bool:
     """Check the database to verify the user exists, is active, and token_version matches."""
     async with AsyncSessionLocal() as session:
         result = await session.execute(
@@ -97,4 +99,3 @@ async def handle_websocket_lifecycle(
         logger.warning("WS error for user=%s: %s", user_id, exc)
     finally:
         await ws_manager.disconnect(user_id, websocket)
-

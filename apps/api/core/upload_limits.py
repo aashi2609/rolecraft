@@ -102,8 +102,6 @@ async def validate_upload(
     if not file.filename:
         raise HTTPException(status_code=400, detail="Missing filename")
 
-    safe_name = sanitize_filename(file.filename)
-
     max_bytes = _MAX_BYTES[category]
     allowed = _ALLOWED_TYPES[category]
 

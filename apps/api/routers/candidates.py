@@ -43,7 +43,10 @@ from services.subscription_service import get_active_subscription
 
 # Fields on CandidateProfileUpdate that are resume-relevant
 _RESUME_RELEVANT_FIELDS = {
-    "full_name", "career_level", "dob", "gender",
+    "full_name",
+    "career_level",
+    "dob",
+    "gender",
 }
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])

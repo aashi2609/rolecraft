@@ -31,6 +31,7 @@ class UserRole(str, enum.Enum):
 
 class ATSScoreStatus(str, enum.Enum):
     """ATS scoring status (Step 5A)."""
+
     scored = "scored"
     unavailable = "unavailable"
     error = "error"
@@ -38,6 +39,7 @@ class ATSScoreStatus(str, enum.Enum):
 
 class EmbeddingStatus(str, enum.Enum):
     """Embedding generation status (Step 5B)."""
+
     pending = "pending"
     scored = "scored"
     failed = "failed"
@@ -53,7 +55,7 @@ class PlanTier(str, enum.Enum):
     starter = "starter"
     growth = "growth"
     scale = "scale"
-    
+
     # candidate
     resume_builder = "resume_builder"
     job_search = "job_search"
@@ -64,9 +66,9 @@ class PlanTier(str, enum.Enum):
 
 
 class SubscriptionStatus(str, enum.Enum):
-    pending = "pending"     # Awaiting payment verification
-    active = "active"       # Active and in good standing
-    cancelled = "cancelled" # User cancelled or expired
+    pending = "pending"  # Awaiting payment verification
+    active = "active"  # Active and in good standing
+    cancelled = "cancelled"  # User cancelled or expired
 
 
 class JobType(str, enum.Enum):
@@ -95,20 +97,6 @@ class ApplicationStatus(str, enum.Enum):
     interview = "interview"
 
 
-class ATSScoreStatus(str, enum.Enum):
-    """Status of ATS scoring for a resume."""
-    scored = "scored"           # Successfully scored by AI
-    unavailable = "unavailable" # Scoring failed (Groq API error, etc.)
-    error = "error"            # Unexpected error during scoring
-
-
-class EmbeddingStatus(str, enum.Enum):
-    """Status of vector embedding for a resume or job."""
-    pending = "pending"         # Not yet embedded
-    scored = "scored"           # Successfully embedded
-    failed = "failed"           # Embedding API failed
-
-
 class User(Base):
     __tablename__ = "users"
 
@@ -129,13 +117,22 @@ class User(Base):
     )
 
     subscription: Mapped[Optional["Subscription"]] = relationship(
-        back_populates="user", uselist=False, cascade="all, delete-orphan", passive_deletes=True
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     candidate_profile: Mapped[Optional["CandidateProfile"]] = relationship(
-        back_populates="user", uselist=False, cascade="all, delete-orphan", passive_deletes=True
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     company: Mapped[Optional["Company"]] = relationship(
-        back_populates="user", uselist=False, cascade="all, delete-orphan", passive_deletes=True
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     notifications: Mapped[list["Notification"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", passive_deletes=True
@@ -179,6 +176,7 @@ class Subscription(Base):
 
 class SubscriptionAuditLog(Base):
     """Step 6A: Audit trail for all subscription changes."""
+
     __tablename__ = "subscription_audit_log"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -204,20 +202,19 @@ class SubscriptionAuditLog(Base):
         comment="Admin who made the change (NULL if system)",
     )
     action: Mapped[str] = mapped_column(
-        String(64), nullable=False,
-        comment="create, update_plan, update_status, cancel, delete"
+        String(64),
+        nullable=False,
+        comment="create, update_plan, update_status, cancel, delete",
     )
     old_plan_tier: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     new_plan_tier: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     old_status: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     new_status: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     reason: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True,
-        comment="Payment verified, Admin override, etc."
+        String(255), nullable=True, comment="Payment verified, Admin override, etc."
     )
     payment_transaction_id: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True,
-        comment="Transaction ID if payment-related"
+        String(255), nullable=True, comment="Transaction ID if payment-related"
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
@@ -418,16 +415,20 @@ class Resume(Base):
     content: Mapped[dict] = mapped_column(JSONB, default=dict)
     ats_score: Mapped[Optional[int]] = mapped_column(Integer)
     ats_status: Mapped[str] = mapped_column(
-        Enum(ATSScoreStatus, name="ats_score_status", create_constraint=False), 
-        default=ATSScoreStatus.unavailable.value
+        Enum(ATSScoreStatus, name="ats_score_status", create_constraint=False),
+        default=ATSScoreStatus.unavailable.value,
     )
     ats_breakdown: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
-    embedding = mapped_column(Vector(512), nullable=True)  # OpenAI text-embedding-3-small: 512 dims
+    embedding = mapped_column(
+        Vector(512), nullable=True
+    )  # OpenAI text-embedding-3-small: 512 dims
     embedding_status: Mapped[str] = mapped_column(
-        Enum(EmbeddingStatus, name="embedding_status", create_constraint=False), 
-        default=EmbeddingStatus.pending.value
+        Enum(EmbeddingStatus, name="embedding_status", create_constraint=False),
+        default=EmbeddingStatus.pending.value,
     )
-    embedding_model: Mapped[str] = mapped_column(String(64), default="text-embedding-3-small")
+    embedding_model: Mapped[str] = mapped_column(
+        String(64), default="text-embedding-3-small"
+    )
     generation_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     version: Mapped[int] = mapped_column(Integer, default=1)
     gcs_path: Mapped[Optional[str]] = mapped_column(String(1024))
@@ -498,12 +499,16 @@ class JobPosting(Base):
     status: Mapped[JobStatus] = mapped_column(
         Enum(JobStatus, name="job_status"), default=JobStatus.draft
     )
-    embedding = mapped_column(Vector(512), nullable=True)  # OpenAI text-embedding-3-small: 512 dims
+    embedding = mapped_column(
+        Vector(512), nullable=True
+    )  # OpenAI text-embedding-3-small: 512 dims
     embedding_status: Mapped[str] = mapped_column(
-        Enum(EmbeddingStatus, name="embedding_status", create_constraint=False), 
-        default=EmbeddingStatus.pending.value
+        Enum(EmbeddingStatus, name="embedding_status", create_constraint=False),
+        default=EmbeddingStatus.pending.value,
     )
-    embedding_model: Mapped[str] = mapped_column(String(64), default="text-embedding-3-small")
+    embedding_model: Mapped[str] = mapped_column(
+        String(64), default="text-embedding-3-small"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -605,7 +610,8 @@ class FitmentResult(Base):
     )
     score: Mapped[float] = mapped_column(Float, nullable=False)
     scoring_method: Mapped[str] = mapped_column(
-        String(20), default="embedding"  # "embedding" or "heuristic"
+        String(20),
+        default="embedding",  # "embedding" or "heuristic"
     )
     rationale: Mapped[Optional[str]] = mapped_column(Text)
     computed_at: Mapped[datetime] = mapped_column(
@@ -615,7 +621,11 @@ class FitmentResult(Base):
 
 class Conversation(Base):
     __tablename__ = "conversations"
-    __table_args__ = (UniqueConstraint("company_id", "candidate_id", name="uq_conversation_participants"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "company_id", "candidate_id", name="uq_conversation_participants"
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -658,7 +668,10 @@ class Message(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     conversation_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), index=True, nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
     )
     sender_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
@@ -715,7 +728,9 @@ class PasswordResetToken(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     token_hash: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     used_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -756,15 +771,17 @@ class FileRecord(Base):
 
 class PaymentStatus(str, enum.Enum):
     """Payment transaction status."""
-    pending = "pending"           # Order created, awaiting payment
-    completed = "completed"       # Payment verified and subscription activated
-    failed = "failed"             # Payment failed or declined
-    cancelled = "cancelled"       # User cancelled or admin override
-    refunded = "refunded"         # Payment refunded
+
+    pending = "pending"  # Order created, awaiting payment
+    completed = "completed"  # Payment verified and subscription activated
+    failed = "failed"  # Payment failed or declined
+    cancelled = "cancelled"  # User cancelled or admin override
+    refunded = "refunded"  # Payment refunded
 
 
 class BillingPeriod(str, enum.Enum):
     """Billing period for subscription pricing."""
+
     monthly = "monthly"
     quarterly = "quarterly"
     annual = "annual"
@@ -773,14 +790,16 @@ class BillingPeriod(str, enum.Enum):
 
 class PricePoint(Base):
     """Step 6D: Pricing table (plan_tier + period → INR paise).
-    
+
     Master table defining all pricing combinations.
     One entry per (plan_tier, billing_period) combination.
     """
-    
+
     __tablename__ = "price_points"
-    __table_args__ = (UniqueConstraint("plan_tier", "billing_period", name="uq_plan_period"),)
-    
+    __table_args__ = (
+        UniqueConstraint("plan_tier", "billing_period", name="uq_plan_period"),
+    )
+
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
@@ -790,10 +809,12 @@ class PricePoint(Base):
     billing_period: Mapped[BillingPeriod] = mapped_column(
         Enum(BillingPeriod, name="billing_period"), nullable=False, index=True
     )
-    amount_paise: Mapped[int] = mapped_column(Integer, nullable=False)  # in paise (₹0.01)
+    amount_paise: Mapped[int] = mapped_column(
+        Integer, nullable=False
+    )  # in paise (₹0.01)
     currency: Mapped[str] = mapped_column(String(3), default="INR", nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    
+
     # Audit trail
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -801,7 +822,7 @@ class PricePoint(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
-    
+
     @property
     def amount_rupees(self) -> float:
         """Convert paise to rupees."""
@@ -810,54 +831,73 @@ class PricePoint(Base):
 
 class PaymentTransaction(Base):
     """Step 6D: Payment transactions with full audit trail.
-    
+
     Records every payment attempt including:
     - Razorpay order ID, payment ID, signature verification
     - Status transitions (pending → completed/failed)
     - Full webhook data for audit
     - Subscription activation link
     """
-    
+
     __tablename__ = "payment_transactions"
-    
+
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    
+
     # User and subscription
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     subscription_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("subscriptions.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True),
+        ForeignKey("subscriptions.id", ondelete="SET NULL"),
+        nullable=True,
     )
-    
+
     # Pricing
     price_point_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("price_points.id", ondelete="RESTRICT"), nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("price_points.id", ondelete="RESTRICT"),
+        nullable=False,
     )
-    amount_paise: Mapped[int] = mapped_column(Integer, nullable=False)  # Snapshot at transaction time
-    
+    amount_paise: Mapped[int] = mapped_column(
+        Integer, nullable=False
+    )  # Snapshot at transaction time
+
     # Razorpay integration
-    razorpay_order_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
-    razorpay_payment_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True, index=True)
-    razorpay_signature: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    
+    razorpay_order_id: Mapped[str] = mapped_column(
+        String(255), nullable=False, unique=True, index=True
+    )
+    razorpay_payment_id: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True, unique=True, index=True
+    )
+    razorpay_signature: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True
+    )
+
     # Status and audit
     status: Mapped[PaymentStatus] = mapped_column(
-        Enum(PaymentStatus, name="payment_status"), default=PaymentStatus.pending, nullable=False, index=True
+        Enum(PaymentStatus, name="payment_status"),
+        default=PaymentStatus.pending,
+        nullable=False,
+        index=True,
     )
-    failure_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Error details if failed
-    
+    failure_reason: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )  # Error details if failed
+
     # Webhook data (stored for audit/debugging)
     webhook_data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
-    webhook_received_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    
+    webhook_received_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     # Idempotency and replay protection
     idempotency_key: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True, unique=True, index=True
     )  # Client-provided for replay protection
-    
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
@@ -868,12 +908,12 @@ class PaymentTransaction(Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    
+
     # Relationships
     user: Mapped["User"] = relationship(back_populates="payment_transactions")
     subscription: Mapped[Optional["Subscription"]] = relationship()
     price_point: Mapped["PricePoint"] = relationship()
-    
+
     @property
     def amount_rupees(self) -> float:
         """Convert paise to rupees."""

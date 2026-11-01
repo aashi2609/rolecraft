@@ -5,7 +5,6 @@ Tickets are short-lived, one-time use tokens issued by authenticated REST calls.
 Never expose tokens in query strings (ends up in logs/proxies).
 """
 
-import os
 import secrets
 import time
 from typing import Optional
@@ -17,7 +16,9 @@ class TicketStore:
     """Simple in-memory ticket store (single worker only)."""
 
     def __init__(self):
-        self._tickets: dict[str, dict] = {}  # ticket -> {user_id, issued_at, expires_at}
+        self._tickets: dict[
+            str, dict
+        ] = {}  # ticket -> {user_id, issued_at, expires_at}
 
     def issue(self, user_id: str) -> str:
         """Issue a one-time WebSocket ticket (valid for 5 seconds)."""
@@ -62,11 +63,11 @@ _ticket_store = TicketStore()
 def issue_websocket_ticket(user_id: str) -> str:
     """
     Issue a WebSocket authentication ticket via REST endpoint.
-    
+
     Example:
         POST /auth/ws-ticket
         Authorization: Bearer <jwt_token>
-        
+
         Response:
         {
             "ticket": "token123...",

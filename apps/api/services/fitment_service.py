@@ -29,14 +29,14 @@ async def compute_fitment(
     db: AsyncSession, job: JobPosting, limit: int = 20
 ) -> list[FitmentResult]:
     """Rank candidates by resume↔job embedding distance; skill-overlap heuristic fallback.
-    
+
     Explicitly excludes NULL embeddings (failed/pending).
     Falls back to heuristic only when job embedding failed or no real embeddings exist.
     """
     await ensure_job_embedding(db, job)
 
     rows = []
-    
+
     # Try embedding-based ranking if job has a valid embedding
     if job.embedding is not None and job.embedding_status == "scored":
         try:
@@ -59,7 +59,10 @@ async def compute_fitment(
                 .all()
             )
         except Exception as exc:
-            logger.warning("Embedding-based fitment query failed: %s. Falling back to heuristic.", exc)
+            logger.warning(
+                "Embedding-based fitment query failed: %s. Falling back to heuristic.",
+                exc,
+            )
             rows = []
 
     results: list[FitmentResult] = []
