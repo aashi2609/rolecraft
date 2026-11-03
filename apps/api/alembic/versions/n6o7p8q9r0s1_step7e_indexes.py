@@ -21,6 +21,10 @@ depends_on = None
 
 def upgrade() -> None:
     """Create indexes on large tables CONCURRENTLY to avoid locks."""
+    # CRITICAL: CREATE INDEX CONCURRENTLY requires autocommit mode (outside transaction)
+    ctx = op.get_context()
+    if ctx.is_transactional:
+        ctx.is_transactional = False
 
     # === FK Indexes (mandatory for join performance) ===
 
