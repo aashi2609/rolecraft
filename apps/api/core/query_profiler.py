@@ -87,14 +87,18 @@ def install_profiler(engine: Engine, enabled: bool = True) -> None:
 
     logger.info("Installing query profiler")
 
-    @event.listens_for(engine, "before_cursor_execute")
+    # For async engines, attach events to the sync_engine
+    # SQLAlchemy doesn't support async event listeners
+    target_engine = getattr(engine, "sync_engine", engine)
+
+    @event.listens_for(target_engine, "before_cursor_execute")
     def receive_before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
         """Called before each SQL statement is executed."""
         conn.info.setdefault("query_start_time", []).append(time.time())
         # Log statement at debug level
         logger.debug(f"SQL: {statement[:100]}")
 
-    @event.listens_for(engine, "after_cursor_execute")
+    @event.listens_for(target_engine, "after_cursor_execute")
     def receive_after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
         """Called after each SQL statement is executed."""
         try:
