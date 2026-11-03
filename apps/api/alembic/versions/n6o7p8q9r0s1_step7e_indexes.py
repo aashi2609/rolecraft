@@ -121,11 +121,11 @@ def upgrade() -> None:
         "WHERE status = 'live'"
     )
 
-    # applications(status) WHERE status IN ('pending', 'shortlisted') - active applications
+    # applications(status) WHERE status IN ('applied', 'shortlisted') - active applications
     op.execute(
         "CREATE INDEX IF NOT EXISTS ix_applications_active_status "
         "ON applications(status) "
-        "WHERE status IN ('pending', 'shortlisted')"
+        "WHERE status IN ('applied', 'shortlisted')"
     )
 
 
