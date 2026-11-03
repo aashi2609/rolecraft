@@ -13,12 +13,14 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
 from models import (
     PlanTier,
     Subscription,
     SubscriptionAuditLog,
     SubscriptionStatus,
+    User,
     UserRole,
 )
 from routers.admin import SubCreate
@@ -41,7 +43,13 @@ class TestSignupCreatesPendingSubscription:
             plan="resume_builder",
         )
         await db_session.commit()
-        await db_session.refresh(user, ["subscription"])
+        
+        # Eagerly reload to avoid lazy-load in async context
+        user = await db_session.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .options(selectinload(User.subscription))
+        )
 
         assert user.subscription is not None
         assert user.subscription.status == SubscriptionStatus.pending
@@ -60,7 +68,13 @@ class TestSignupCreatesPendingSubscription:
             plan="corporate_annual",
         )
         await db_session.commit()
-        await db_session.refresh(user, ["subscription"])
+        
+        # Eagerly reload to avoid lazy-load in async context
+        user = await db_session.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .options(selectinload(User.subscription))
+        )
 
         assert user.subscription is not None
         assert user.subscription.status == SubscriptionStatus.pending
@@ -77,7 +91,13 @@ class TestSignupCreatesPendingSubscription:
             name="Free User",
         )
         await db_session.commit()
-        await db_session.refresh(user, ["subscription"])
+        
+        # Eagerly reload to avoid lazy-load in async context
+        user = await db_session.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .options(selectinload(User.subscription))
+        )
 
         assert user.subscription.status == SubscriptionStatus.pending
         # Note: "free" is no longer a valid plan tier; defaults to job_search or similar
@@ -96,6 +116,13 @@ class TestSignupCreatesPendingSubscription:
             plan="complete",
         )
         await db_session.commit()
+        
+        # Eagerly reload to avoid lazy-load in async context
+        user = await db_session.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .options(selectinload(User.subscription))
+        )
 
         # Subscription is pending, not active
         assert user.subscription.status == SubscriptionStatus.pending
@@ -116,6 +143,13 @@ class TestAuditLogging:
             plan="job_search",
         )
         await db_session.commit()
+        
+        # Eagerly reload to avoid lazy-load in async context
+        user = await db_session.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .options(selectinload(User.subscription))
+        )
 
         # Check audit log
         audit = await db_session.scalar(
@@ -141,7 +175,13 @@ class TestAuditLogging:
             plan="resume_builder",
         )
         await db_session.commit()
-        await db_session.refresh(user, ["subscription"])
+        
+        # Eagerly reload to avoid lazy-load in async context
+        user = await db_session.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .options(selectinload(User.subscription))
+        )
         
         sub_id = user.subscription.id
         user_id = user.id
@@ -201,6 +241,13 @@ class TestAdminCannotManuallyActivate:
             plan="job_search",
         )
         await db_session.commit()
+        
+        # Eagerly reload to avoid lazy-load in async context
+        user = await db_session.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .options(selectinload(User.subscription))
+        )
 
         # Admin upgrades plan (but status stays pending)
         old_status = user.subscription.status.value
@@ -246,6 +293,13 @@ class TestSoftDelete:
             role=UserRole.candidate,
         )
         await db_session.commit()
+        
+        # Eagerly reload to avoid lazy-load in async context
+        user = await db_session.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .options(selectinload(User.subscription))
+        )
 
         sub_id = user.subscription.id
         user_id = user.id
@@ -293,6 +347,13 @@ class TestSubscriptionTransitions:
             role=UserRole.candidate,
         )
         await db_session.commit()
+        
+        # Eagerly reload to avoid lazy-load in async context
+        user = await db_session.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .options(selectinload(User.subscription))
+        )
 
         assert user.subscription.status == SubscriptionStatus.pending
 
@@ -313,7 +374,13 @@ class TestSubscriptionTransitions:
             payment_transaction_id="razorpay_payment_id",
         )
         await db_session.commit()
-        await db_session.refresh(user, ["subscription"])
+        
+        # Eagerly reload again to verify changes
+        user = await db_session.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .options(selectinload(User.subscription))
+        )
 
         assert user.subscription.status == SubscriptionStatus.active
         assert user.subscription.renews_at is not None
@@ -326,6 +393,15 @@ class TestSubscriptionTransitions:
             password="Test1234!",
             role=UserRole.candidate,
         )
+        await db_session.commit()
+        
+        # Eagerly reload to avoid lazy-load in async context
+        user = await db_session.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .options(selectinload(User.subscription))
+        )
+        
         # Manually set to active for test
         user.subscription.status = SubscriptionStatus.active
         await db_session.commit()
@@ -341,7 +417,13 @@ class TestSubscriptionTransitions:
             reason="User cancellation request",
         )
         await db_session.commit()
-        await db_session.refresh(user, ["subscription"])
+        
+        # Eagerly reload again to verify changes
+        user = await db_session.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .options(selectinload(User.subscription))
+        )
 
         assert user.subscription.status == SubscriptionStatus.cancelled
 
@@ -361,7 +443,13 @@ class TestNoBackdoorActivation:
             name="Bypass Test",
         )
         await db_session.commit()
-        await db_session.refresh(user, ["subscription"])
+        
+        # Eagerly reload to avoid lazy-load in async context
+        user = await db_session.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .options(selectinload(User.subscription))
+        )
         
         # Verify the created subscription defaults to pending
         assert user.subscription.status == SubscriptionStatus.pending
@@ -401,7 +489,13 @@ class TestAuditLogIntegrity:
             plan="complete",
         )
         await db_session.commit()
-        await db_session.refresh(user, ["subscription"])
+        
+        # Eagerly reload to avoid lazy-load in async context
+        user = await db_session.scalar(
+            select(User)
+            .where(User.id == user.id)
+            .options(selectinload(User.subscription))
+        )
         
         admin_id = admin_user.id
         sub_id = user.subscription.id

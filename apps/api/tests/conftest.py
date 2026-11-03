@@ -204,8 +204,18 @@ async def other_company_user(db_session):
 
 @pytest_asyncio.fixture
 async def admin_user(db_session):
-    """Create an admin user for testing - uses the same ID as test_deactivation.py expects."""
+    """Create or get an admin user for testing. Uses fixed UUID so tests are idempotent."""
     admin_id = uuid.UUID("b55c77e8-1a01-4f9c-a1ff-4568879121c7")
+    
+    # Always try to fetch first - don't assume it doesn't exist
+    existing = await db_session.scalar(select(User).where(User.id == admin_id))
+    if existing:
+        # Ensure detached state - expunge and re-merge to avoid session issues
+        db_session.expunge(existing)
+        existing = await db_session.scalar(select(User).where(User.id == admin_id))
+        return existing
+    
+    # Create new only if truly doesn't exist
     user = User(
         id=admin_id,
         email="admin@test.com",
@@ -222,8 +232,17 @@ async def admin_user(db_session):
 
 @pytest_asyncio.fixture
 async def unpaid_company_user(db_session):
-    """Create a company user with cancelled subscription for testing unpaid access."""
+    """Create or get a company user with cancelled subscription for testing unpaid access."""
     company_id = uuid.UUID("5f7f4c5d-6fb3-41e1-8b12-5bb7d1670de1")
+    
+    # Always try to fetch first
+    existing = await db_session.scalar(select(User).where(User.id == company_id))
+    if existing:
+        db_session.expunge(existing)
+        existing = await db_session.scalar(select(User).where(User.id == company_id))
+        return existing
+    
+    # Create new only if doesn't exist
     user = User(
         id=company_id,
         email="unpaid_company@test.com",

@@ -137,8 +137,10 @@ async def create_job(
     await db.flush()
     await refresh_job_embedding(db, job)
 
-    # Load company for enrichment
-    await db.refresh(job)
+    # Eagerly load company for enrichment (avoid lazy-load in async context)
+    job = await db.scalar(
+        select(JobPosting).where(JobPosting.id == job.id).options(selectinload(JobPosting.company))
+    )
     return await enrich_job(job, company=job.company, stats=None)
 
 

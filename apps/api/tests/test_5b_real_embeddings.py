@@ -272,10 +272,11 @@ class TestRefreshEmbeddingHandlesFailure:
             embedding_status=EmbeddingStatus.pending.value,
         )
 
-        # Mock query to return resumes
+        # Mock execute to return an async context that yields scalars
         mock_result = AsyncMock()
         mock_result.scalars.return_value.all.return_value = [resume1, resume2]
-        mock_db.execute.return_value = mock_result
+        mock_db.execute = AsyncMock(return_value=mock_result)
+        mock_db.flush = AsyncMock()
 
         # Mock embed_text to succeed
         with patch("services.embedding_service.embed_text") as mock_embed:
@@ -285,8 +286,8 @@ class TestRefreshEmbeddingHandlesFailure:
                 mock_db, resume1.candidate_id
             )
 
-            # Should have attempted to embed both resumes
-            assert success_count >= 0
+            # Should have successfully embedded both resumes
+            assert success_count == 2
 
 
 class TestFitmentScoringMethodTracking:

@@ -75,19 +75,22 @@ def total_experience_years(
 
     for from_dt, to_dt, is_internship in merged:
         days = (to_dt - from_dt).days
-        if is_internship and include_internships:
+        
+        if is_internship:
+            # Always count internship days separately
             internship_days += days
-        elif not is_internship:
+            # Only add to total if include_internships is True
+            if include_internships:
+                total_days += days
+        else:
+            # Always count non-internship days toward total
             total_days += days
 
     total_years = round(total_days / 365.25, 1)
     internship_years = round(internship_days / 365.25, 1)
 
-    # Decide internship contribution
-    if include_internships:
-        return round(total_years + internship_years, 1), internship_years
-    else:
-        return total_years, internship_years
+    # Return total (which may or may not include internships based on flag) and separate internship_years
+    return total_years, internship_years
 
 
 def _to_date(value) -> Optional[date]:

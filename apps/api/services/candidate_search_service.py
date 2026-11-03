@@ -6,7 +6,7 @@ import re
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Integer, func, or_, select
+from sqlalchemy import Integer, and_, func, or_, select
 from sqlalchemy.orm import selectinload
 
 from models import CandidateProfile, CandidateSkill, Education, Experience, Skill, User
@@ -143,7 +143,8 @@ def apply_salary_filter(
         conditions.append(Experience.expected_salary.isnot(None))
 
     if conditions:
-        query = query.where(or_(*conditions) if len(conditions) > 1 else conditions[0])
+        # Use and_() to combine all conditions (salary must be >= min AND <= max)
+        query = query.where(and_(*conditions))
 
     return query
 
