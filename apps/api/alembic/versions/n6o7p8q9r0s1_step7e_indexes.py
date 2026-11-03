@@ -9,8 +9,10 @@ These indexes were added after EXPLAIN ANALYZE on hot queries:
 - Composite indexes for common WHERE + ORDER BY patterns
 - Partial indexes for status filters (to reduce index size)
 
-NOTE: CREATE INDEX CONCURRENTLY requires autocommit mode.
-This migration runs outside a transaction block.
+CRITICAL: In async migrations, CREATE INDEX CONCURRENTLY requires
+committing the transaction first, then executing outside the transaction.
+Solution: Remove CONCURRENTLY since this is a new repo with no prod data.
+Production indexes can be added with CONCURRENTLY in a follow-up maintenance task.
 """
 
 from alembic import op
@@ -21,55 +23,59 @@ down_revision = "m5n6o7p8q9r0"
 branch_labels = None
 depends_on = None
 
-# CRITICAL: This migration uses CREATE INDEX CONCURRENTLY which requires autocommit
-# Alembic handles this automatically when operations outside transaction are detected
-isolation_level = "AUTOCOMMIT"
-
 
 def upgrade() -> None:
-    """Create indexes on large tables CONCURRENTLY to avoid locks."""
+    """Create indexes on tables.
+    
+    NOTE: Uses CREATE INDEX (not CONCURRENTLY) since we're migrating
+    on a fresh database with no production traffic. This allows the migration
+    to work within Alembic's transaction model.
+    
+    On production DBs with existing data, use a maintenance window with:
+      psql -c "CREATE INDEX CONCURRENTLY ..." (outside transaction)
+    """
     
     # === FK Indexes (mandatory for join performance) ===
 
     # applications(job_id) - used in hot queries for job applications lookup
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_applications_job_id "
+        "CREATE INDEX IF NOT EXISTS ix_applications_job_id "
         "ON applications(job_id)"
     )
 
     # applications(candidate_id) - used for my_applications lookup
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_applications_candidate_id "
+        "CREATE INDEX IF NOT EXISTS ix_applications_candidate_id "
         "ON applications(candidate_id)"
     )
 
     # messages(conversation_id) - used for thread message lookup
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_messages_conversation_id "
+        "CREATE INDEX IF NOT EXISTS ix_messages_conversation_id "
         "ON messages(conversation_id)"
     )
 
     # notifications(user_id) - used for user's notifications lookup
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_notifications_user_id "
+        "CREATE INDEX IF NOT EXISTS ix_notifications_user_id "
         "ON notifications(user_id)"
     )
 
     # resumes(candidate_id) - used for candidate's resumes lookup
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_resumes_candidate_id "
+        "CREATE INDEX IF NOT EXISTS ix_resumes_candidate_id "
         "ON resumes(candidate_id)"
     )
 
     # fitment_results(candidate_id) - used for candidate fitment scores
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_fitment_results_candidate_id "
+        "CREATE INDEX IF NOT EXISTS ix_fitment_results_candidate_id "
         "ON fitment_results(candidate_id)"
     )
 
     # fitment_results(job_id) - used for job fitment scores
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_fitment_results_job_id "
+        "CREATE INDEX IF NOT EXISTS ix_fitment_results_job_id "
         "ON fitment_results(job_id)"
     )
 
@@ -77,32 +83,32 @@ def upgrade() -> None:
 
     # job_postings(status, created_at DESC) - live jobs browse, high volume query
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_job_postings_status_created "
+        "CREATE INDEX IF NOT EXISTS ix_job_postings_status_created "
         "ON job_postings(status, created_at DESC) "
         "WHERE status = 'live'"  # Partial index to reduce size
     )
 
     # applications(job_id, status) - filter applications by status within a job
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_applications_job_status "
+        "CREATE INDEX IF NOT EXISTS ix_applications_job_status "
         "ON applications(job_id, status)"
     )
 
     # applications(candidate_id, applied_at DESC) - candidate's applications, newest first
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_applications_candidate_applied "
+        "CREATE INDEX IF NOT EXISTS ix_applications_candidate_applied "
         "ON applications(candidate_id, applied_at DESC)"
     )
 
     # messages(conversation_id, sent_at DESC) - thread messages, newest first
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_messages_conversation_sent "
+        "CREATE INDEX IF NOT EXISTS ix_messages_conversation_sent "
         "ON messages(conversation_id, sent_at DESC)"
     )
 
     # notifications(user_id, is_read, created_at DESC) - unread notifications, newest first
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_notifications_user_read_created "
+        "CREATE INDEX IF NOT EXISTS ix_notifications_user_read_created "
         "ON notifications(user_id, is_read, created_at DESC)"
     )
 
@@ -110,14 +116,14 @@ def upgrade() -> None:
 
     # job_postings(company_id) WHERE status='live' - active jobs for company
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_job_postings_company_live "
+        "CREATE INDEX IF NOT EXISTS ix_job_postings_company_live "
         "ON job_postings(company_id, created_at DESC) "
         "WHERE status = 'live'"
     )
 
     # applications(status) WHERE status IN ('pending', 'shortlisted') - active applications
     op.execute(
-        "CREATE INDEX CONCURRENTLY IF NOT EXISTS ix_applications_active_status "
+        "CREATE INDEX IF NOT EXISTS ix_applications_active_status "
         "ON applications(status) "
         "WHERE status IN ('pending', 'shortlisted')"
     )
@@ -126,17 +132,17 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Drop all created indexes."""
 
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_applications_job_id")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_applications_candidate_id")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_messages_conversation_id")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_notifications_user_id")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_resumes_candidate_id")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_fitment_results_candidate_id")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_fitment_results_job_id")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_job_postings_status_created")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_applications_job_status")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_applications_candidate_applied")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_messages_conversation_sent")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_notifications_user_read_created")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_job_postings_company_live")
-    op.execute("DROP INDEX CONCURRENTLY IF EXISTS ix_applications_active_status")
+    op.execute("DROP INDEX IF EXISTS ix_applications_job_id")
+    op.execute("DROP INDEX IF EXISTS ix_applications_candidate_id")
+    op.execute("DROP INDEX IF EXISTS ix_messages_conversation_id")
+    op.execute("DROP INDEX IF EXISTS ix_notifications_user_id")
+    op.execute("DROP INDEX IF EXISTS ix_resumes_candidate_id")
+    op.execute("DROP INDEX IF EXISTS ix_fitment_results_candidate_id")
+    op.execute("DROP INDEX IF EXISTS ix_fitment_results_job_id")
+    op.execute("DROP INDEX IF EXISTS ix_job_postings_status_created")
+    op.execute("DROP INDEX IF EXISTS ix_applications_job_status")
+    op.execute("DROP INDEX IF EXISTS ix_applications_candidate_applied")
+    op.execute("DROP INDEX IF EXISTS ix_messages_conversation_sent")
+    op.execute("DROP INDEX IF EXISTS ix_notifications_user_read_created")
+    op.execute("DROP INDEX IF EXISTS ix_job_postings_company_live")
+    op.execute("DROP INDEX IF EXISTS ix_applications_active_status")
