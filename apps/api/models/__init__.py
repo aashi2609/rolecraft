@@ -97,6 +97,25 @@ class ApplicationStatus(str, enum.Enum):
     interview = "interview"
 
 
+class PaymentStatus(str, enum.Enum):
+    """Step 6D: Payment transaction status."""
+
+    pending = "pending"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+    refunded = "refunded"
+
+
+class BillingPeriod(str, enum.Enum):
+    """Step 6D: Billing period for pricing."""
+
+    monthly = "monthly"
+    quarterly = "quarterly"
+    annual = "annual"
+    lifetime = "lifetime"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -763,10 +782,10 @@ class PaymentTransaction(Base):
 
     # Razorpay integration
     razorpay_order_id: Mapped[str] = mapped_column(
-        String(255), nullable=False, unique=True, index=True
+        String(255), nullable=False, unique=True
     )
     razorpay_payment_id: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True, unique=True, index=True
+        String(255), nullable=True, unique=True
     )
     razorpay_signature: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
@@ -789,7 +808,7 @@ class PaymentTransaction(Base):
 
     # Idempotency and replay protection
     idempotency_key: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True, unique=True, index=True
+        String(255), nullable=True, unique=True
     )  # Client-provided for replay protection
 
     # Timestamps

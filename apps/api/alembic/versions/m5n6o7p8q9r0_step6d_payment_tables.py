@@ -184,16 +184,8 @@ def upgrade() -> None:
         "payment_transactions",
         ["user_id"],
     )
-    op.create_index(
-        "ix_payment_transactions_razorpay_order_id",
-        "payment_transactions",
-        ["razorpay_order_id"],
-    )
-    op.create_index(
-        "ix_payment_transactions_razorpay_payment_id",
-        "payment_transactions",
-        ["razorpay_payment_id"],
-    )
+    # Note: razorpay_order_id, razorpay_payment_id, and idempotency_key have UNIQUE constraints
+    # which automatically create indexes in PostgreSQL, so we don't create separate indexes for them.
     op.create_index(
         "ix_payment_transactions_status",
         "payment_transactions",
