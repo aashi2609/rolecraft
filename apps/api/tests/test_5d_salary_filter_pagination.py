@@ -38,7 +38,7 @@ class TestSalaryFilterBeforePagination:
 
         await db_session.commit()
 
-        # Request page 1, salary 10-20 LPA (matches 12 candidates)
+        # Request page 1, salary 10-20 LPA (matches 11 candidates: 10,11,12,13,14,15,16,17,18,19,20)
         result, total = await search_candidates(
             db_session,
             salary_min=10,
@@ -48,7 +48,7 @@ class TestSalaryFilterBeforePagination:
         )
 
         assert len(result) == 10
-        assert total == 12
+        assert total == 11
 
     async def test_total_count_includes_salary_filter(self, db_session):
         """Total count reflects salary filter applied BEFORE LIMIT/OFFSET."""

@@ -119,33 +119,39 @@ def apply_salary_filter(
 
     Filters Experience.expected_salary (parsed as integer LPA).
     Salary is parsed from strings like "8-12 LPA" or "8 LPA".
+    
+    NOTE: Does NOT join Experience here - it's joined by apply_title_filter if needed,
+    or we use a subquery approach to avoid Cartesian products from multiple Experience outerjoin calls.
     """
     if salary_min is None and salary_max is None:
         return query
 
-    # Join Experience if not already joined
-    query = query.outerjoin(Experience, CandidateProfile.user_id == Experience.candidate_id)
-
-    # Build salary conditions
-    conditions = []
-
-    # Extract first number from expected_salary string (e.g., "8-12 LPA" → 8)
+    # Use a subquery-based approach to filter by salary without multiple outerjoin calls
+    # Create a subquery that checks salary conditions
     salary_expr = func.cast(func.substring(Experience.expected_salary, r"^\d+"), Integer)
-
+    
+    conditions = []
     if salary_min is not None:
         conditions.append(salary_expr >= salary_min)
-
     if salary_max is not None:
         conditions.append(salary_expr <= salary_max)
-
     if not include_null_salary:
-        # Exclude NULL salaries when filter is active
         conditions.append(Experience.expected_salary.isnot(None))
-
-    if conditions:
-        # Use and_() to combine all conditions (salary must be >= min AND <= max)
-        query = query.where(and_(*conditions))
-
+    
+    if not conditions:
+        return query
+    
+    # Get candidate IDs that match the salary criteria
+    salary_subquery = (
+        select(Experience.candidate_id)
+        .where(and_(*conditions))
+        .distinct()
+        .subquery()
+    )
+    
+    # Filter CandidateProfiles to only those with matching salary
+    query = query.where(CandidateProfile.user_id.in_(select(salary_subquery.c.candidate_id)))
+    
     return query
 
 

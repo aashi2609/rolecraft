@@ -34,8 +34,8 @@ def downgrade() -> None:
         ALTER TABLE subscriptions 
             ALTER COLUMN status TYPE subscription_status_new 
             USING CASE 
-                WHEN status = 'pending'::text THEN 'active'::subscription_status_new
-                ELSE status::subscription_status_new
+                WHEN status::text = 'pending' THEN 'active'::subscription_status_new
+                ELSE status::text::subscription_status_new
             END
     """)
     

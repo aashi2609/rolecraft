@@ -231,7 +231,7 @@ class TestAdminCannotManuallyActivate:
         # Placeholder for integration test - skip for now
         pytest.skip("Integration test placeholder - requires full route setup")
 
-    async def test_admin_can_modify_plan_tier(self, db_session):
+    async def test_admin_can_modify_plan_tier(self, db_session, admin_user):
         """Admin can still change plan_tier (just not status to active)."""
         user = await create_user_with_profile(
             db=db_session,
@@ -259,7 +259,7 @@ class TestAdminCannotManuallyActivate:
             db=db_session,
             subscription_id=user.subscription.id,
             user_id=user.id,
-            admin_id=uuid4(),
+            admin_id=admin_user.id,
             action="update",
             old_plan_tier=old_plan,
             new_plan_tier=PlanTier.complete.value,
@@ -283,7 +283,7 @@ class TestSoftDelete:
         # Placeholder for route testing - skip for now
         pytest.skip("Integration test placeholder - requires full route setup")
 
-    async def test_mark_as_cancelled_preserves_audit(self, db_session):
+    async def test_mark_as_cancelled_preserves_audit(self, db_session, admin_user):
         """Cancelling a subscription preserves audit history."""
 
         user = await create_user_with_profile(
@@ -317,7 +317,7 @@ class TestSoftDelete:
             db=db_session,
             subscription_id=sub_id,
             user_id=user_id,
-            admin_id=uuid4(),
+            admin_id=admin_user.id,
             action="cancel",
             old_status="pending",
             new_status="cancelled",

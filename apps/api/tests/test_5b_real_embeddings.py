@@ -273,13 +273,17 @@ class TestRefreshEmbeddingHandlesFailure:
         )
 
         # Mock execute to return an async context that yields scalars
+        mock_scalars = MagicMock()
+        mock_scalars.all.return_value = [resume1, resume2]
+        
         mock_result = AsyncMock()
-        mock_result.scalars.return_value.all.return_value = [resume1, resume2]
+        mock_result.scalars.return_value = mock_scalars
+        
         mock_db.execute = AsyncMock(return_value=mock_result)
         mock_db.flush = AsyncMock()
 
         # Mock embed_text to succeed
-        with patch("services.embedding_service.embed_text") as mock_embed:
+        with patch("services.embedding_service.embed_text", new_callable=AsyncMock) as mock_embed:
             mock_embed.return_value = [0.1] * 512
 
             success_count = await refresh_resume_embeddings_for_candidate(

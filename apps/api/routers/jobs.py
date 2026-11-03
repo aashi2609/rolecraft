@@ -247,7 +247,7 @@ async def get_job(
         is_owner = user is not None and user.role == UserRole.company and job.company_id == user.id
         if not is_owner:
             raise HTTPException(status_code=404, detail="Job not found")
-    return await enrich_job(db, job)
+    return await enrich_job(job)
 
 
 @router.put("/{job_id:uuid}", response_model=JobOut)
@@ -269,7 +269,7 @@ async def update_job(job_id: UUID, body: JobUpdate, user: CompanyUser, db: DbSes
             setattr(job, k, v)
     await db.flush()
     await refresh_job_embedding(db, job)
-    return await enrich_job(db, job)
+    return await enrich_job(job)
 
 
 @router.patch("/{job_id:uuid}/status", response_model=JobOut)
@@ -279,7 +279,7 @@ async def patch_status(job_id: UUID, body: JobStatusUpdate, user: CompanyUser, d
         raise HTTPException(status_code=404, detail="Not found")
     job.status = coerce_enum(JobStatus, body.status, "status", allow_none=False)
     await db.flush()
-    return await enrich_job(db, job)
+    return await enrich_job(job)
 
 
 @router.get("/{job_id:uuid}/candidates", response_model=list[FitmentCandidateOut])
