@@ -8,6 +8,9 @@ These indexes were added after EXPLAIN ANALYZE on hot queries:
 - FK columns without indexes to enable efficient joins
 - Composite indexes for common WHERE + ORDER BY patterns
 - Partial indexes for status filters (to reduce index size)
+
+NOTE: CREATE INDEX CONCURRENTLY requires autocommit mode.
+This migration runs outside a transaction block.
 """
 
 from alembic import op
@@ -18,14 +21,14 @@ down_revision = "m5n6o7p8q9r0"
 branch_labels = None
 depends_on = None
 
+# CRITICAL: This migration uses CREATE INDEX CONCURRENTLY which requires autocommit
+# Alembic handles this automatically when operations outside transaction are detected
+isolation_level = "AUTOCOMMIT"
+
 
 def upgrade() -> None:
     """Create indexes on large tables CONCURRENTLY to avoid locks."""
-    # CRITICAL: CREATE INDEX CONCURRENTLY requires autocommit mode (outside transaction)
-    ctx = op.get_context()
-    if ctx.is_transactional:
-        ctx.is_transactional = False
-
+    
     # === FK Indexes (mandatory for join performance) ===
 
     # applications(job_id) - used in hot queries for job applications lookup
