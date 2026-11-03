@@ -15,6 +15,7 @@ on:
 defaults:
   run:
     working-directory: apps/api
+    shell: bash
 
 jobs:
   test:
@@ -57,8 +58,13 @@ jobs:
 
       - name: Show interpreter
         run: |
-          pwd
+          set -euo pipefail
+          echo "=== Python Version ===" 
           python --version
+          echo "=== Working Directory ===" 
+          pwd
+          echo "=== Environment ===" 
+          env | grep -i "python\|database" || true
 
       - name: Install dependencies
         run: |
@@ -72,10 +78,15 @@ jobs:
 
       - name: Alembic single head
         run: |
+          set -euo pipefail
           export PYTHONPATH=.
           heads=$(alembic heads)
           echo "$heads"
-          echo "$heads" | wc -l | grep -q '^ *1$'
+          head_count=$(echo "$heads" | wc -l)
+          if [ "$head_count" -ne 1 ]; then
+            echo "ERROR: Expected 1 Alembic head, got $head_count"
+            exit 1
+          fi
 
       - name: Alembic upgrade head (empty DB)
         run: |
@@ -89,5 +100,16 @@ jobs:
 
       - name: Pytest (isolation + unit + migrations)
         run: |
+          set -euo pipefail
           export PYTHONPATH=.
-          python -m pytest tests/ -q --tb=line
+          python -m pytest tests/ -v --tb=short --junit-xml=pytest.xml 2>&1 | tee pytest.log
+          exit "${PIPESTATUS[0]}"
+        
+      - name: Upload pytest artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results
+          path: |
+            apps/api/pytest.log
+            apps/api/pytest.xml
