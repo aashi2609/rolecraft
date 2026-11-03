@@ -50,11 +50,9 @@ def test_search_candidate_token_returns_403(client: TestClient) -> None:
     assert "Forbidden" in r.text or "restricted" in r.text.lower()
 
 
-def test_search_unpaid_company_returns_403(client: TestClient) -> None:
+def test_search_unpaid_company_returns_403(client: TestClient, unpaid_company_user) -> None:
     """A company user whose subscription is cancelled / inactive gets 403 with upgrade message."""
-    # User 5f7f4c5d-6fb3-41e1-8b12-5bb7d1670de1 is a company user with SubscriptionStatus.cancelled in DB
-    cancelled_company_id = uuid.UUID("5f7f4c5d-6fb3-41e1-8b12-5bb7d1670de1")
-    unpaid_token = create_access_token(user_id=cancelled_company_id, role="company")
+    unpaid_token = create_access_token(user_id=unpaid_company_user.id, role="company")
 
     r = client.get(
         "/candidates/search",
@@ -105,10 +103,9 @@ def test_search_paid_company_returns_200_and_no_pii_keys(client: TestClient) -> 
         )
 
 
-def test_search_admin_allowed(client: TestClient) -> None:
+def test_search_admin_allowed(client: TestClient, admin_user) -> None:
     """Admin role is allowed to search candidates without requiring a company subscription."""
-    admin_id = uuid.UUID("b55c77e8-1a01-4f9c-a1ff-4568879121c7")
-    admin_token = create_access_token(user_id=admin_id, role="admin")
+    admin_token = create_access_token(user_id=admin_user.id, role="admin")
 
     r = client.get(
         "/candidates/search",

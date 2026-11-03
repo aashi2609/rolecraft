@@ -203,10 +203,61 @@ async def other_company_user(db_session):
 
 
 @pytest_asyncio.fixture
+async def admin_user(db_session):
+    """Create an admin user for testing - uses the same ID as test_deactivation.py expects."""
+    admin_id = uuid.UUID("b55c77e8-1a01-4f9c-a1ff-4568879121c7")
+    user = User(
+        id=admin_id,
+        email="admin@test.com",
+        password_hash="$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6",  # "password"
+        role=UserRole.admin,
+        is_active=True,
+        token_version=1,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def unpaid_company_user(db_session):
+    """Create a company user with cancelled subscription for testing unpaid access."""
+    company_id = uuid.UUID("5f7f4c5d-6fb3-41e1-8b12-5bb7d1670de1")
+    user = User(
+        id=company_id,
+        email="unpaid_company@test.com",
+        password_hash="$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6",  # "password"
+        role=UserRole.company,
+        is_active=True,
+        token_version=1,
+    )
+    db_session.add(user)
+
+    company = Company(user_id=user.id, name="Unpaid Company")
+    db_session.add(company)
+    
+    # Create cancelled subscription
+    subscription = Subscription(
+        id=uuid.uuid4(),
+        user_id=user.id,
+        role=UserRole.company,
+        plan_tier=PlanTier.starter,
+        status=SubscriptionStatus.cancelled,
+    )
+    db_session.add(subscription)
+    
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
 async def candidate_client(candidate_user):
     """Authenticated AsyncClient for candidate user."""
+    from httpx import ASGITransport
     token = create_access_token(user_id=candidate_user.id, role="candidate")
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         client.headers["Authorization"] = f"Bearer {token}"
         yield client
 
@@ -214,8 +265,9 @@ async def candidate_client(candidate_user):
 @pytest_asyncio.fixture
 async def company_client(company_user):
     """Authenticated AsyncClient for company user."""
+    from httpx import ASGITransport
     token = create_access_token(user_id=company_user.id, role="company")
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         client.headers["Authorization"] = f"Bearer {token}"
         yield client
 
@@ -223,8 +275,9 @@ async def company_client(company_user):
 @pytest_asyncio.fixture
 async def other_company_client(other_company_user):
     """Authenticated AsyncClient for other company user."""
+    from httpx import ASGITransport
     token = create_access_token(user_id=other_company_user.id, role="company")
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         client.headers["Authorization"] = f"Bearer {token}"
         yield client
 

@@ -59,9 +59,10 @@ if not settings.is_production:
     from core.database import engine
     from core.query_profiler import ProfilerMiddleware, install_profiler
 
-    app.add_middleware(ProfilerMiddleware, enabled=True)
-    install_profiler(engine, enabled=True)
-    logger.info("Query profiler enabled (dev/test mode)")
+    # Query profiler disabled temporarily (causes greenlet issues in async tests)
+    # app.add_middleware(ProfilerMiddleware, enabled=True)
+    # install_profiler(engine, enabled=True)
+    logger.info("Query profiler disabled (pre-staging baseline)")
 
 # Request ID middleware
 app.add_middleware(RequestIdMiddleware)

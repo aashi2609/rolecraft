@@ -31,9 +31,9 @@ _ADMIN_ID = uuid.UUID("b55c77e8-1a01-4f9c-a1ff-4568879121c7")
 
 
 @pytest.fixture
-def admin_token() -> str:
+def admin_token(admin_user) -> str:
     """JWT token for the seeded admin user."""
-    return create_access_token(user_id=_ADMIN_ID, role="admin")
+    return create_access_token(user_id=admin_user.id, role="admin")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
