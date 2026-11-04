@@ -20,6 +20,7 @@ from routers import (
     auth,
     candidates,
     companies,
+    conversations,
     files,
     jobs,
     messages,
@@ -281,6 +282,7 @@ app.include_router(auth.router)
 app.include_router(candidates.router)
 app.include_router(resumes.router)
 app.include_router(companies.router)
+app.include_router(conversations.router)
 app.include_router(jobs.router)
 app.include_router(applications.router)
 app.include_router(messages.router)

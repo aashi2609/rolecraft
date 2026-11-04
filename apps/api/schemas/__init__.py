@@ -534,6 +534,16 @@ class ApplicationOut(ORMModel):
 # ── Messages / Notifications / Subscriptions ──────────────────────────────────
 
 
+class ConversationOut(ORMModel):
+    """Conversation response schema."""
+    id: UUID
+    candidate_id: UUID
+    company_id: UUID
+    job_id: Optional[UUID] = None
+    created_at: datetime
+    last_message_at: datetime
+
+
 class MessageCreate(BaseModel):
     body: str
     recipient_id: Optional[UUID] = None

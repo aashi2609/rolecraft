@@ -33,7 +33,7 @@ class TestConversationAuthorization:
             f"Expected 201, got {response.status_code}: {response.text}"
         )
         data = response.json()
-        assert data["status"] == "open"
+        assert "id" in data
         assert str(data["candidate_id"]) == str(candidate_user.id)
 
     async def test_candidate_cannot_initiate_conversation(

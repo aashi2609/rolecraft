@@ -127,10 +127,14 @@ def apply_salary_filter(
     conditions = []
 
     # Extract first number from expected_salary string (e.g., "8-12 LPA" → 8)
-    # Use CAST to handle numeric prefix, then REGEXP_MATCHES for PostgreSQL regex support
-    # PostgreSQL: split_part first word and cast to integer
+    # Using simple substring extraction: get chars until first non-digit
+    # For "8 LPA" → "8", for "8-12 LPA" → "8"
     salary_expr = func.cast(
-        func.split_part(Experience.expected_salary, ' ', 1),
+        func.regexp_replace(
+            Experience.expected_salary,
+            r'^(\d+).*',  # Capture first sequence of digits
+            r'\1'         # Replace with just those digits
+        ),
         Integer
     )
 

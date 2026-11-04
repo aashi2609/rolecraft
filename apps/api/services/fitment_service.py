@@ -5,11 +5,12 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
+import sqlalchemy.exc
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import FitmentResult, JobPosting, Resume
-from services.embedding_service import refresh_job_embedding
+from services.embedding_service import refresh_job_embedding, EmbeddingError
 from services.fitment_rationale_service import (
     generate_fitment_rationale,
     template_rationale,
@@ -58,12 +59,26 @@ async def compute_fitment(
                 .mappings()
                 .all()
             )
-        except Exception as exc:
+        except (
+            sqlalchemy.exc.DatabaseError,
+            sqlalchemy.exc.OperationalError,
+            EmbeddingError,
+            TypeError,  # NULL embedding causes type error
+        ) as exc:
             logger.warning(
-                "Embedding-based fitment query failed: %s. Falling back to heuristic.",
+                "Embedding-based fitment query failed (%s: %s). Falling back to heuristic.",
+                type(exc).__name__,
                 exc,
             )
             rows = []
+        except Exception as exc:
+            # Re-raise unexpected errors (dimension mismatch, SQL errors, etc.)
+            logger.error(
+                "Unexpected error in embedding fitment: %s: %s",
+                type(exc).__name__,
+                exc,
+            )
+            raise
 
     results: list[FitmentResult] = []
     if rows:

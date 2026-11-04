@@ -269,3 +269,47 @@ class TestSalaryFilterBeforePagination:
         # Check no duplicates
         assert len(all_ids) == len(set(all_ids))
         assert len(all_ids) == 30
+
+
+    async def test_salary_filter_various_formats(self, db_session):
+        """Salary filter correctly extracts leading number from various formats."""
+        formats = {
+            "8 LPA": 8,
+            "8-12 LPA": 8,
+            "8 - 12 LPA": 8,
+            "8-12,000 LPA": 8,
+            "₹8L": None,  # Non-numeric prefix - CAST will fail, excluded
+        }
+        
+        for salary_str, expected_min in formats.items():
+            user = User(
+                id=uuid4(),
+                email=f"salary_test_{salary_str.replace(' ', '_')}@test.com",
+                password_hash="h",
+                role=UserRole.candidate,
+                is_active=True,
+            )
+            db_session.add(user)
+            profile = CandidateProfile(user_id=user.id, weblinks={})
+            db_session.add(profile)
+            exp = Experience(
+                candidate_id=user.id,
+                role="Dev",
+                expected_salary=salary_str,
+            )
+            db_session.add(exp)
+        
+        await db_session.commit()
+        
+        # Query for salary_min=8
+        result, total = await search_candidates(
+            db_session,
+            salary_min=8,
+            salary_max=100,
+            page=1,
+            page_size=100,
+        )
+        
+        # Should match: "8 LPA", "8-12 LPA", "8 - 12 LPA", "8-12,000 LPA"
+        # Should NOT match: "₹8L" (non-numeric)
+        assert total == 4, f"Expected 4 matches (valid numeric formats), got {total}"

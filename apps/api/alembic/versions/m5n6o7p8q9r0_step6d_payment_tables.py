@@ -223,3 +223,4 @@ def downgrade() -> None:
         op.execute("DROP TYPE IF EXISTS billing_period CASCADE")
     except Exception:
         pass
+

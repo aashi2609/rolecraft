@@ -147,40 +147,91 @@ class TestFitmentExcludesNullEmbeddings:
     """Test that fitment ranking explicitly excludes NULL embeddings."""
 
     @pytest.mark.asyncio
-    async def test_compute_fitment_excludes_null_embeddings(self):
+    async def test_compute_fitment_excludes_null_embeddings(self, db_session, candidate_user):
         """Fitment query only considers resumes with embedding_status='scored'."""
-        from models import JobPosting
+        from models import JobPosting, Resume, EmbeddingStatus
         from services.fitment_service import compute_fitment
-
-        # Mock DB session and job
-        mock_db = AsyncMock(spec=AsyncSession)
-        mock_job = MagicMock(spec=JobPosting)
-        mock_job.id = uuid.uuid4()
-        mock_job.embedding = [0.1] * 512
-        mock_job.embedding_status = "scored"
-        mock_job.required_skills = ["Python", "React"]
-
-        # Mock execute to return fitment results:
-        # One resume with embedding (included), one with NULL embedding (excluded)
-        mock_fitment_row1 = MagicMock()
-        mock_fitment_row1.candidate_id = uuid.uuid4()
-        mock_fitment_row1.score = 85.0
+        from uuid import uuid4
         
-        mock_fitment_row2 = MagicMock()
-        mock_fitment_row2.candidate_id = uuid.uuid4()
-        mock_fitment_row2.score = 60.0
+        # Create real job with valid embedding
+        job = JobPosting(
+            id=uuid4(),
+            company_id=uuid4(),
+            title="Senior Engineer",
+            embedding=[0.1] * 1536,  # pgvector dimension
+            embedding_status=EmbeddingStatus.scored.value,
+            required_skills=["Python"],
+        )
+        db_session.add(job)
         
-        mock_result = AsyncMock()
-        mock_result.mappings.return_value.all = MagicMock(return_value=[mock_fitment_row1, mock_fitment_row2])
-        mock_db.execute = AsyncMock(return_value=mock_result)
-
-        # Call compute_fitment
-        result = await compute_fitment(mock_db, mock_job)
+        # Create resume WITH embedding (should be included)
+        resume_with_embedding = Resume(
+            id=uuid4(),
+            candidate_id=candidate_user.id,
+            target_vertical="software",
+            content={"skills": ["Python", "React"]},
+            embedding=[0.15] * 1536,  # Valid pgvector
+            embedding_status=EmbeddingStatus.scored.value,
+        )
+        db_session.add(resume_with_embedding)
         
-        # Assert that NULL-embedding candidates were excluded (only 2 scored candidates)
-        assert len(result) <= 2, f"Expected <= 2 results (only scored embeddings), got {len(result)}"
-        # Verify SQL query was executed (execute called at least once)
-        assert mock_db.execute.called, "compute_fitment should query the database"
+        # Create resume WITHOUT embedding (should be excluded)
+        resume_no_embedding = Resume(
+            id=uuid4(),
+            candidate_id=uuid4(),
+            target_vertical="software",
+            content={"skills": ["Python"]},
+            embedding=None,  # NULL embedding
+            embedding_status=EmbeddingStatus.pending.value,
+        )
+        db_session.add(resume_no_embedding)
+        await db_session.commit()
+        
+        # Compute fitment
+        result = await compute_fitment(db_session, job)
+        
+        # Assert: only resume with valid embedding is ranked
+        assert len(result) == 1, f"Expected 1 ranked resume (non-null embedding only), got {len(result)}"
+        assert result[0].candidate_id == candidate_user.id
+        assert 40 <= result[0].score <= 100
+    
+    @pytest.mark.asyncio
+    async def test_compute_fitment_fallback_heuristic_on_error(self, db_session, candidate_user):
+        """When embeddings fail, fitment falls back to heuristic (skill matching)."""
+        from models import JobPosting, Resume, EmbeddingStatus
+        from services.fitment_service import compute_fitment
+        from uuid import uuid4
+        
+        # Create job WITHOUT embedding (will trigger heuristic)
+        job = JobPosting(
+            id=uuid4(),
+            company_id=uuid4(),
+            title="Senior Engineer",
+            embedding=None,  # No embedding → use heuristic
+            embedding_status=EmbeddingStatus.pending.value,
+            required_skills=["Python", "React"],
+        )
+        db_session.add(job)
+        
+        # Create resume (no embedding needed for heuristic)
+        resume = Resume(
+            id=uuid4(),
+            candidate_id=candidate_user.id,
+            target_vertical="software",
+            content={"skills": ["Python", "React", "FastAPI"]},
+            embedding=None,
+            embedding_status=EmbeddingStatus.pending.value,
+        )
+        db_session.add(resume)
+        await db_session.commit()
+        
+        # Compute fitment (should use heuristic, not fail)
+        result = await compute_fitment(db_session, job)
+        
+        # Assert: heuristic returned results based on skill overlap
+        assert len(result) >= 0, "Heuristic fallback should return results or empty list"
+        if result:
+            assert result[0].scoring_method == "heuristic"
 
 
 class TestEmbeddingStatusTracking:

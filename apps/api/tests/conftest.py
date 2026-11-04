@@ -381,17 +381,15 @@ def db_profiler():
 
 @pytest_asyncio.fixture
 async def grant_plan(db_session):
-    """Grant a specific plan with optional expiry to a user."""
+    """Grant a specific plan with optional status and expiry to a user."""
 
     async def _grant_plan(
         user_id: uuid.UUID,
         plan_tier: PlanTier = PlanTier.complete,
+        status: SubscriptionStatus = SubscriptionStatus.active,
         valid_until: datetime | None = None,
     ):
-        from models import Subscription, SubscriptionStatus
-
         # Remove existing subscription if any
-        await db_session.execute(select(Subscription).where(Subscription.user_id == user_id))
         existing = (
             (await db_session.execute(select(Subscription).where(Subscription.user_id == user_id)))
             .scalars()
@@ -405,7 +403,7 @@ async def grant_plan(db_session):
             user_id=user_id,
             role=UserRole.candidate,
             plan_tier=plan_tier,
-            status=SubscriptionStatus.active,
+            status=status,
             valid_until=valid_until,  # None = lifetime, datetime = expiry
         )
         db_session.add(subscription)
@@ -482,19 +480,20 @@ async def make_conversation(db_session, candidate_user, company_user):
     """Create a conversation between candidate and company."""
 
     async def _make_conversation(
-        status: str = "open",
         candidate_id: uuid.UUID | None = None,
         company_id: uuid.UUID | None = None,
+        job_id: uuid.UUID | None = None,
     ):
-        from models import Conversation, ConversationStatus
+        from models import Conversation
         from datetime import datetime
 
         conv = Conversation(
             id=uuid.uuid4(),
             candidate_id=candidate_id or candidate_user.id,
             company_id=company_id or company_user.id,
-            status=ConversationStatus(status) if isinstance(status, str) else status,
+            job_id=job_id,
             created_at=datetime.utcnow(),
+            last_message_at=datetime.utcnow(),
         )
         db_session.add(conv)
         await db_session.commit()
@@ -628,3 +627,37 @@ def verify_no_external_calls():
     # pytest-socket would be configured here when needed
     # For now, this is a placeholder that documents the intent
     pass
+
+
+@pytest.fixture(scope="session", autouse=True)
+async def empty_tables_check():
+    """After all tests, assert every table is empty (transactional isolation check)."""
+    yield  # Let tests run first
+    
+    # After all tests: check all tables are empty
+    test_db_url = os.getenv("TEST_DATABASE_URL", "").strip()
+    if not test_db_url:
+        pytest.skip("TEST_DATABASE_URL not set, skipping empty table check")
+        return
+    
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+    from sqlalchemy import inspect, text
+    
+    db_url, connect_args = asyncpg_engine_kwargs(test_db_url)
+    engine = create_async_engine(db_url, connect_args=connect_args)
+    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    
+    async with session_factory() as session:
+        # Get all table names
+        inspector = inspect(engine.sync_engine)
+        tables = inspector.get_table_names()
+        
+        # Check each table for rows
+        for table in tables:
+            if table.startswith("alembic"):  # Skip Alembic's internal tables
+                continue
+            result = await session.execute(text(f"SELECT COUNT(*) as cnt FROM {table}"))
+            count = result.scalar()
+            assert count == 0, f"Table {table} is not empty after tests (found {count} rows). Isolation failed!"
+    
+    await engine.dispose()
