@@ -11,9 +11,12 @@ Covers:
 
 import uuid
 
+import pytest
 from sqlalchemy import select
 
 from models import Notification
+
+pytestmark = pytest.mark.asyncio
 
 
 class TestConversationAuthorization:

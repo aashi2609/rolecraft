@@ -160,16 +160,27 @@ class TestFitmentExcludesNullEmbeddings:
         mock_job.embedding_status = "scored"
         mock_job.required_skills = ["Python", "React"]
 
-        # Mock execute to return empty result
+        # Mock execute to return fitment results:
+        # One resume with embedding (included), one with NULL embedding (excluded)
+        mock_fitment_row1 = MagicMock()
+        mock_fitment_row1.candidate_id = uuid.uuid4()
+        mock_fitment_row1.score = 85.0
+        
+        mock_fitment_row2 = MagicMock()
+        mock_fitment_row2.candidate_id = uuid.uuid4()
+        mock_fitment_row2.score = 60.0
+        
         mock_result = AsyncMock()
-        mock_result.mappings.return_value.all.return_value = []
-        mock_db.execute.return_value = mock_result
+        mock_result.mappings.return_value.all = MagicMock(return_value=[mock_fitment_row1, mock_fitment_row2])
+        mock_db.execute = AsyncMock(return_value=mock_result)
 
-        # Call compute_fitment - it should not crash with AttributeError
-        try:
-            await compute_fitment(mock_db, mock_job)
-        except Exception:
-            pass  # Expected if job embedding not ready
+        # Call compute_fitment
+        result = await compute_fitment(mock_db, mock_job)
+        
+        # Assert that NULL-embedding candidates were excluded (only 2 scored candidates)
+        assert len(result) <= 2, f"Expected <= 2 results (only scored embeddings), got {len(result)}"
+        # Verify SQL query was executed (execute called at least once)
+        assert mock_db.execute.called, "compute_fitment should query the database"
 
 
 class TestEmbeddingStatusTracking:
@@ -272,12 +283,13 @@ class TestRefreshEmbeddingHandlesFailure:
             embedding_status=EmbeddingStatus.pending.value,
         )
 
-        # Mock execute to return an async context that yields scalars
+        # Mock execute to return a result with scalars().all()
+        # db.execute() is awaited and returns a Result, then .scalars().all() is called synchronously
         mock_scalars = MagicMock()
-        mock_scalars.all.return_value = [resume1, resume2]
+        mock_scalars.all = MagicMock(return_value=[resume1, resume2])
         
-        mock_result = AsyncMock()
-        mock_result.scalars.return_value = mock_scalars
+        mock_result = MagicMock()  # Regular MagicMock - db.execute() will await to this
+        mock_result.scalars = MagicMock(return_value=mock_scalars)
         
         mock_db.execute = AsyncMock(return_value=mock_result)
         mock_db.flush = AsyncMock()

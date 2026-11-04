@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 
 from core.security import create_access_token
+from models import PlanTier, SubscriptionStatus
 
 
 def _signup(client: TestClient, role: str = "candidate") -> tuple[str, str]:
@@ -66,15 +68,55 @@ def test_search_unpaid_company_returns_403(client: TestClient, unpaid_company_us
     )
 
 
-def test_search_paid_company_returns_200_and_no_pii_keys(client: TestClient) -> None:
+@pytest.mark.asyncio
+async def test_search_paid_company_returns_200_and_no_pii_keys(
+    company_user, grant_plan, db_session
+) -> None:
     """Paid company returns 200 with no PII in results.
     
-    SKIPPED: Requires activating subscription without webhook. The test fixture requires async/await
-    which is incompatible with TestClient (sync). This test should be rewritten as an async test
-    using AsyncClient and the grant_plan fixture to mark subscription as active.
+    Uses grant_plan fixture to activate subscription, then verifies search works.
     """
-    import pytest
-    pytest.skip("Requires async test refactor to use grant_plan fixture")
+    from httpx import AsyncClient, ASGITransport
+    from core.security import create_access_token
+    from main import app
+    
+    # Grant paid plan to company
+    subscription = await grant_plan(
+        user_id=company_user.id,
+        plan_tier=PlanTier.complete,
+        status=SubscriptionStatus.active,
+    )
+    await db_session.commit()
+    
+    # Create AsyncClient with company token
+    company_token = create_access_token(user_id=company_user.id, role="company")
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        client.headers["Authorization"] = f"Bearer {company_token}"
+        
+        r = await client.get("/candidates/search")
+        assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text}"
+        
+        data = r.json()
+        
+        # Verify no PII keys in results
+        # PII fields that should NOT be in candidate search results
+        forbidden_pii_keys = {
+            "email", "phone", "address", "ssn", "dob", "date_of_birth",
+            "bank_account", "credit_card", "password", "secret",
+        }
+        
+        if "results" in data:
+            for candidate in data["results"]:
+                for key in forbidden_pii_keys:
+                    assert key.lower() not in {k.lower() for k in candidate.keys()}, (
+                        f"PII key '{key}' found in candidate search results"
+                    )
+        elif isinstance(data, list):
+            for candidate in data:
+                for key in forbidden_pii_keys:
+                    assert key.lower() not in {k.lower() for k in candidate.keys()}, (
+                        f"PII key '{key}' found in candidate search results"
+                    )
 
 
 def test_search_admin_allowed(client: TestClient, admin_user) -> None:

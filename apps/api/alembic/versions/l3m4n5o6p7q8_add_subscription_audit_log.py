@@ -84,4 +84,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    import os
+    # Guard: Prevent accidental audit trail destruction
+    if not os.getenv("ALLOW_DESTRUCTIVE_DOWNGRADE"):
+        raise RuntimeError(
+            "DESTRUCTIVE: This downgrade drops subscription_audit_log table (audit trail). "
+            "Set ALLOW_DESTRUCTIVE_DOWNGRADE=1 to proceed."
+        )
     op.drop_table("subscription_audit_log")

@@ -6,7 +6,7 @@ import re
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Integer, and_, func, or_, select
+from sqlalchemy import Integer, and_, func, or_, select, text
 from sqlalchemy.orm import selectinload
 
 from models import CandidateProfile, CandidateSkill, Education, Experience, Skill, User
@@ -119,39 +119,41 @@ def apply_salary_filter(
 
     Filters Experience.expected_salary (parsed as integer LPA).
     Salary is parsed from strings like "8-12 LPA" or "8 LPA".
-    
-    NOTE: Does NOT join Experience here - it's joined by apply_title_filter if needed,
-    or we use a subquery approach to avoid Cartesian products from multiple Experience outerjoin calls.
     """
     if salary_min is None and salary_max is None:
         return query
 
-    # Use a subquery-based approach to filter by salary without multiple outerjoin calls
-    # Create a subquery that checks salary conditions
-    salary_expr = func.cast(func.substring(Experience.expected_salary, r"^\d+"), Integer)
-    
+    # Build salary conditions
     conditions = []
+
+    # Extract first number from expected_salary string (e.g., "8-12 LPA" → 8)
+    # Use CAST to handle numeric prefix, then REGEXP_MATCHES for PostgreSQL regex support
+    # PostgreSQL: split_part first word and cast to integer
+    salary_expr = func.cast(
+        func.split_part(Experience.expected_salary, ' ', 1),
+        Integer
+    )
+
     if salary_min is not None:
         conditions.append(salary_expr >= salary_min)
+
     if salary_max is not None:
         conditions.append(salary_expr <= salary_max)
+
     if not include_null_salary:
+        # Exclude NULL salaries when filter is active
         conditions.append(Experience.expected_salary.isnot(None))
-    
-    if not conditions:
-        return query
-    
-    # Get candidate IDs that match the salary criteria
-    salary_subquery = (
-        select(Experience.candidate_id)
-        .where(and_(*conditions))
-        .distinct()
-        .subquery()
-    )
-    
-    # Filter CandidateProfiles to only those with matching salary
-    query = query.where(CandidateProfile.user_id.in_(select(salary_subquery.c.candidate_id)))
-    
+
+    if conditions:
+        # Use EXISTS subquery to avoid Cartesian product from multiple Experience joins
+        exists_subquery = (
+            select(1)
+            .select_from(Experience)
+            .where(Experience.candidate_id == CandidateProfile.user_id)
+            .where(and_(*conditions))
+        )
+        query = query.where(exists_subquery.exists())
+
     return query
 
 

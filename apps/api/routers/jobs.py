@@ -240,20 +240,26 @@ async def list_hidden_jobs(user: CandidateUser, db: DbSession):
 async def get_job(
     job_id: UUID, db: DbSession, user: User | None = Depends(get_optional_current_user)
 ):
-    job = await db.get(JobPosting, job_id)
+    # Eager-load company to avoid lazy-load in async context
+    job = await db.scalar(
+        select(JobPosting).where(JobPosting.id == job_id).options(selectinload(JobPosting.company))
+    )
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     if job.status != JobStatus.live:
         is_owner = user is not None and user.role == UserRole.company and job.company_id == user.id
         if not is_owner:
             raise HTTPException(status_code=404, detail="Job not found")
-    return await enrich_job(job)
+    return await enrich_job(job, company=job.company)
 
 
 @router.put("/{job_id:uuid}", response_model=JobOut)
 @router.patch("/{job_id:uuid}", response_model=JobOut)
 async def update_job(job_id: UUID, body: JobUpdate, user: CompanyUser, db: DbSession):
-    job = await db.get(JobPosting, job_id)
+    # Eager-load company to avoid lazy-load in async context
+    job = await db.scalar(
+        select(JobPosting).where(JobPosting.id == job_id).options(selectinload(JobPosting.company))
+    )
     if not job or job.company_id != user.id:
         raise HTTPException(status_code=404, detail="Not found")
     data = body.model_dump(exclude_unset=True)
@@ -269,7 +275,9 @@ async def update_job(job_id: UUID, body: JobUpdate, user: CompanyUser, db: DbSes
             setattr(job, k, v)
     await db.flush()
     await refresh_job_embedding(db, job)
-    return await enrich_job(job)
+    # Eager-load company for enrich_job
+    await db.refresh(job, ["company"])
+    return await enrich_job(job, company=job.company)
 
 
 @router.patch("/{job_id:uuid}/status", response_model=JobOut)
@@ -279,7 +287,9 @@ async def patch_status(job_id: UUID, body: JobStatusUpdate, user: CompanyUser, d
         raise HTTPException(status_code=404, detail="Not found")
     job.status = coerce_enum(JobStatus, body.status, "status", allow_none=False)
     await db.flush()
-    return await enrich_job(job)
+    # Eager-load company for enrich_job
+    await db.refresh(job, ["company"])
+    return await enrich_job(job, company=job.company)
 
 
 @router.get("/{job_id:uuid}/candidates", response_model=list[FitmentCandidateOut])

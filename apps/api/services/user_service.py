@@ -61,4 +61,17 @@ async def create_user_with_profile(
         db.add(Company(user_id=user.id, name=name or "", industry=industry))
 
     await db.flush()
+    
+    # Step 6A: Log subscription creation as system action (admin_id=None)
+    from services.subscription_service import log_subscription_change
+    await log_subscription_change(
+        db=db,
+        subscription_id=sub.id,
+        user_id=user.id,
+        admin_id=None,  # System/registration action, not admin
+        action="create",
+        new_status=sub.status.value,
+        reason="User registration",
+    )
+    
     return user

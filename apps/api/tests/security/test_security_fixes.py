@@ -182,3 +182,45 @@ def test_plan_limit_before_groq(client: TestClient) -> None:
                     json={"target_role": "Engineer"},
                 )
                 assert r.status_code == 403, f"status={r.status_code}"
+
+
+def test_job_endpoints_do_not_lazy_load_company(client: TestClient) -> None:
+    """Regression: GET/PUT/PATCH /jobs/{id} must not lazy-load company (MissingGreenlet)."""
+    # Create company and job
+    co_resp = _signup(client, f"company_{uuid.uuid4().hex[:8]}@test.com", "company")
+    co_token = co_resp["access_token"]
+    
+    job_resp = client.post(
+        "/jobs",
+        headers={"Authorization": f"Bearer {co_token}"},
+        json={
+            "title": "Engineer",
+            "description": "Test job",
+            "min_salary": 10,
+            "max_salary": 20,
+        },
+    )
+    assert job_resp.status_code == 200, f"job creation failed: {job_resp.status_code}"
+    job_id = job_resp.json()["id"]
+    
+    # GET /jobs/{id} must return 200 with company_name (not 500 greenlet error)
+    get_resp = client.get(f"/jobs/{job_id}", headers={"Authorization": f"Bearer {co_token}"})
+    assert get_resp.status_code == 200, f"GET /jobs/{id} returned {get_resp.status_code}: {get_resp.text[:200]}"
+    job_data = get_resp.json()
+    assert job_data.get("company_name") is not None, "company_name must be present"
+    
+    # PUT /jobs/{id} must return 200 (not 500)
+    put_resp = client.put(
+        f"/jobs/{job_id}",
+        headers={"Authorization": f"Bearer {co_token}"},
+        json={"title": "Senior Engineer"},
+    )
+    assert put_resp.status_code == 200, f"PUT /jobs/{id} returned {put_resp.status_code}"
+    
+    # PATCH /jobs/{id}/status must return 200 (not 500)
+    patch_resp = client.patch(
+        f"/jobs/{job_id}/status",
+        headers={"Authorization": f"Bearer {co_token}"},
+        json={"status": "live"},
+    )
+    assert patch_resp.status_code == 200, f"PATCH /jobs/{id}/status returned {patch_resp.status_code}"

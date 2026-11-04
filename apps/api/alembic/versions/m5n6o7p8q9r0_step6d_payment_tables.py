@@ -199,6 +199,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    import os
+    # Guard: Prevent accidental data loss on production
+    if not os.getenv("ALLOW_DESTRUCTIVE_DOWNGRADE"):
+        raise RuntimeError(
+            "DESTRUCTIVE: This downgrade drops payment_transactions and price_points tables. "
+            "Set ALLOW_DESTRUCTIVE_DOWNGRADE=1 to proceed."
+        )
+    
     # Drop payment_transactions table
     op.drop_table("payment_transactions")
 

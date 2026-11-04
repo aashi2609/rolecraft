@@ -215,8 +215,9 @@ async def enrich_job(job: JobPosting, company: Company = None, stats: dict = Non
         company: Pre-loaded Company instance (from eager load). If None, uses job.company.
         stats: Pre-computed stats dict from get_job_stats(). If None, uses defaults.
     """
-    # Use pre-loaded company if available (from eager load), otherwise try lazy load
-    company_obj = company or (job.company if hasattr(job, "company") else None)
+    # Use pre-loaded company if available (from eager load)
+    # IMPORTANT: company MUST be passed - never access job.company directly as it causes lazy-load in async
+    company_obj = company
 
     # Use pre-computed stats if available, otherwise defaults
     job_stats = (
