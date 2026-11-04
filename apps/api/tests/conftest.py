@@ -482,13 +482,53 @@ async def make_conversation(db_session, candidate_user, company_user):
         company_id: uuid.UUID | None = None,
         job_id: uuid.UUID | None = None,
     ):
-        from models import Conversation
+        from models import Conversation, CandidateProfile, Company, User, UserRole
         from datetime import datetime
+
+        # Use defaults if not provided
+        final_candidate_id = candidate_id or candidate_user.id
+        final_company_id = company_id or company_user.id
+
+        # Ensure candidate profile exists if we're using a custom ID
+        if candidate_id and candidate_id != candidate_user.id:
+            existing_candidate = await db_session.get(User, candidate_id)
+            if not existing_candidate:
+                # Create user + profile for the candidate
+                user = User(
+                    id=candidate_id,
+                    email=f"candidate_{uuid.uuid4().hex[:8]}@test.com",
+                    password_hash="$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6",
+                    role=UserRole.candidate,
+                    is_active=True,
+                    token_version=1,
+                )
+                db_session.add(user)
+                profile = CandidateProfile(user_id=candidate_id, weblinks={"full_name": "Test Candidate"})
+                db_session.add(profile)
+                await db_session.flush()
+
+        # Ensure company exists if we're using a custom ID
+        if company_id and company_id != company_user.id:
+            existing_company = await db_session.get(Company, company_id)
+            if not existing_company:
+                # Create user + company for the company
+                user = User(
+                    id=company_id,
+                    email=f"company_{uuid.uuid4().hex[:8]}@test.com",
+                    password_hash="$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6",
+                    role=UserRole.company,
+                    is_active=True,
+                    token_version=1,
+                )
+                db_session.add(user)
+                company = Company(user_id=company_id, name="Test Company")
+                db_session.add(company)
+                await db_session.flush()
 
         conv = Conversation(
             id=uuid.uuid4(),
-            candidate_id=candidate_id or candidate_user.id,
-            company_id=company_id or company_user.id,
+            candidate_id=final_candidate_id,
+            company_id=final_company_id,
             job_id=job_id,
             created_at=datetime.utcnow(),
             last_message_at=datetime.utcnow(),
@@ -509,6 +549,7 @@ async def make_message(db_session):
         conversation_id: uuid.UUID,
         sender_id: uuid.UUID,
         body: str = "Test message",
+        sender_role: str = "company",
         **kwargs,
     ):
         from models import Message
@@ -518,6 +559,7 @@ async def make_message(db_session):
             id=uuid.uuid4(),
             conversation_id=conversation_id,
             sender_id=sender_id,
+            sender_role=sender_role,
             body=body,
             sent_at=datetime.utcnow(),
         )

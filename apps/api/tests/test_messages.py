@@ -23,9 +23,40 @@ class TestConversationAuthorization:
     """Conversation access control and ownership."""
 
     async def test_company_creates_conversation_with_candidate(
-        self, company_client, candidate_user, db_session
+        self, company_client, candidate_user, company_user, db_session
     ):
         """Company can start a conversation with a candidate."""
+        # First, create a job and application so messaging policy passes
+        job = await db_session.execute(
+            select(JobPosting).where(JobPosting.company_id == company_user.id).limit(1)
+        )
+        job = job.scalar()
+        
+        if not job:
+            # Create a job if none exists
+            from models import JobPosting, JobStatus, EmbeddingStatus
+            job = JobPosting(
+                id=uuid.uuid4(),
+                company_id=company_user.id,
+                title="Test Job",
+                status=JobStatus.draft,
+                embedding_status=EmbeddingStatus.pending,
+                embedding=[0.1] * 512,
+            )
+            db_session.add(job)
+            await db_session.flush()
+        
+        # Create application
+        from models import Application, ApplicationStatus
+        app = Application(
+            id=uuid.uuid4(),
+            job_id=job.id,
+            candidate_id=candidate_user.id,
+            status=ApplicationStatus.applied,
+        )
+        db_session.add(app)
+        await db_session.commit()
+        
         response = await company_client.post(
             f"/conversations?candidate_id={candidate_user.id}"
         )
