@@ -387,7 +387,6 @@ async def grant_plan(db_session):
         user_id: uuid.UUID,
         plan_tier: PlanTier = PlanTier.complete,
         status: SubscriptionStatus = SubscriptionStatus.active,
-        valid_until: datetime | None = None,
     ):
         # Remove existing subscription if any
         existing = (
@@ -404,7 +403,6 @@ async def grant_plan(db_session):
             role=UserRole.candidate,
             plan_tier=plan_tier,
             status=status,
-            valid_until=valid_until,  # None = lifetime, datetime = expiry
         )
         db_session.add(subscription)
         await db_session.commit()
@@ -510,7 +508,7 @@ async def make_message(db_session):
     async def _make_message(
         conversation_id: uuid.UUID,
         sender_id: uuid.UUID,
-        content: str = "Test message",
+        body: str = "Test message",
         **kwargs,
     ):
         from models import Message
@@ -520,8 +518,8 @@ async def make_message(db_session):
             id=uuid.uuid4(),
             conversation_id=conversation_id,
             sender_id=sender_id,
-            content=content,
-            created_at=datetime.utcnow(),
+            body=body,
+            sent_at=datetime.utcnow(),
         )
         db_session.add(message)
         await db_session.commit()

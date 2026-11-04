@@ -158,7 +158,7 @@ class TestFitmentExcludesNullEmbeddings:
             id=uuid4(),
             company_id=uuid4(),
             title="Senior Engineer",
-            embedding=[0.1] * 1536,  # pgvector dimension
+            embedding=[0.1] * 512,  # Match DB dimension (512, not 1536)
             embedding_status=EmbeddingStatus.scored.value,
             required_skills=["Python"],
         )
@@ -170,7 +170,7 @@ class TestFitmentExcludesNullEmbeddings:
             candidate_id=candidate_user.id,
             target_vertical="software",
             content={"skills": ["Python", "React"]},
-            embedding=[0.15] * 1536,  # Valid pgvector
+            embedding=[0.15] * 512,  # Valid pgvector
             embedding_status=EmbeddingStatus.scored.value,
         )
         db_session.add(resume_with_embedding)

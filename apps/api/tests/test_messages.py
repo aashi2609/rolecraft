@@ -27,7 +27,7 @@ class TestConversationAuthorization:
     ):
         """Company can start a conversation with a candidate."""
         response = await company_client.post(
-            "/conversations", json={"candidate_id": str(candidate_user.id)}
+            f"/conversations?candidate_id={candidate_user.id}"
         )
         assert response.status_code == 201, (
             f"Expected 201, got {response.status_code}: {response.text}"
@@ -41,7 +41,7 @@ class TestConversationAuthorization:
     ):
         """Candidate cannot start a conversation (company initiates only)."""
         response = await candidate_client.post(
-            "/conversations", json={"company_id": str(company_user.id)}
+            f"/conversations?candidate_id={company_user.id}"
         )
         # Should return 403 (forbidden) or 405 (method not allowed for role)
         assert response.status_code in [403, 405], (
