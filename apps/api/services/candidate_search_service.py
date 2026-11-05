@@ -127,16 +127,20 @@ def apply_salary_filter(
     conditions = []
 
     # Extract first number from expected_salary string (e.g., "8-12 LPA" → 8)
-    # Extract first digits only, default to 0 if no match
-    # Use SUBSTRING with regular expression to safely extract digits
+    # Extract first digits safely using CASE + regex validation + CAST
+    # If regex matches digits, extract them; otherwise use 0
     salary_expr = func.coalesce(
         func.cast(
-            func.coalesce(
-                func.substring(
-                    Experience.expected_salary,
-                    r'^\d+'
+            func.case(
+                (
+                    func.regexp_like(Experience.expected_salary, r'^\d'),
+                    func.regexp_replace(
+                        Experience.expected_salary,
+                        r'^(\d+).*',
+                        r'\1'
+                    )
                 ),
-                '0'
+                else_='0'
             ),
             Integer
         ),

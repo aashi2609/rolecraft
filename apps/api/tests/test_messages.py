@@ -14,7 +14,7 @@ import uuid
 import pytest
 from sqlalchemy import select
 
-from models import Notification
+from models import Notification, JobPosting, JobStatus, EmbeddingStatus, Application, ApplicationStatus
 
 pytestmark = pytest.mark.asyncio
 
@@ -34,7 +34,6 @@ class TestConversationAuthorization:
         
         if not job:
             # Create a job if none exists
-            from models import JobPosting, JobStatus, EmbeddingStatus
             job = JobPosting(
                 id=uuid.uuid4(),
                 company_id=company_user.id,

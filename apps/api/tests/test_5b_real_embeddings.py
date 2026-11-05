@@ -147,7 +147,7 @@ class TestFitmentExcludesNullEmbeddings:
     """Test that fitment ranking explicitly excludes NULL embeddings."""
 
     @pytest.mark.asyncio
-    async def test_compute_fitment_excludes_null_embeddings(self, db_session, candidate_user):
+    async def test_compute_fitment_excludes_null_embeddings(self, db_session, candidate_user, company_user):
         """Fitment query only considers resumes with embedding_status='scored'."""
         from models import JobPosting, Resume, EmbeddingStatus
         from services.fitment_service import compute_fitment
@@ -156,7 +156,7 @@ class TestFitmentExcludesNullEmbeddings:
         # Create real job with valid embedding
         job = JobPosting(
             id=uuid4(),
-            company_id=uuid4(),
+            company_id=company_user.id,
             title="Senior Engineer",
             embedding=[0.1] * 512,  # Match DB dimension (512, not 1536)
             embedding_status=EmbeddingStatus.scored.value,
@@ -196,7 +196,7 @@ class TestFitmentExcludesNullEmbeddings:
         assert 40 <= result[0].score <= 100
     
     @pytest.mark.asyncio
-    async def test_compute_fitment_fallback_heuristic_on_error(self, db_session, candidate_user):
+    async def test_compute_fitment_fallback_heuristic_on_error(self, db_session, candidate_user, company_user):
         """When embeddings fail, fitment falls back to heuristic (skill matching)."""
         from models import JobPosting, Resume, EmbeddingStatus
         from services.fitment_service import compute_fitment
@@ -205,7 +205,7 @@ class TestFitmentExcludesNullEmbeddings:
         # Create job WITHOUT embedding (will trigger heuristic)
         job = JobPosting(
             id=uuid4(),
-            company_id=uuid4(),
+            company_id=company_user.id,
             title="Senior Engineer",
             embedding=None,  # No embedding → use heuristic
             embedding_status=EmbeddingStatus.pending.value,
