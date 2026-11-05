@@ -116,7 +116,7 @@ async def batch_load_experiences(db, candidate_ids: list[UUID]) -> dict:
         select(Experience)
         .where(Experience.candidate_id.in_(candidate_ids))
         .distinct(Experience.candidate_id)
-        .order_by(Experience.candidate_id, desc(Experience.from_date.nullslast()))
+        .order_by(Experience.candidate_id, Experience.from_date.desc().nullslast())
     )
 
     experiences = {}
