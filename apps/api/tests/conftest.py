@@ -119,24 +119,56 @@ def _ensure_test_config(monkeypatch) -> None:
 async def db_session():
     """Isolated async db session for unit/integration tests.
 
-    Uses SQLAlchemy 2 savepoint mode for nested transaction isolation:
-    each test gets a savepoint that rolls back on fixture teardown.
+    Binds session to a connection with an outer transaction begun,
+    then creates a savepoint for each test that rolls back on teardown.
     """
     test_db_url = os.getenv("TEST_DATABASE_URL", "").strip()
     db_url, connect_args = asyncpg_engine_kwargs(test_db_url)
     connect_args["statement_cache_size"] = 0
     engine = create_async_engine(db_url, connect_args=connect_args)
-    # join_transaction_mode="create_savepoint" enables per-test transaction isolation
-    session_factory = async_sessionmaker(
-        engine,
-        expire_on_commit=False,
-        class_=AsyncSession,
-        join_transaction_mode="create_savepoint",
-    )
-    async with session_factory() as session:
-        yield session
-        await session.rollback()
+    
+    # Begin outer transaction
+    async with engine.begin() as connection:
+        # Bind session to connection, not engine
+        session_factory = async_sessionmaker(
+            bind=connection,
+            expire_on_commit=False,
+            class_=AsyncSession,
+            join_transaction_mode="create_savepoint",
+        )
+        async with session_factory() as session:
+            yield session
+            await session.rollback()
+    
     await engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+async def leak_detector(db_session):
+    """Strict leak detector: fails test if any rows remain after rollback."""
+    yield
+    # After test completes and rollback, check for data leaks
+    from sqlalchemy import text
+    
+    # Get all table names except alembic_version
+    tables_query = text("""
+        SELECT tablename FROM pg_tables 
+        WHERE schemaname = 'public' 
+        AND tablename != 'alembic_version'
+    """)
+    result = await db_session.execute(tables_query)
+    tables = [row[0] for row in result.fetchall()]
+    
+    leaked_data = []
+    for table in tables:
+        count_query = text(f"SELECT COUNT(*) FROM {table}")
+        count_result = await db_session.execute(count_query)
+        count = count_result.scalar()
+        if count > 0:
+            leaked_data.append(f"{table}: {count} rows")
+    
+    if leaked_data:
+        pytest.fail(f"Data leak detected after test rollback:\n" + "\n".join(leaked_data))
 
 
 # ── User and Client Fixtures ──────────────────────────────────────────────────
@@ -180,6 +212,28 @@ async def company_user(db_session):
     await db_session.commit()
     await db_session.refresh(user)
     return user
+
+
+@pytest_asyncio.fixture
+async def make_company(db_session):
+    """Create a company user with profile."""
+    async def _make_company(company_id: uuid.UUID | None = None):
+        cid = company_id or uuid.uuid4()
+        user = User(
+            id=cid,
+            email=f"company_{uuid.uuid4().hex[:8]}@test.com",
+            password_hash="$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6",
+            role=UserRole.company,
+            is_active=True,
+            token_version=1,
+        )
+        db_session.add(user)
+        company = Company(user_id=cid, name="Test Company")
+        db_session.add(company)
+        await db_session.commit()
+        await db_session.refresh(user)
+        return user
+    return _make_company
 
 
 @pytest_asyncio.fixture
@@ -272,33 +326,63 @@ async def unpaid_company_user(db_session):
 
 
 @pytest_asyncio.fixture
-async def candidate_client(candidate_user):
+async def candidate_client(candidate_user, db_session):
     """Authenticated AsyncClient for candidate user."""
     from httpx import ASGITransport
+    from core.database import get_db
+    
+    # Override get_db to use test session
+    async def override_get_db():
+        yield db_session
+    
+    app.dependency_overrides[get_db] = override_get_db
+    
     token = create_access_token(user_id=candidate_user.id, role="candidate")
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         client.headers["Authorization"] = f"Bearer {token}"
         yield client
+    
+    app.dependency_overrides.clear()
 
 
 @pytest_asyncio.fixture
-async def company_client(company_user):
+async def company_client(company_user, db_session):
     """Authenticated AsyncClient for company user."""
     from httpx import ASGITransport
+    from core.database import get_db
+    
+    # Override get_db to use test session
+    async def override_get_db():
+        yield db_session
+    
+    app.dependency_overrides[get_db] = override_get_db
+    
     token = create_access_token(user_id=company_user.id, role="company")
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         client.headers["Authorization"] = f"Bearer {token}"
         yield client
+    
+    app.dependency_overrides.clear()
 
 
 @pytest_asyncio.fixture
-async def other_company_client(other_company_user):
+async def other_company_client(other_company_user, db_session):
     """Authenticated AsyncClient for other company user."""
     from httpx import ASGITransport
+    from core.database import get_db
+    
+    # Override get_db to use test session
+    async def override_get_db():
+        yield db_session
+    
+    app.dependency_overrides[get_db] = override_get_db
+    
     token = create_access_token(user_id=other_company_user.id, role="company")
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         client.headers["Authorization"] = f"Bearer {token}"
         yield client
+    
+    app.dependency_overrides.clear()
 
 
 @pytest_asyncio.fixture

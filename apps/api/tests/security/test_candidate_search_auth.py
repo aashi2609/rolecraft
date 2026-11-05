@@ -79,14 +79,25 @@ async def test_search_paid_company_returns_200_and_no_pii_keys(
     from httpx import AsyncClient, ASGITransport
     from core.security import create_access_token
     from main import app
+    from services.plan_limits import get_user_plan
+    from sqlalchemy import select
+    from models import Subscription
     
-    # Grant paid plan to company
+    # Grant paid plan to company (using growth tier which is in _ALLOWED_SEARCH_COMPANY_PLANS)
     subscription = await grant_plan(
         user_id=company_user.id,
-        plan_tier=PlanTier.complete,
+        plan_tier=PlanTier.growth,
         status=SubscriptionStatus.active,
     )
     await db_session.commit()
+    
+    # DEBUG: Print subscription row
+    sub_row = await db_session.scalar(select(Subscription).where(Subscription.user_id == company_user.id))
+    print(f"DEBUG Subscription row: id={sub_row.id}, user_id={sub_row.user_id}, plan_tier={sub_row.plan_tier}, status={sub_row.status}")
+    
+    # DEBUG: Print get_user_plan result
+    plan_result = await get_user_plan(company_user.id, db_session)
+    print(f"DEBUG get_user_plan result: {plan_result}")
     
     # Create AsyncClient with company token
     company_token = create_access_token(user_id=company_user.id, role="company")
@@ -98,7 +109,13 @@ async def test_search_paid_company_returns_200_and_no_pii_keys(
         
         data = r.json()
         
-        # Verify no PII keys in results
+        # Assert exact key allowlist for each candidate result
+        allowed_keys = {
+            "id", "name", "title", "experience_years", "location", "skills",
+            "match_percent", "education", "expected_salary_lpa", "notice_period_days",
+            "photo_url", "rationale", "rationale_source"
+        }
+        
         # PII fields that should NOT be in candidate search results
         forbidden_pii_keys = {
             "email", "phone", "address", "ssn", "dob", "date_of_birth",
@@ -107,16 +124,26 @@ async def test_search_paid_company_returns_200_and_no_pii_keys(
         
         if "results" in data:
             for candidate in data["results"]:
-                for key in forbidden_pii_keys:
-                    assert key.lower() not in {k.lower() for k in candidate.keys()}, (
-                        f"PII key '{key}' found in candidate search results"
-                    )
+                actual_keys = set(candidate.keys())
+                # All actual keys must be in allowed list
+                assert actual_keys.issubset(allowed_keys), (
+                    f"Unexpected keys in result: {actual_keys - allowed_keys}"
+                )
+                # No forbidden PII keys
+                assert not actual_keys.intersection(forbidden_pii_keys), (
+                    f"PII keys found: {actual_keys.intersection(forbidden_pii_keys)}"
+                )
         elif isinstance(data, list):
             for candidate in data:
-                for key in forbidden_pii_keys:
-                    assert key.lower() not in {k.lower() for k in candidate.keys()}, (
-                        f"PII key '{key}' found in candidate search results"
-                    )
+                actual_keys = set(candidate.keys())
+                # All actual keys must be in allowed list
+                assert actual_keys.issubset(allowed_keys), (
+                    f"Unexpected keys in result: {actual_keys - allowed_keys}"
+                )
+                # No forbidden PII keys
+                assert not actual_keys.intersection(forbidden_pii_keys), (
+                    f"PII keys found: {actual_keys.intersection(forbidden_pii_keys)}"
+                )
 
 
 def test_search_admin_allowed(client: TestClient, admin_user) -> None:

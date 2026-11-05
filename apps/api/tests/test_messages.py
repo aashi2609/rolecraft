@@ -57,7 +57,7 @@ class TestConversationAuthorization:
         await db_session.commit()
         
         response = await company_client.post(
-            f"/conversations?candidate_id={candidate_user.id}"
+            f"/messages/threads?candidate_id={candidate_user.id}"
         )
         assert response.status_code == 201, (
             f"Expected 201, got {response.status_code}: {response.text}"
@@ -71,11 +71,11 @@ class TestConversationAuthorization:
     ):
         """Candidate cannot start a conversation (company initiates only)."""
         response = await candidate_client.post(
-            f"/conversations?candidate_id={company_user.id}"
+            f"/messages/threads?candidate_id={company_user.id}"
         )
-        # Should return 403 (forbidden) or 405 (method not allowed for role)
-        assert response.status_code in [403, 405], (
-            f"Expected 403 or 405, got {response.status_code}"
+        # Should return exactly 403 (forbidden)
+        assert response.status_code == 403, (
+            f"Expected 403, got {response.status_code}"
         )
 
     async def test_candidate_accesses_own_conversation(
@@ -83,7 +83,7 @@ class TestConversationAuthorization:
     ):
         """Candidate can retrieve their own conversation."""
         conversation = await make_conversation(candidate_id=candidate_user.id)
-        response = await candidate_client.get(f"/conversations/{conversation.id}")
+        response = await candidate_client.get(f"/messages/threads/{conversation.id}")
         assert response.status_code == 200
         data = response.json()
         assert str(data["id"]) == str(conversation.id)
@@ -96,7 +96,7 @@ class TestConversationAuthorization:
         conversation = await make_conversation(
             candidate_id=other_candidate_id, company_id=other_company_user.id
         )
-        response = await candidate_client.get(f"/conversations/{conversation.id}")
+        response = await candidate_client.get(f"/messages/threads/{conversation.id}")
         assert response.status_code == 404, (
             f"Expected 404 (IDOR prevention), got {response.status_code}"
         )
@@ -107,14 +107,14 @@ class TestConversationAuthorization:
         """Only one active conversation allowed per candidate-company pair."""
         # Create first conversation
         resp1 = await company_client.post(
-            "/conversations", json={"candidate_id": str(candidate_user.id)}
+            "/messages/threads", json={"candidate_id": str(candidate_user.id)}
         )
         assert resp1.status_code == 201
         conv1_id = resp1.json()["id"]
 
         # Try to create second conversation with same pair
         resp2 = await company_client.post(
-            "/conversations", json={"candidate_id": str(candidate_user.id)}
+            "/messages/threads", json={"candidate_id": str(candidate_user.id)}
         )
         # Should either return existing conversation or 409 (conflict)
         assert resp2.status_code in [200, 409], f"Expected 200 or 409, got {resp2.status_code}"
@@ -141,7 +141,7 @@ class TestMessagingAndNotifications:
         )
 
         response = await company_client.post(
-            f"/conversations/{conversation.id}/messages",
+            f"/messages/threads/{conversation.id}",
             json={"content": "Hello, interested in this role?"},
         )
         assert response.status_code == 201, (
@@ -170,7 +170,7 @@ class TestMessagingAndNotifications:
 
         # Candidate replies
         response = await candidate_client.post(
-            f"/conversations/{conversation.id}/messages",
+            f"/messages/threads/{conversation.id}",
             json={"content": "Thanks for reaching out!"},
         )
         assert response.status_code == 201
@@ -186,7 +186,7 @@ class TestMessagingAndNotifications:
         )
 
         response = await other_company_client.post(
-            f"/conversations/{conversation.id}/messages",
+            f"/messages/threads/{conversation.id}",
             json={"content": "Trying to hijack this conversation"},
         )
         assert response.status_code in [403, 404], (
@@ -213,7 +213,7 @@ class TestMessagingAndNotifications:
 
         # Company sends message
         response = await company_client.post(
-            f"/conversations/{conversation.id}/messages",
+            f"/messages/threads/{conversation.id}",
             json={"content": "Check out this opportunity"},
         )
         assert response.status_code == 201
@@ -251,7 +251,7 @@ class TestMessagingAndNotifications:
         )
 
         # Get initial unread count
-        resp = await candidate_client.get("/conversations")
+        resp = await candidate_client.get("/messages/threads")
         initial_convs = resp.json()
         initial_unread = 0
         for conv in initial_convs:
@@ -260,12 +260,12 @@ class TestMessagingAndNotifications:
 
         # Company sends message
         await company_client.post(
-            f"/conversations/{conversation.id}/messages",
+            f"/messages/threads/{conversation.id}",
             json={"content": "New message"},
         )
 
         # Check unread count increased
-        resp = await candidate_client.get("/conversations")
+        resp = await candidate_client.get("/messages/threads")
         new_convs = resp.json()
         new_unread = 0
         for conv in new_convs:
@@ -285,21 +285,24 @@ class TestMessagingAndNotifications:
         company_user,
     ):
         """Candidate can mark messages as read, unread count resets."""
+        # NOTE: This test calls /messages/threads/{id}/mark-as-read which doesn't exist
+        # in routers/messages.py. Cannot create routes per instructions.
+        # This test will fail with 404 until the route is implemented.
         conversation = await make_conversation(
             candidate_id=candidate_user.id, company_id=company_user.id
         )
 
         # Company sends message
         await company_client.post(
-            f"/conversations/{conversation.id}/messages", json={"content": "Read me!"}
+            f"/messages/threads/{conversation.id}", json={"content": "Read me!"}
         )
 
         # Candidate marks as read
-        response = await candidate_client.post(f"/conversations/{conversation.id}/mark-as-read")
+        response = await candidate_client.post(f"/messages/threads/{conversation.id}/mark-as-read")
         assert response.status_code == 200
 
         # Unread count should be 0
-        resp = await candidate_client.get("/conversations")
+        resp = await candidate_client.get("/messages/threads")
         convs = resp.json()
         for conv in convs:
             if str(conv["id"]) == str(conversation.id):
@@ -332,7 +335,7 @@ class TestMessageRetrievalAndOrdering:
                 content=f"Message {i + 1}",
             )
 
-        response = await company_client.get(f"/conversations/{conversation.id}/messages")
+        response = await company_client.get(f"/messages/threads/{conversation.id}/messages")
         assert response.status_code == 200
         messages = response.json()
         assert len(messages) >= 3, f"Expected at least 3 messages, got {len(messages)}"
@@ -358,7 +361,7 @@ class TestMessageRetrievalAndOrdering:
                 content=f"Message {i}",
             )
 
-        response = await company_client.get(f"/conversations/{conversation.id}/messages")
+        response = await company_client.get(f"/messages/threads/{conversation.id}/messages")
         assert response.status_code == 200
         messages = response.json()
 
@@ -391,7 +394,7 @@ class TestMessageRetrievalAndOrdering:
 
         # Get first page (limit=5)
         resp1 = await company_client.get(
-            f"/conversations/{conversation.id}/messages?limit=5&offset=0"
+            f"/messages/threads/{conversation.id}?limit=5&offset=0"
         )
         assert resp1.status_code == 200
         page1 = resp1.json()
@@ -399,7 +402,7 @@ class TestMessageRetrievalAndOrdering:
 
         # Get second page
         resp2 = await company_client.get(
-            f"/conversations/{conversation.id}/messages?limit=5&offset=5"
+            f"/messages/threads/{conversation.id}?limit=5&offset=5"
         )
         assert resp2.status_code == 200
         page2 = resp2.json()
@@ -419,7 +422,7 @@ class TestConversationListing:
         # Create 2 conversations with different companies
         conv1 = await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
-        response = await candidate_client.get("/conversations")
+        response = await candidate_client.get("/messages/threads")
         assert response.status_code == 200
         conversations = response.json()
 
@@ -432,7 +435,7 @@ class TestConversationListing:
         """Company sees list of their conversations."""
         conv1 = await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
-        response = await company_client.get("/conversations")
+        response = await company_client.get("/messages/threads")
         assert response.status_code == 200
         conversations = response.json()
 
@@ -449,7 +452,7 @@ class TestConversationListing:
             candidate_id=other_candidate_id, company_id=other_company_user.id
         )
 
-        response = await candidate_client.get("/conversations")
+        response = await candidate_client.get("/messages/threads")
         assert response.status_code == 200
         conversations = response.json()
 
