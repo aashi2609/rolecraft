@@ -201,7 +201,7 @@ async def get_job_stats(db, job_ids: list) -> dict:
     return stats
 
 
-async def enrich_job(job: JobPosting, company: Company = None, stats: dict = None) -> JobOut:
+async def enrich_job(job: JobPosting, *, company: Company, stats: dict = None) -> JobOut:
     """Enrich job with company name and application pipeline counts.
 
     matched     = total applications for this job (pipeline size)
@@ -212,12 +212,11 @@ async def enrich_job(job: JobPosting, company: Company = None, stats: dict = Non
 
     Args:
         job: JobPosting model instance
-        company: Pre-loaded Company instance (from eager load). If None, uses job.company.
+        company: Pre-loaded Company instance (from eager load or db.refresh).
+                 Keyword-only and required so callers that forget it get a
+                 clear TypeError instead of a MissingGreenlet 500 in prod.
         stats: Pre-computed stats dict from get_job_stats(). If None, uses defaults.
     """
-    # Use pre-loaded company if available (from eager load), otherwise try lazy load
-    company_obj = company or (job.company if hasattr(job, "company") else None)
-
     # Use pre-computed stats if available, otherwise defaults
     job_stats = (
         stats.get(job.id, {"matched": 0, "shortlisted": 0})
@@ -226,7 +225,7 @@ async def enrich_job(job: JobPosting, company: Company = None, stats: dict = Non
     )
 
     data = JobOut.model_validate(job)
-    data.company_name = company_obj.name if company_obj else None
+    data.company_name = company.name if company else None
     # Enum values already coerced by JobOut validators; keep explicit .value for clarity
     if job.job_type is not None:
         data.job_type = job.job_type.value
