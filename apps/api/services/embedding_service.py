@@ -108,7 +108,9 @@ def build_resume_embedding_text(resume: Resume) -> str:
     content = resume.content or {}
     highlighted = content.get("highlightedSkills") or content.get("skills") or []
     skills = (
-        " ".join(str(s) for s in highlighted) if isinstance(highlighted, list) else str(highlighted)
+        " ".join(str(s) for s in highlighted)
+        if isinstance(highlighted, list)
+        else str(highlighted)
     )
     summary = content.get("summary") or ""
     mapping = content.get("mappingNotes") or content.get("mapping_notes") or ""
@@ -135,7 +137,9 @@ async def refresh_job_embedding(db: AsyncSession, job: JobPosting) -> None:
     await db.flush()
 
 
-async def refresh_resume_embeddings_for_candidate(db: AsyncSession, candidate_id: UUID) -> int:
+async def refresh_resume_embeddings_for_candidate(
+    db: AsyncSession, candidate_id: UUID
+) -> int:
     """Re-embed all resumes for a candidate after profile update.
 
     Returns count of successfully embedded resumes.

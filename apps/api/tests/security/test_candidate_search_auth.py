@@ -63,9 +63,9 @@ def test_search_unpaid_company_returns_403(client: TestClient) -> None:
     assert r.status_code == 403, f"Expected 403, got {r.status_code}: {r.text}"
     data = r.json()
     detail = data.get("detail", "").lower()
-    assert "subscription" in detail or "upgrade" in detail, (
-        f"Expected upgrade message, got {detail}"
-    )
+    assert (
+        "subscription" in detail or "upgrade" in detail
+    ), f"Expected upgrade message, got {detail}"
 
 
 def test_search_paid_company_returns_200_and_no_pii_keys(client: TestClient) -> None:
@@ -100,9 +100,9 @@ def test_search_paid_company_returns_200_and_no_pii_keys(client: TestClient) -> 
     # Assert on actual keys returned in payload
     for item in data:
         present_forbidden = forbidden_keys.intersection(item.keys())
-        assert not present_forbidden, (
-            f"PII fields leaked in candidate search payload: {present_forbidden}"
-        )
+        assert (
+            not present_forbidden
+        ), f"PII fields leaked in candidate search payload: {present_forbidden}"
 
 
 def test_search_admin_allowed(client: TestClient) -> None:

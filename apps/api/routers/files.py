@@ -89,7 +89,9 @@ async def _check_file_access(db, file_record: FileRecord, user: User) -> None:
         # Documents (resumes, marksheets, certificates): only if the
         # candidate has applied/been-shortlisted to one of the company's jobs.
         if file_record.category == FileCategory.document:
-            has_rel = await _company_has_candidate_relationship(db, user.id, file_record.owner_id)
+            has_rel = await _company_has_candidate_relationship(
+                db, user.id, file_record.owner_id
+            )
             if has_rel:
                 return
 

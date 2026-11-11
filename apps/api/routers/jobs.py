@@ -74,7 +74,9 @@ async def parse_jd(
     else:
         data, _, _ = await validate_upload(file, "document")
         if not (data.startswith(b"%PDF") or lower.endswith(".pdf")):
-            raise HTTPException(status_code=400, detail="Upload a PDF or TXT job description")
+            raise HTTPException(
+                status_code=400, detail="Upload a PDF or TXT job description"
+            )
 
     parsed = await parse_job_description(data, filename=safe_filename)
     return JobParsedJDOut.model_validate(parsed)
@@ -91,14 +93,18 @@ async def create_job(
 
     if user.role == UserRole.admin:
         if not body.company_id:
-            raise HTTPException(status_code=400, detail="company_id is required for admins")
+            raise HTTPException(
+                status_code=400, detail="company_id is required for admins"
+            )
         company_id = body.company_id
         company_exists = await db.get(User, company_id)
         if not company_exists or company_exists.role != UserRole.company:
             raise HTTPException(status_code=400, detail="Company not found")
     else:
         if body.company_id and body.company_id != user.id:
-            raise HTTPException(status_code=403, detail="Cannot create job for another company")
+            raise HTTPException(
+                status_code=403, detail="Cannot create job for another company"
+            )
         company_id = user.id
 
     if status in (JobStatus.live, JobStatus.draft):
@@ -150,9 +156,15 @@ async def list_jobs(
     country: str | None = None,
     state: str | None = None,
     city: str | None = None,
-    exclude_country: str | None = Query(None, description="Comma-separated countries to exclude"),
-    exclude_state: str | None = Query(None, description="Comma-separated states to exclude"),
-    exclude_city: str | None = Query(None, description="Comma-separated cities to exclude"),
+    exclude_country: str | None = Query(
+        None, description="Comma-separated countries to exclude"
+    ),
+    exclude_state: str | None = Query(
+        None, description="Comma-separated states to exclude"
+    ),
+    exclude_city: str | None = Query(
+        None, description="Comma-separated cities to exclude"
+    ),
     employment_type: str | None = None,
     job_type: str | None = None,
     experience_range: str | None = None,
@@ -230,7 +242,9 @@ async def my_jobs(user: CompanyUser, db: DbSession):
 
 @router.get("/hidden")
 async def list_hidden_jobs(user: CandidateUser, db: DbSession):
-    hidden = await db.scalars(select(HiddenJob.job_id).where(HiddenJob.candidate_id == user.id))
+    hidden = await db.scalars(
+        select(HiddenJob.job_id).where(HiddenJob.candidate_id == user.id)
+    )
     return {"job_ids": [str(j) for j in hidden.all()]}
 
 
@@ -239,13 +253,19 @@ async def get_job(
     job_id: UUID, db: DbSession, user: User | None = Depends(get_optional_current_user)
 ):
     result = await db.execute(
-        select(JobPosting).where(JobPosting.id == job_id).options(selectinload(JobPosting.company))
+        select(JobPosting)
+        .where(JobPosting.id == job_id)
+        .options(selectinload(JobPosting.company))
     )
     job = result.scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     if job.status != JobStatus.live:
-        is_owner = user is not None and user.role == UserRole.company and job.company_id == user.id
+        is_owner = (
+            user is not None
+            and user.role == UserRole.company
+            and job.company_id == user.id
+        )
         if not is_owner:
             raise HTTPException(status_code=404, detail="Job not found")
 
@@ -283,7 +303,9 @@ async def update_job(job_id: UUID, body: JobUpdate, user: CompanyUser, db: DbSes
 
 
 @router.patch("/{job_id:uuid}/status", response_model=JobOut)
-async def patch_status(job_id: UUID, body: JobStatusUpdate, user: CompanyUser, db: DbSession):
+async def patch_status(
+    job_id: UUID, body: JobStatusUpdate, user: CompanyUser, db: DbSession
+):
     job = await db.get(JobPosting, job_id)
     if not job or job.company_id != user.id:
         raise HTTPException(status_code=404, detail="Not found")
@@ -312,7 +334,9 @@ async def hide_job(job_id: UUID, user: CandidateUser, db: DbSession):
         raise HTTPException(status_code=404, detail="Job not found")
 
     hidden = await db.scalar(
-        select(HiddenJob).where(HiddenJob.job_id == job_id, HiddenJob.candidate_id == user.id)
+        select(HiddenJob).where(
+            HiddenJob.job_id == job_id, HiddenJob.candidate_id == user.id
+        )
     )
     if not hidden:
         db.add(HiddenJob(candidate_id=user.id, job_id=job_id))
@@ -323,7 +347,9 @@ async def hide_job(job_id: UUID, user: CandidateUser, db: DbSession):
 @router.delete("/{job_id:uuid}/hide")
 async def unhide_job(job_id: UUID, user: CandidateUser, db: DbSession):
     hidden = await db.scalar(
-        select(HiddenJob).where(HiddenJob.job_id == job_id, HiddenJob.candidate_id == user.id)
+        select(HiddenJob).where(
+            HiddenJob.job_id == job_id, HiddenJob.candidate_id == user.id
+        )
     )
     if hidden:
         await db.delete(hidden)

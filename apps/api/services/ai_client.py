@@ -100,7 +100,9 @@ class CircuitBreakerState:
 _circuit_breaker = CircuitBreakerState()
 
 
-def _calculate_backoff_with_jitter(attempt: int, retry_after: int | None = None) -> float:
+def _calculate_backoff_with_jitter(
+    attempt: int, retry_after: int | None = None
+) -> float:
     """Calculate backoff duration with jitter to prevent thundering herd.
 
     Args:
@@ -211,7 +213,9 @@ async def generate_content(
     api_key = settings.groq_api_key
     if not api_key or not api_key.strip():
         logger.error("GROQ_API_KEY is not configured or empty")
-        raise AIServiceError("GROQ_API_KEY is not configured", error_code="ai_auth_failed")
+        raise AIServiceError(
+            "GROQ_API_KEY is not configured", error_code="ai_auth_failed"
+        )
 
     used_model = model or settings.groq_model
 
@@ -279,13 +283,17 @@ async def generate_content(
 
             choices = data.get("choices", [])
             if not choices:
-                raise AIServiceError("Groq returned no choices", error_code="ai_bad_output")
+                raise AIServiceError(
+                    "Groq returned no choices", error_code="ai_bad_output"
+                )
 
             message = choices[0].get("message", {})
             text = _extract_message_text(message)
 
             if not text:
-                raise AIServiceError("Groq returned empty response", error_code="ai_bad_output")
+                raise AIServiceError(
+                    "Groq returned empty response", error_code="ai_bad_output"
+                )
 
             parsed = _parse_json_response(text)
 
@@ -313,7 +321,9 @@ async def generate_content(
 
         except httpx.HTTPStatusError as exc:
             status_code = exc.response.status_code
-            error_text = exc.response.text[:200] if exc.response.text else "No error details"
+            error_text = (
+                exc.response.text[:200] if exc.response.text else "No error details"
+            )
 
             # 401/403: Auth failures - don't retry
             if status_code in (401, 403):
@@ -400,18 +410,28 @@ async def generate_content(
             _circuit_breaker.record_failure()
 
         except Exception as exc:
-            last_error = AIServiceError(f"Groq call failed: {exc}", error_code="ai_unavailable")
-            logger.warning("Groq unexpected error (attempt %d/%d): %s", attempt, retries, exc)
+            last_error = AIServiceError(
+                f"Groq call failed: {exc}", error_code="ai_unavailable"
+            )
+            logger.warning(
+                "Groq unexpected error (attempt %d/%d): %s", attempt, retries, exc
+            )
             _circuit_breaker.record_failure()
 
         # Exponential backoff with jitter (for non-429 errors)
-        if attempt < retries and last_error and last_error.error_code != "ai_rate_limited":
+        if (
+            attempt < retries
+            and last_error
+            and last_error.error_code != "ai_rate_limited"
+        ):
             wait = _calculate_backoff_with_jitter(attempt)
             logger.info("Waiting %.1fs before retry %d...", wait, attempt + 1)
             await asyncio.sleep(wait)
 
     # All retries exhausted
-    error_msg = f"Groq call failed after {retries} retries (deadline: {deadline_seconds}s)"
+    error_msg = (
+        f"Groq call failed after {retries} retries (deadline: {deadline_seconds}s)"
+    )
     if last_error:
         error_msg += f": {last_error}"
 

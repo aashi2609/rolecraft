@@ -149,7 +149,9 @@ class TestAuditLogging:
         await db_session.commit()
 
         audit = await db_session.scalar(
-            select(SubscriptionAuditLog).where(SubscriptionAuditLog.subscription_id == sub_id)
+            select(SubscriptionAuditLog).where(
+                SubscriptionAuditLog.subscription_id == sub_id
+            )
         )
         assert audit is not None
         assert audit.action == "update"
@@ -379,7 +381,9 @@ class TestAuditLogIntegrity:
         await db_session.commit()
 
         audit = await db_session.scalar(
-            select(SubscriptionAuditLog).where(SubscriptionAuditLog.subscription_id == sub_id)
+            select(SubscriptionAuditLog).where(
+                SubscriptionAuditLog.subscription_id == sub_id
+            )
         )
 
         assert audit.subscription_id == sub_id

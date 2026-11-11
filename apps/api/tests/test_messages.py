@@ -26,9 +26,9 @@ class TestConversationAuthorization:
         response = await company_client.post(
             "/conversations", json={"candidate_id": str(candidate_user.id)}
         )
-        assert response.status_code == 201, (
-            f"Expected 201, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 201
+        ), f"Expected 201, got {response.status_code}: {response.text}"
         data = response.json()
         assert data["status"] == "open"
         assert str(data["candidate_id"]) == str(candidate_user.id)
@@ -41,9 +41,10 @@ class TestConversationAuthorization:
             "/conversations", json={"company_id": str(company_user.id)}
         )
         # Should return 403 (forbidden) or 405 (method not allowed for role)
-        assert response.status_code in [403, 405], (
-            f"Expected 403 or 405, got {response.status_code}"
-        )
+        assert response.status_code in [
+            403,
+            405,
+        ], f"Expected 403 or 405, got {response.status_code}"
 
     async def test_candidate_accesses_own_conversation(
         self, candidate_client, make_conversation, candidate_user
@@ -64,9 +65,9 @@ class TestConversationAuthorization:
             candidate_id=other_candidate_id, company_id=other_company_user.id
         )
         response = await candidate_client.get(f"/conversations/{conversation.id}")
-        assert response.status_code == 404, (
-            f"Expected 404 (IDOR prevention), got {response.status_code}"
-        )
+        assert (
+            response.status_code == 404
+        ), f"Expected 404 (IDOR prevention), got {response.status_code}"
 
     async def test_one_conversation_per_candidate_company_pair(
         self, company_client, candidate_user, make_conversation, db_session
@@ -84,7 +85,10 @@ class TestConversationAuthorization:
             "/conversations", json={"candidate_id": str(candidate_user.id)}
         )
         # Should either return existing conversation or 409 (conflict)
-        assert resp2.status_code in [200, 409], f"Expected 200 or 409, got {resp2.status_code}"
+        assert resp2.status_code in [
+            200,
+            409,
+        ], f"Expected 200 or 409, got {resp2.status_code}"
 
         if resp2.status_code == 200:
             # Should be the same conversation
@@ -111,9 +115,9 @@ class TestMessagingAndNotifications:
             f"/conversations/{conversation.id}/messages",
             json={"content": "Hello, interested in this role?"},
         )
-        assert response.status_code == 201, (
-            f"Expected 201, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 201
+        ), f"Expected 201, got {response.status_code}: {response.text}"
         data = response.json()
         assert data["content"] == "Hello, interested in this role?"
         assert str(data["conversation_id"]) == str(conversation.id)
@@ -156,9 +160,10 @@ class TestMessagingAndNotifications:
             f"/conversations/{conversation.id}/messages",
             json={"content": "Trying to hijack this conversation"},
         )
-        assert response.status_code in [403, 404], (
-            f"Expected 403 or 404 (access denied), got {response.status_code}"
-        )
+        assert response.status_code in [
+            403,
+            404,
+        ], f"Expected 403 or 404 (access denied), got {response.status_code}"
 
     async def test_notification_created_on_new_message(
         self,
@@ -189,7 +194,9 @@ class TestMessagingAndNotifications:
         notifications = (
             (
                 await db_session.execute(
-                    select(Notification).where(Notification.user_id == candidate_user.id)
+                    select(Notification).where(
+                        Notification.user_id == candidate_user.id
+                    )
                 )
             )
             .scalars()
@@ -200,7 +207,8 @@ class TestMessagingAndNotifications:
         notification = notifications[0]
         assert notification.notification_type == "message"
         assert (
-            "message" in notification.content.lower() or "replied" in notification.content.lower()
+            "message" in notification.content.lower()
+            or "replied" in notification.content.lower()
         )
 
     async def test_unread_count_increments(
@@ -239,9 +247,9 @@ class TestMessagingAndNotifications:
             if str(conv["id"]) == str(conversation.id):
                 new_unread = conv.get("unread_count", 0)
 
-        assert new_unread > initial_unread, (
-            f"Unread count should increase from {initial_unread} to > {initial_unread}, got {new_unread}"
-        )
+        assert (
+            new_unread > initial_unread
+        ), f"Unread count should increase from {initial_unread} to > {initial_unread}, got {new_unread}"
 
     async def test_mark_messages_as_read(
         self,
@@ -262,7 +270,9 @@ class TestMessagingAndNotifications:
         )
 
         # Candidate marks as read
-        response = await candidate_client.post(f"/conversations/{conversation.id}/mark-as-read")
+        response = await candidate_client.post(
+            f"/conversations/{conversation.id}/mark-as-read"
+        )
         assert response.status_code == 200
 
         # Unread count should be 0
@@ -270,9 +280,9 @@ class TestMessagingAndNotifications:
         convs = resp.json()
         for conv in convs:
             if str(conv["id"]) == str(conversation.id):
-                assert conv.get("unread_count", 0) == 0, (
-                    f"Unread count should be 0 after marking read, got {conv['unread_count']}"
-                )
+                assert (
+                    conv.get("unread_count", 0) == 0
+                ), f"Unread count should be 0 after marking read, got {conv['unread_count']}"
 
 
 class TestMessageRetrievalAndOrdering:
@@ -299,7 +309,9 @@ class TestMessageRetrievalAndOrdering:
                 content=f"Message {i + 1}",
             )
 
-        response = await company_client.get(f"/conversations/{conversation.id}/messages")
+        response = await company_client.get(
+            f"/conversations/{conversation.id}/messages"
+        )
         assert response.status_code == 200
         messages = response.json()
         assert len(messages) >= 3, f"Expected at least 3 messages, got {len(messages)}"
@@ -325,7 +337,9 @@ class TestMessageRetrievalAndOrdering:
                 content=f"Message {i}",
             )
 
-        response = await company_client.get(f"/conversations/{conversation.id}/messages")
+        response = await company_client.get(
+            f"/conversations/{conversation.id}/messages"
+        )
         assert response.status_code == 200
         messages = response.json()
 
@@ -384,7 +398,9 @@ class TestConversationListing:
     ):
         """Candidate sees list of their conversations."""
         # Create 2 conversations with different companies
-        conv1 = await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
+        conv1 = await make_conversation(
+            candidate_id=candidate_user.id, company_id=company_user.id
+        )
 
         response = await candidate_client.get("/conversations")
         assert response.status_code == 200
@@ -397,7 +413,9 @@ class TestConversationListing:
         self, company_client, make_conversation, candidate_user, company_user
     ):
         """Company sees list of their conversations."""
-        conv1 = await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
+        conv1 = await make_conversation(
+            candidate_id=candidate_user.id, company_id=company_user.id
+        )
 
         response = await company_client.get("/conversations")
         assert response.status_code == 200
@@ -421,6 +439,6 @@ class TestConversationListing:
         conversations = response.json()
 
         conv_ids = [str(c["id"]) for c in conversations]
-        assert str(other_conv.id) not in conv_ids, (
-            "Candidate should not see other candidates' conversations"
-        )
+        assert (
+            str(other_conv.id) not in conv_ids
+        ), "Candidate should not see other candidates' conversations"

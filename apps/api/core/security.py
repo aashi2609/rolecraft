@@ -30,7 +30,9 @@ def create_access_token(
     expires_minutes: Optional[int] = None,
 ) -> str:
     now = datetime.now(timezone.utc)
-    expire = now + timedelta(minutes=expires_minutes or settings.access_token_expire_minutes)
+    expire = now + timedelta(
+        minutes=expires_minutes or settings.access_token_expire_minutes
+    )
     payload: dict[str, Any] = {
         "sub": str(user_id),
         "role": role,

@@ -313,7 +313,9 @@ async def check_plan_expired(user: User, db) -> bool:
     if not entitlements.is_active:
         return True
 
-    if entitlements.valid_until and entitlements.valid_until < datetime.now(timezone.utc):
+    if entitlements.valid_until and entitlements.valid_until < datetime.now(
+        timezone.utc
+    ):
         return True
 
     return False

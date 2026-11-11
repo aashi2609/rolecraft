@@ -53,7 +53,9 @@ def apply_location_filter(query, location: Optional[str]):
         loc_conditions.append(CandidateProfile.permanent_address.ilike(pattern))
         # preferred_locations is ARRAY(String) — cast to text for ilike
         loc_conditions.append(
-            func.array_to_string(CandidateProfile.preferred_locations, ",").ilike(pattern)
+            func.array_to_string(CandidateProfile.preferred_locations, ",").ilike(
+                pattern
+            )
         )
     return query.where(or_(*loc_conditions))
 
@@ -80,7 +82,9 @@ def apply_skills_filter(query, skills: Optional[str]):
     return query
 
 
-def apply_experience_filter(query, experience_min: Optional[int], experience_max: Optional[int]):
+def apply_experience_filter(
+    query, experience_min: Optional[int], experience_max: Optional[int]
+):
     """Apply experience range filter (checks career_level)."""
     if experience_min is None and experience_max is None:
         return query
@@ -88,10 +92,14 @@ def apply_experience_filter(query, experience_min: Optional[int], experience_max
     exp_conditions = []
     if experience_min is not None:
         if experience_min >= 5:
-            exp_conditions.append(CandidateProfile.career_level.in_(["Experienced", "Senior"]))
+            exp_conditions.append(
+                CandidateProfile.career_level.in_(["Experienced", "Senior"])
+            )
         elif experience_min >= 3:
             exp_conditions.append(
-                CandidateProfile.career_level.in_(["Mid Career", "Experienced", "Senior"])
+                CandidateProfile.career_level.in_(
+                    ["Mid Career", "Experienced", "Senior"]
+                )
             )
         elif experience_min >= 1:
             exp_conditions.append(
@@ -103,7 +111,9 @@ def apply_experience_filter(query, experience_min: Optional[int], experience_max
         if experience_max < 1:
             exp_conditions.append(CandidateProfile.career_level == "Fresher")
         elif experience_max < 3:
-            exp_conditions.append(CandidateProfile.career_level.in_(["Fresher", "Early Career"]))
+            exp_conditions.append(
+                CandidateProfile.career_level.in_(["Fresher", "Early Career"])
+            )
     if exp_conditions:
         return query.where(or_(*exp_conditions))
     return query
@@ -124,13 +134,17 @@ def apply_salary_filter(
         return query
 
     # Join Experience if not already joined
-    query = query.outerjoin(Experience, CandidateProfile.user_id == Experience.candidate_id)
+    query = query.outerjoin(
+        Experience, CandidateProfile.user_id == Experience.candidate_id
+    )
 
     # Build salary conditions
     conditions = []
 
     # Extract first number from expected_salary string (e.g., "8-12 LPA" → 8)
-    salary_expr = func.cast(func.substring(Experience.expected_salary, r"^\d+"), Integer)
+    salary_expr = func.cast(
+        func.substring(Experience.expected_salary, r"^\d+"), Integer
+    )
 
     if salary_min is not None:
         conditions.append(salary_expr >= salary_min)
@@ -152,7 +166,9 @@ def apply_education_filter(query, education: Optional[str]):
     if not education:
         return query
 
-    query = query.outerjoin(Education, CandidateProfile.user_id == Education.candidate_id)
+    query = query.outerjoin(
+        Education, CandidateProfile.user_id == Education.candidate_id
+    )
     education_lower = f"%{education.lower()}%"
     return query.where(
         or_(
@@ -168,7 +184,9 @@ def apply_title_filter(query, title: Optional[str]):
     if not title:
         return query
 
-    query = query.outerjoin(Experience, CandidateProfile.user_id == Experience.candidate_id)
+    query = query.outerjoin(
+        Experience, CandidateProfile.user_id == Experience.candidate_id
+    )
     title_lower = f"%{title.lower()}%"
     return query.where(
         or_(
@@ -199,7 +217,9 @@ def calculate_experience_years(experience_list) -> int:
     if not experience_list:
         return 0
 
-    latest_exp = max(experience_list, key=lambda e: e.from_date or date.min, default=None)
+    latest_exp = max(
+        experience_list, key=lambda e: e.from_date or date.min, default=None
+    )
     if not latest_exp or not latest_exp.from_date:
         return 0
 
@@ -216,7 +236,9 @@ def get_job_title(experience_list) -> Optional[str]:
     if not experience_list:
         return None
 
-    latest_exp = max(experience_list, key=lambda e: e.from_date or date.min, default=None)
+    latest_exp = max(
+        experience_list, key=lambda e: e.from_date or date.min, default=None
+    )
     if latest_exp:
         return latest_exp.role or latest_exp.designation
     return None
@@ -288,7 +310,9 @@ def transform_profile_to_search_out(
     rationale = "Profile matches target role based on skills and experience"
 
     links = profile.weblinks or {}
-    display_name = (links.get("display_name") or links.get("full_name") or "").strip() or None
+    display_name = (
+        links.get("display_name") or links.get("full_name") or ""
+    ).strip() or None
     if not display_name and profile.user and profile.user.email:
         display_name = profile.user.email.split("@")[0].replace(".", " ").title()
 
@@ -297,7 +321,9 @@ def transform_profile_to_search_out(
         name=display_name,
         title=job_title,
         experience_years=exp_years if exp_years > 0 else None,
-        location=(profile.preferred_locations[0] if profile.preferred_locations else None),
+        location=(
+            profile.preferred_locations[0] if profile.preferred_locations else None
+        ),
         skills=skill_names[:10],  # Limit to top 10 skills
         match_percent=round(match_score, 1),
         education=education_level,
@@ -344,7 +370,9 @@ async def search_candidates(
     query = apply_experience_filter(query, experience_min, experience_max)
     query = apply_education_filter(query, education)
     query = apply_title_filter(query, title)
-    query = apply_salary_filter(query, salary_min, salary_max, include_null_salary=False)  # Step 5D
+    query = apply_salary_filter(
+        query, salary_min, salary_max, include_null_salary=False
+    )  # Step 5D
 
     # Use distinct to avoid duplicate profiles from outer joins
     query = query.distinct()
@@ -367,7 +395,9 @@ async def search_candidates(
     # Transform to output format (NO salary filtering here - already done in SQL)
     candidates = []
     for profile in profiles:
-        candidate_out = transform_profile_to_search_out(profile, salary_min=None, salary_max=None)
+        candidate_out = transform_profile_to_search_out(
+            profile, salary_min=None, salary_max=None
+        )
         if candidate_out:
             candidates.append(candidate_out)
 

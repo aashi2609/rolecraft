@@ -33,7 +33,9 @@ def _signup(client: TestClient, role: str = "candidate") -> tuple[str, str]:
     return data["access_token"], data["user_id"]
 
 
-def _upload_png(client: TestClient, token: str, endpoint: str = "/uploads/photo") -> dict:
+def _upload_png(
+    client: TestClient, token: str, endpoint: str = "/uploads/photo"
+) -> dict:
     headers = {"Authorization": f"Bearer {token}"}
     png = (
         b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
@@ -64,7 +66,9 @@ def test_unauthenticated_file_access_blocked(client: TestClient) -> None:
 
     # Try fetching with no auth header
     r = client.get(url)
-    assert r.status_code == 401, f"Expected 401 for unauthenticated access, got {r.status_code}"
+    assert (
+        r.status_code == 401
+    ), f"Expected 401 for unauthenticated access, got {r.status_code}"
 
 
 def test_file_access_owner_and_other_candidate(client: TestClient) -> None:
@@ -81,7 +85,9 @@ def test_file_access_owner_and_other_candidate(client: TestClient) -> None:
 
     # Other candidate is denied with 404
     r_other = client.get(url, headers={"Authorization": f"Bearer {tok_b}"})
-    assert r_other.status_code == 404, f"Other candidate expected 404, got {r_other.status_code}"
+    assert (
+        r_other.status_code == 404
+    ), f"Other candidate expected 404, got {r_other.status_code}"
 
 
 def test_company_access_to_candidate_document_requires_application(
@@ -122,7 +128,9 @@ def test_company_access_to_candidate_document_requires_application(
         )
         if r_apply.status_code == 200:
             # Now Co1 can access candidate's document
-            r_co1_after = client.get(url, headers={"Authorization": f"Bearer {tok_co1}"})
+            r_co1_after = client.get(
+                url, headers={"Authorization": f"Bearer {tok_co1}"}
+            )
             assert r_co1_after.status_code == 200
 
             # Co2 still cannot access candidate's document -> 404

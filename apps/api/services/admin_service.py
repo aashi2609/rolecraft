@@ -25,27 +25,39 @@ async def get_dashboard_stats(db) -> dict[str, Any]:
     total_users = await db.scalar(select(func.count()).select_from(User)) or 0
     total_candidates = (
         await db.scalar(
-            select(func.count()).select_from(User).where(User.role == UserRole.candidate)
+            select(func.count())
+            .select_from(User)
+            .where(User.role == UserRole.candidate)
         )
         or 0
     )
     total_companies = (
-        await db.scalar(select(func.count()).select_from(User).where(User.role == UserRole.company))
+        await db.scalar(
+            select(func.count()).select_from(User).where(User.role == UserRole.company)
+        )
         or 0
     )
     total_admins = (
-        await db.scalar(select(func.count()).select_from(User).where(User.role == UserRole.admin))
+        await db.scalar(
+            select(func.count()).select_from(User).where(User.role == UserRole.admin)
+        )
         or 0
     )
     total_jobs = await db.scalar(select(func.count()).select_from(JobPosting)) or 0
     active_jobs = (
         await db.scalar(
-            select(func.count()).select_from(JobPosting).where(JobPosting.status == JobStatus.live)
+            select(func.count())
+            .select_from(JobPosting)
+            .where(JobPosting.status == JobStatus.live)
         )
         or 0
     )
-    total_applications = await db.scalar(select(func.count()).select_from(Application)) or 0
-    total_subscriptions = await db.scalar(select(func.count()).select_from(Subscription)) or 0
+    total_applications = (
+        await db.scalar(select(func.count()).select_from(Application)) or 0
+    )
+    total_subscriptions = (
+        await db.scalar(select(func.count()).select_from(Subscription)) or 0
+    )
     active_subscriptions = (
         await db.scalar(
             select(func.count())
@@ -62,7 +74,8 @@ async def get_dashboard_stats(db) -> dict[str, Any]:
         .group_by(Subscription.plan_tier)
     )
     plan_breakdown = {
-        str(row[0].value if hasattr(row[0], "value") else row[0]): row[1] for row in plan_rows.all()
+        str(row[0].value if hasattr(row[0], "value") else row[0]): row[1]
+        for row in plan_rows.all()
     }
 
     return {

@@ -39,7 +39,9 @@ async def test_force_deterministic_skips_ai():
             new_callable=AsyncMock,
         ) as ai,
     ):
-        result = await resume_service.generate_resume_for_vertical(profile, "Software", ["Python"])
+        result = await resume_service.generate_resume_for_vertical(
+            profile, "Software", ["Python"]
+        )
 
     assert result["ats_score"] == 80
     det.assert_awaited_once()

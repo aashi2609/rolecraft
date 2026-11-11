@@ -41,15 +41,13 @@ def upgrade() -> None:
         ),
     )
     # Backfill: set to same value as profile's profile_updated_at so existing resumes are NOT stale
-    op.execute(
-        """
+    op.execute("""
         UPDATE resumes r
         SET generated_from_profile_at = cp.profile_updated_at
         FROM candidate_profiles cp
         WHERE r.candidate_id = cp.user_id
         AND r.generated_from_profile_at IS NULL
-        """
-    )
+        """)
 
 
 def downgrade() -> None:

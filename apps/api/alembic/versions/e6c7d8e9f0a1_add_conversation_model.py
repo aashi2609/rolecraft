@@ -127,8 +127,7 @@ def upgrade() -> None:
     # 4. Job linkage (thread_id matches job_postings.id -> company)
     #
     # Then validate that both participants exist in companies and candidate_profiles.
-    conn.execute(
-        sa.text("""
+    conn.execute(sa.text("""
         CREATE TEMPORARY TABLE _msg_inference AS
         WITH direct_pairs AS (
             SELECT
@@ -195,12 +194,10 @@ def upgrade() -> None:
         LEFT JOIN thread_peers tp ON tp.thread_id = m.thread_id
         LEFT JOIN app_linkage  al ON al.thread_id = m.thread_id
         LEFT JOIN job_linkage  jl ON jl.thread_id = m.thread_id;
-    """)
-    )
+    """))
 
     # Step 4a: Insert distinct valid conversations
-    conn.execute(
-        sa.text("""
+    conn.execute(sa.text("""
         INSERT INTO conversations (id, company_id, candidate_id, job_id, created_at, last_message_at)
         SELECT
             gen_random_uuid(),
@@ -217,12 +214,10 @@ def upgrade() -> None:
         ON CONFLICT (company_id, candidate_id) DO UPDATE
             SET job_id = COALESCE(conversations.job_id, EXCLUDED.job_id),
                 last_message_at = GREATEST(conversations.last_message_at, EXCLUDED.last_message_at)
-    """)
-    )
+    """))
 
     # Step 4b: Backfill conversation_id into messages
-    conn.execute(
-        sa.text("""
+    conn.execute(sa.text("""
         UPDATE messages m
         SET conversation_id = conv.id
         FROM _msg_inference inf
@@ -231,14 +226,12 @@ def upgrade() -> None:
          AND conv.candidate_id = inf.candidate_id
         WHERE m.id = inf.message_id
           AND m.conversation_id IS NULL
-    """)
-    )
+    """))
 
     conn.execute(sa.text("DROP TABLE _msg_inference"))
 
     # ── 5. Quarantine un-mappable messages ────────────────────────────
-    conn.execute(
-        sa.text("""
+    conn.execute(sa.text("""
         INSERT INTO messages_quarantine (id, thread_id, sender_id, sender_role, recipient_id, body, sent_at, quarantine_reason)
         SELECT
             m.id, m.thread_id, m.sender_id, m.sender_role, m.recipient_id, m.body, m.sent_at,
@@ -250,19 +243,16 @@ def upgrade() -> None:
             END
         FROM messages m
         WHERE m.conversation_id IS NULL
-    """)
-    )
+    """))
 
     quarantined = conn.execute(
         sa.text("SELECT count(*) FROM messages_quarantine")
     ).scalar()
 
     # Delete quarantined rows from messages (they are safely in messages_quarantine)
-    conn.execute(
-        sa.text("""
+    conn.execute(sa.text("""
         DELETE FROM messages WHERE conversation_id IS NULL
-    """)
-    )
+    """))
 
     # ── 6. Row-count assertion ────────────────────────────────────────
     remaining = conn.execute(sa.text("SELECT count(*) FROM messages")).scalar()
@@ -322,14 +312,12 @@ def downgrade() -> None:
 
     # 3. Restore quarantined messages back into the messages table
     conn = op.get_bind()
-    conn.execute(
-        sa.text("""
+    conn.execute(sa.text("""
         INSERT INTO messages (id, thread_id, sender_id, sender_role, recipient_id, body, sent_at)
         SELECT id, thread_id, sender_id, sender_role, recipient_id, body, sent_at
         FROM messages_quarantine
         ON CONFLICT (id) DO NOTHING
-    """)
-    )
+    """))
 
     # 4. Drop quarantine and conversations tables
     op.drop_table("messages_quarantine")

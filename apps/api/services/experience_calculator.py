@@ -60,7 +60,9 @@ def total_experience_years(
 
         # Only include if interval has positive duration or is current/today
         if to_dt >= from_dt:
-            is_internship = exp.employment_type and "internship" in exp.employment_type.lower()
+            is_internship = (
+                exp.employment_type and "internship" in exp.employment_type.lower()
+            )
             intervals.append((from_dt, to_dt, is_internship))
 
     if not intervals:

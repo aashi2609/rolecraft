@@ -225,9 +225,9 @@ def test_check_plan_limit_ast_no_unconditional_return():
     source = inspect.getsource(check_plan_limit)
     # 1. No bypass keywords in source
     for kw in ["bypass", "temporarily", "return none"]:
-        assert kw not in source.lower(), (
-            f"Forbidden short-circuit keyword '{kw}' found in check_plan_limit source!"
-        )
+        assert (
+            kw not in source.lower()
+        ), f"Forbidden short-circuit keyword '{kw}' found in check_plan_limit source!"
 
     # 2. Parse AST: ensure no top-level Return statement precedes plan gating logic
     tree = ast.parse(source)
@@ -238,9 +238,9 @@ def test_check_plan_limit_ast_no_unconditional_return():
         for n in func_def.body
         if not (isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant))
     ]
-    assert not isinstance(body_nodes[0], ast.Return), (
-        "check_plan_limit has an unconditional early return at top of function!"
-    )
+    assert not isinstance(
+        body_nodes[0], ast.Return
+    ), "check_plan_limit has an unconditional early return at top of function!"
 
 
 @pytest.mark.skip_db_guard

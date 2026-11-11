@@ -14,7 +14,9 @@ class EnumValidationError(HTTPException, ValueError):
     """
 
     def __init__(self, detail: str):
-        super().__init__(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail)
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail
+        )
 
     def __str__(self) -> str:
         return self.detail

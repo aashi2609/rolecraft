@@ -174,7 +174,9 @@ class SubCreate(BaseModel):
     @classmethod
     def validate_status(cls, v: Any) -> SubscriptionStatus:
         res = coerce_enum(SubscriptionStatus, v, "status")
-        return res if res is not None else SubscriptionStatus.pending  # Default to pending
+        return (
+            res if res is not None else SubscriptionStatus.pending
+        )  # Default to pending
 
 
 class SubscriptionGrant(BaseModel):
@@ -326,7 +328,9 @@ async def delete_user(
 ) -> Any:
     from services.account_deletion_service import delete_user_account
 
-    deleted = await delete_user_account(db, UUID(user_id) if isinstance(user_id, str) else user_id)
+    deleted = await delete_user_account(
+        db, UUID(user_id) if isinstance(user_id, str) else user_id
+    )
     if not deleted:
         raise HTTPException(status_code=404, detail="User not found")
     await db.commit()
@@ -373,7 +377,10 @@ async def get_all_subscriptions(
                 # Fallback to parsing email if no name in weblinks
                 if not user_name:
                     user_name = (
-                        s.user.email.split("@")[0].replace(".", " ").replace("_", " ").title()
+                        s.user.email.split("@")[0]
+                        .replace(".", " ")
+                        .replace("_", " ")
+                        .title()
                     )
         out.append(
             AdminSubOut(
@@ -382,7 +389,9 @@ async def get_all_subscriptions(
                 user_email=user_email,
                 user_name=user_name,
                 role=str(s.role.value if hasattr(s.role, "value") else s.role),
-                plan_tier=str(s.plan_tier.value if hasattr(s.plan_tier, "value") else s.plan_tier),
+                plan_tier=str(
+                    s.plan_tier.value if hasattr(s.plan_tier, "value") else s.plan_tier
+                ),
                 status=str(s.status.value if hasattr(s.status, "value") else s.status),
                 started_at=s.started_at.isoformat(),
                 renews_at=s.renews_at.isoformat() if s.renews_at else None,
@@ -416,7 +425,9 @@ async def update_subscription(
 
     # If changing status to active, require explicit reason with payment proof
     if update_data.status is not None:
-        new_status = coerce_enum(SubscriptionStatus, update_data.status, "status", allow_none=False)
+        new_status = coerce_enum(
+            SubscriptionStatus, update_data.status, "status", allow_none=False
+        )
         if new_status == SubscriptionStatus.active and old_status != "active":
             # Reject: must go through payment verification flow
             raise HTTPException(
@@ -426,7 +437,9 @@ async def update_subscription(
         sub.status = new_status
 
     if update_data.plan_tier is not None:
-        sub.plan_tier = coerce_enum(PlanTier, update_data.plan_tier, "plan_tier", allow_none=False)
+        sub.plan_tier = coerce_enum(
+            PlanTier, update_data.plan_tier, "plan_tier", allow_none=False
+        )
 
     if update_data.role is not None:
         sub.role = coerce_enum(UserRole, update_data.role, "role", allow_none=False)
@@ -469,8 +482,12 @@ async def create_subscription(
     sub = Subscription(
         user_id=UUID(create_data.user_id),
         role=coerce_enum(UserRole, create_data.role, "role", allow_none=False),
-        plan_tier=coerce_enum(PlanTier, create_data.plan_tier, "plan_tier", allow_none=False),
-        status=coerce_enum(SubscriptionStatus, create_data.status, "status", allow_none=False),
+        plan_tier=coerce_enum(
+            PlanTier, create_data.plan_tier, "plan_tier", allow_none=False
+        ),
+        status=coerce_enum(
+            SubscriptionStatus, create_data.status, "status", allow_none=False
+        ),
     )
     db.add(sub)
     await db.flush()
@@ -605,7 +622,9 @@ async def get_all_jobs(
         # Count applications
         app_count = (
             await db.scalar(
-                select(func.count()).select_from(Application).where(Application.job_id == j.id)
+                select(func.count())
+                .select_from(Application)
+                .where(Application.job_id == j.id)
             )
             or 0
         )
@@ -616,7 +635,8 @@ async def get_all_jobs(
                 company_name=j.company.name if j.company else None,
                 company_id=str(j.company_id),
                 status=str(j.status.value if hasattr(j.status, "value") else j.status),
-                location=j.location or ", ".join(filter(None, [j.city, j.state, j.country])),
+                location=j.location
+                or ", ".join(filter(None, [j.city, j.state, j.country])),
                 employment_type=j.employment_type,
                 created_at=j.created_at.isoformat(),
                 application_count=app_count,
@@ -630,12 +650,18 @@ async def get_all_jobs(
                 country=j.country,
                 state=j.state,
                 city=j.city,
-                job_type=str(j.job_type.value) if hasattr(j.job_type, "value") else j.job_type,
+                job_type=(
+                    str(j.job_type.value)
+                    if hasattr(j.job_type, "value")
+                    else j.job_type
+                ),
                 required_skills=j.required_skills,
                 num_openings=j.num_openings,
-                application_deadline=j.application_deadline.isoformat()
-                if j.application_deadline
-                else None,
+                application_deadline=(
+                    j.application_deadline.isoformat()
+                    if j.application_deadline
+                    else None
+                ),
                 description=j.description,
                 responsibilities=j.responsibilities,
                 requirements=j.requirements,
@@ -686,9 +712,13 @@ async def create_job(
             JobStatus, create_dict["status"], "status", allow_none=False
         )
     if "job_type" in create_dict:
-        create_dict["job_type"] = coerce_enum(JobType, create_dict["job_type"], "job_type")
+        create_dict["job_type"] = coerce_enum(
+            JobType, create_dict["job_type"], "job_type"
+        )
     if "employment_type" in create_dict:
-        emp = coerce_enum(EmploymentType, create_dict["employment_type"], "employment_type")
+        emp = coerce_enum(
+            EmploymentType, create_dict["employment_type"], "employment_type"
+        )
         create_dict["employment_type"] = emp.value if emp else None
 
     job = JobPosting(**create_dict)

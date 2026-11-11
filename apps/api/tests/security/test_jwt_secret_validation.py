@@ -244,8 +244,8 @@ def test_no_hardcoded_jwt_default_in_source():
     from core.config import Settings
 
     source = inspect.getsource(Settings)
-    assert "dev-secret-change-me" not in source, (
-        "The old hardcoded default 'dev-secret-change-me' is still in config.py"
-    )
+    assert (
+        "dev-secret-change-me" not in source
+    ), "The old hardcoded default 'dev-secret-change-me' is still in config.py"
     # The default should be empty string, not any plaintext secret
     assert 'jwt_secret: str = ""' in source or "jwt_secret: str = ''" in source

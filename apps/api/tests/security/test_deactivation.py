@@ -100,7 +100,9 @@ class TestDeactivatedUserTokenRevocation:
             f"/candidates/{cand_id}",
             headers={"Authorization": f"Bearer {cand_token}"},
         )
-        assert r.status_code == 401, f"post-deactivation: expected 401, got {r.status_code}"
+        assert (
+            r.status_code == 401
+        ), f"post-deactivation: expected 401, got {r.status_code}"
 
     def test_company_token_revoked_on_deactivation(self, client, admin_token):
         uid = uuid.uuid4().hex[:8]
@@ -122,7 +124,9 @@ class TestDeactivatedUserTokenRevocation:
             "/jobs/mine",
             headers={"Authorization": f"Bearer {comp_token}"},
         )
-        assert r.status_code == 401, f"post-deactivation: expected 401, got {r.status_code}"
+        assert (
+            r.status_code == 401
+        ), f"post-deactivation: expected 401, got {r.status_code}"
 
 
 class TestDeactivatedUserSignin:
@@ -144,7 +148,9 @@ class TestDeactivatedUserSignin:
 
         # Signin must fail — same generic message as wrong credentials
         r = client.post("/auth/signin", json={"email": email, "password": password})
-        assert r.status_code == 401, f"post-deactivation signin: expected 401, got {r.status_code}"
+        assert (
+            r.status_code == 401
+        ), f"post-deactivation signin: expected 401, got {r.status_code}"
         assert r.json()["detail"] == "Invalid email or password"
 
 

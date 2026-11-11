@@ -15,7 +15,9 @@ from services.ai_client import AIServiceError, generate_content
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-_PARSE_SYSTEM = "You are a strict JSON-returning AI. Return only a JSON object, no markdown."
+_PARSE_SYSTEM = (
+    "You are a strict JSON-returning AI. Return only a JSON object, no markdown."
+)
 
 _PARSE_PROMPT = """\
 You are an expert job-description parser. Extract hiring fields from the JD text below.
@@ -74,7 +76,9 @@ def extract_text_from_upload(file_data: bytes, filename: str = "") -> str:
                 status_code=400, detail="Failed to read PDF: invalid or corrupted file"
             ) from exc
         if not text:
-            raise HTTPException(status_code=400, detail="No extractable text found in PDF")
+            raise HTTPException(
+                status_code=400, detail="No extractable text found in PDF"
+            )
         return text
 
     try:
@@ -84,7 +88,9 @@ def extract_text_from_upload(file_data: bytes, filename: str = "") -> str:
             return file_data.decode("latin-1")
         except Exception as exc:
             logger.warning("Unsupported file encoding: %s", exc)
-            raise HTTPException(status_code=400, detail="Unsupported file encoding") from exc
+            raise HTTPException(
+                status_code=400, detail="Unsupported file encoding"
+            ) from exc
 
 
 def _heuristic_parse(text: str) -> dict[str, Any]:
@@ -133,7 +139,9 @@ def _heuristic_parse(text: str) -> dict[str, Any]:
     min_salary = max_salary = None
     if salary:
         # 12-18 LPA or 1200000-1800000
-        lpa = re.findall(r"(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*lpa", salary, re.I)
+        lpa = re.findall(
+            r"(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*lpa", salary, re.I
+        )
         if lpa:
             a, b = float(lpa[0][0]), float(lpa[0][1])
             min_salary, max_salary = int(a * 100000), int(b * 100000)
@@ -160,9 +168,15 @@ def _heuristic_parse(text: str) -> dict[str, Any]:
                     return "\n".join(buf).strip()
         return ""
 
-    description = section_after(["About the Role", "About the Job", "Job Description", "Overview"])
-    responsibilities = section_after(["Responsibilities", "What you'll do", "Key Responsibilities"])
-    requirements = section_after(["Requirements", "Qualifications", "What we're looking for"])
+    description = section_after(
+        ["About the Role", "About the Job", "Job Description", "Overview"]
+    )
+    responsibilities = section_after(
+        ["Responsibilities", "What you'll do", "Key Responsibilities"]
+    )
+    requirements = section_after(
+        ["Requirements", "Qualifications", "What we're looking for"]
+    )
     benefits = section_after(["Benefits", "Perks", "What we offer"])
 
     skills: list[str] = []

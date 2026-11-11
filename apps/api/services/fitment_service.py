@@ -160,13 +160,17 @@ async def ranked_candidates_for_job(db: AsyncSession, job: JobPosting) -> list:
             await db.execute(
                 select(CandidateProfile)
                 .options(
-                    selectinload(CandidateProfile.skills).selectinload(CandidateSkill.skill),
+                    selectinload(CandidateProfile.skills).selectinload(
+                        CandidateSkill.skill
+                    ),
                     selectinload(CandidateProfile.user),
                 )
                 .where(CandidateProfile.user_id == fr.candidate_id)
             )
         ).scalar_one_or_none()
-        skills = [cs.skill.name for cs in (profile.skills if profile else []) if cs.skill]
+        skills = [
+            cs.skill.name for cs in (profile.skills if profile else []) if cs.skill
+        ]
         email = profile.user.email if profile and profile.user else None
         name = email.split("@")[0].replace(".", " ").title() if email else "Candidate"
         display_name = None
@@ -178,7 +182,9 @@ async def ranked_candidates_for_job(db: AsyncSession, job: JobPosting) -> list:
             job_department=job.department,
             job_skills=list(job.required_skills or []),
             candidate_name=display_name or name,
-            candidate_title=((profile.preferred_sectors or [None])[0] if profile else None),
+            candidate_title=(
+                (profile.preferred_sectors or [None])[0] if profile else None
+            ),
             candidate_skills=skills,
             score=fr.score,
         )
@@ -192,7 +198,9 @@ async def ranked_candidates_for_job(db: AsyncSession, job: JobPosting) -> list:
                 rationale=rationale,
                 rationale_source=source,
                 skills=skills,
-                location=((profile.preferred_locations or [None])[0] if profile else None),
+                location=(
+                    (profile.preferred_locations or [None])[0] if profile else None
+                ),
             )
         )
     await db.flush()

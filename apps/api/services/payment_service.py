@@ -77,7 +77,9 @@ class PaymentService:
             )
         )
         if not price_point:
-            raise ValueError(f"No active pricing for {plan_tier.value}/{billing_period.value}")
+            raise ValueError(
+                f"No active pricing for {plan_tier.value}/{billing_period.value}"
+            )
 
         # Check for idempotency (if key provided)
         if idempotency_key:
@@ -191,9 +193,13 @@ class PaymentService:
             logger.info(f"Ignoring webhook event: {event_type}")
             return None
 
-    async def _handle_payment_authorized(self, db, webhook_data: dict) -> PaymentTransaction:
+    async def _handle_payment_authorized(
+        self, db, webhook_data: dict
+    ) -> PaymentTransaction:
         """Handle payment.authorized webhook."""
-        payment_data = webhook_data.get("payload", {}).get("payment", {}).get("entity", {})
+        payment_data = (
+            webhook_data.get("payload", {}).get("payment", {}).get("entity", {})
+        )
 
         razorpay_payment_id = payment_data.get("id")
         razorpay_order_id = payment_data.get("order_id")
@@ -277,9 +283,13 @@ class PaymentService:
         await db.flush()
         return transaction
 
-    async def _handle_payment_failed(self, db, webhook_data: dict) -> PaymentTransaction:
+    async def _handle_payment_failed(
+        self, db, webhook_data: dict
+    ) -> PaymentTransaction:
         """Handle payment.failed webhook."""
-        payment_data = webhook_data.get("payload", {}).get("payment", {}).get("entity", {})
+        payment_data = (
+            webhook_data.get("payload", {}).get("payment", {}).get("entity", {})
+        )
 
         razorpay_payment_id = payment_data.get("id")
         razorpay_order_id = payment_data.get("order_id")
@@ -300,7 +310,9 @@ class PaymentService:
 
         # Idempotency: if already failed, return
         if transaction.status == PaymentStatus.failed:
-            logger.info(f"Transaction {razorpay_order_id} already marked failed, skipping")
+            logger.info(
+                f"Transaction {razorpay_order_id} already marked failed, skipping"
+            )
             return transaction
 
         # Update transaction status

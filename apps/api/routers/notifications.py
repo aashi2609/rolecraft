@@ -51,7 +51,9 @@ async def get_subscription(user: CurrentUser, db: DbSession):
 
 
 @router_subscriptions.post("", response_model=SubscriptionOut)
-async def upsert_subscription_route(body: SubscriptionCreate, user: CurrentUser, db: DbSession):
+async def upsert_subscription_route(
+    body: SubscriptionCreate, user: CurrentUser, db: DbSession
+):
     return await upsert_subscription(db, body, user.id, user.role)
 
 

@@ -71,7 +71,9 @@ else:
     _engine_kwargs["pool_pre_ping"] = _pool_settings.pool_pre_ping
 
 engine = create_async_engine(_db_url, **_engine_kwargs)
-AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+AsyncSessionLocal = async_sessionmaker(
+    engine, class_=AsyncSession, expire_on_commit=False
+)
 
 
 class Base(DeclarativeBase):

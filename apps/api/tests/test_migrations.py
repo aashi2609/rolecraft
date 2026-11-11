@@ -26,7 +26,9 @@ def run_alembic_command(
     args: list[str], cwd: Path, extra_env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess:
     """Run an Alembic command and return the result."""
-    alembic_exe = Path(sys.executable).parent / ("alembic.exe" if os.name == "nt" else "alembic")
+    alembic_exe = Path(sys.executable).parent / (
+        "alembic.exe" if os.name == "nt" else "alembic"
+    )
     cmd = (
         [str(alembic_exe)] + args
         if alembic_exe.exists()
@@ -54,7 +56,9 @@ def get_table_count(table_name: str) -> int:
         connect_args["statement_cache_size"] = 0
         engine = create_async_engine(db_url, connect_args=connect_args)
         async with engine.connect() as conn:
-            cnt = (await conn.execute(text(f"SELECT COUNT(*) FROM {table_name};"))).scalar()
+            cnt = (
+                await conn.execute(text(f"SELECT COUNT(*) FROM {table_name};"))
+            ).scalar()
         await engine.dispose()
         return cnt or 0
 
@@ -70,35 +74,28 @@ def seed_old_structure_messages() -> None:
         engine = create_async_engine(db_url, connect_args=connect_args)
         async with engine.begin() as conn:
             # Insert test users
-            await conn.execute(
-                text("""
+            await conn.execute(text("""
                 INSERT INTO users (id, email, password_hash, role) VALUES
                     ('11111111-1111-1111-1111-111111111111', 'company@test.com', 'hash', 'company'),
                     ('22222222-2222-2222-2222-222222222222', 'candidate@test.com', 'hash', 'candidate')
                 ON CONFLICT (id) DO NOTHING;
-            """)
-            )
+            """))
             # Insert profiles
-            await conn.execute(
-                text("""
+            await conn.execute(text("""
                 INSERT INTO companies (user_id, name) VALUES
                     ('11111111-1111-1111-1111-111111111111', 'Test Company')
                 ON CONFLICT (user_id) DO NOTHING;
-            """)
-            )
-            await conn.execute(
-                text("""
+            """))
+            await conn.execute(text("""
                 INSERT INTO candidate_profiles (user_id) VALUES
                     ('22222222-2222-2222-2222-222222222222')
                 ON CONFLICT (user_id) DO NOTHING;
-            """)
-            )
+            """))
             # Clean up old messages before seeding
             await conn.execute(text("DELETE FROM messages;"))
             # Seed messages with old structure (thread_id based)
             # Tier 1: Direct (sender_role + recipient_id)
-            await conn.execute(
-                text("""
+            await conn.execute(text("""
                 INSERT INTO messages (id, thread_id, sender_id, sender_role, recipient_id, body) VALUES
                     ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
                      '33333333-3333-3333-3333-333333333333',
@@ -106,30 +103,25 @@ def seed_old_structure_messages() -> None:
                      'company',
                      '22222222-2222-2222-2222-222222222222',
                      'Direct message test');
-            """)
-            )
+            """))
             # Tier 2: Thread peers (no recipient_id on message)
-            await conn.execute(
-                text("""
+            await conn.execute(text("""
                 INSERT INTO messages (id, thread_id, sender_id, sender_role, body) VALUES
                     ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
                      '33333333-3333-3333-3333-333333333333',
                      '22222222-2222-2222-2222-222222222222',
                      'candidate',
                      'Thread peer test');
-            """)
-            )
+            """))
             # Tier 3: Unmappable (isolated thread, no other participant/company peer)
-            await conn.execute(
-                text("""
+            await conn.execute(text("""
                 INSERT INTO messages (id, thread_id, sender_id, sender_role, body) VALUES
                     ('cccccccc-cccc-cccc-cccc-cccccccccccc',
                      '44444444-4444-4444-4444-444444444444',
                      '22222222-2222-2222-2222-222222222222',
                      'candidate',
                      'Unmappable message (isolated thread, no company peer)');
-            """)
-            )
+            """))
         await engine.dispose()
 
     asyncio.run(_seed())
@@ -204,7 +196,9 @@ class TestConversationMigration:
 
         # Verify conversations table was created
         conversations_count = get_table_count("conversations")
-        assert conversations_count > 0, "Conversations table should have at least one conversation"
+        assert (
+            conversations_count > 0
+        ), "Conversations table should have at least one conversation"
 
     def test_upgrade_to_head(self, api_root: Path) -> None:
         """Test upgrading from conversation migration to head."""
@@ -214,8 +208,13 @@ class TestConversationMigration:
     def test_downgrade_requires_flag(self, api_root: Path) -> None:
         """Test that downgrade requires ALLOW_DESTRUCTIVE_DOWNGRADE flag."""
         result = run_alembic_command(["downgrade", "-1"], api_root)
-        assert result.returncode != 0, "Downgrade should fail without ALLOW_DESTRUCTIVE_DOWNGRADE"
-        assert "ALLOW_DESTRUCTIVE_DOWNGRADE" in result.stderr or "Refusing" in result.stderr
+        assert (
+            result.returncode != 0
+        ), "Downgrade should fail without ALLOW_DESTRUCTIVE_DOWNGRADE"
+        assert (
+            "ALLOW_DESTRUCTIVE_DOWNGRADE" in result.stderr
+            or "Refusing" in result.stderr
+        )
 
     def test_downgrade_with_flag(self, api_root: Path) -> None:
         """Test that downgrade succeeds with ALLOW_DESTRUCTIVE_DOWNGRADE flag."""
@@ -292,7 +291,9 @@ class TestEnumMigration:
             "corporate_lifetime",
         ]
         for value in new_values:
-            assert value in enum_values, f"Enum value {value} not found in plan_tier: {enum_values}"
+            assert (
+                value in enum_values
+            ), f"Enum value {value} not found in plan_tier: {enum_values}"
 
         # Re-upgrade to head
         run_alembic_command(["upgrade", "head"], api_root)
