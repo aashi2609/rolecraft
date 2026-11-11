@@ -239,9 +239,7 @@ async def get_job(
     job_id: UUID, db: DbSession, user: User | None = Depends(get_optional_current_user)
 ):
     result = await db.execute(
-        select(JobPosting)
-        .where(JobPosting.id == job_id)
-        .options(selectinload(JobPosting.company))
+        select(JobPosting).where(JobPosting.id == job_id).options(selectinload(JobPosting.company))
     )
     job = result.scalar_one_or_none()
     if not job:
