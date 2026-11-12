@@ -95,11 +95,16 @@ FREE_COMPANY_PLANS = {PlanTier.starter, PlanTier.free, PlanTier.basic, None}
 
 
 async def get_user_plan(user: User, db: AsyncSession) -> Optional[PlanTier]:
+    from datetime import datetime, timezone
+    
     # Check if subscription relationship is already loaded in instance dict without triggering IO
     if "subscription" in user.__dict__ and user.__dict__["subscription"] is not None:
         sub = user.__dict__["subscription"]
         if sub.status == SubscriptionStatus.active:
-            return sub.plan_tier
+            # Check if subscription is not expired (renews_at is None for lifetime, or future date)
+            now = datetime.now(timezone.utc)
+            if sub.renews_at is None or sub.renews_at > now:
+                return sub.plan_tier
     # Otherwise query the database asynchronously
     result = await db.execute(
         select(Subscription)
@@ -111,7 +116,10 @@ async def get_user_plan(user: User, db: AsyncSession) -> Optional[PlanTier]:
     )
     sub = result.scalar_one_or_none()
     if sub:
-        return sub.plan_tier
+        # Check expiration: renews_at is None for lifetime subscriptions
+        now = datetime.now(timezone.utc)
+        if sub.renews_at is None or sub.renews_at > now:
+            return sub.plan_tier
     return None
 
 

@@ -44,6 +44,8 @@ RATE_LIMITS: dict[str, str] = {
     # Messaging & uploads
     "messages_user": "30/minute",
     "uploads_user": "20/hour",
+    # Webhooks (E4: Razorpay webhook rate limit)
+    "webhook_ip": "100/minute",  # Allow bursts from Razorpay retries
 }
 
 GENERIC_429_DETAIL = "Too many requests. Please try again later."

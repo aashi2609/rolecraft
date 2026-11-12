@@ -829,6 +829,49 @@ class PricePoint(Base):
         return self.amount_paise / 100.0
 
 
+class WebhookEvent(Base):
+    """Step E4: Webhook event idempotency tracking.
+
+    Stores Razorpay webhook event IDs to prevent duplicate processing.
+    Each event from Razorpay has a unique X-Razorpay-Event-Id header.
+    If we receive the same event ID twice, we skip processing to ensure idempotency.
+    """
+
+    __tablename__ = "webhook_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    provider_event_id: Mapped[str] = mapped_column(
+        String(255), nullable=False, unique=True, index=True
+    )  # X-Razorpay-Event-Id
+    provider: Mapped[str] = mapped_column(
+        String(50), default="razorpay", nullable=False
+    )  # Provider name
+    event_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, index=True
+    )  # e.g. payment.authorized
+    processed: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, index=True
+    )
+    payment_transaction_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("payment_transactions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    # Raw event data for audit
+    event_data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+
+    # Timestamps
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    processed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
 class PaymentTransaction(Base):
     """Step 6D: Payment transactions with full audit trail.
 

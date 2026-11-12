@@ -15,6 +15,7 @@ from pydantic import BaseModel, field_validator
 from core.config import get_settings
 from core.dependencies import DbSession, get_current_user
 from core.enum_utils import coerce_enum
+from core.rate_limit import RATE_LIMITS, limiter
 from models import (
     BillingPeriod,
     PaymentStatus,
@@ -257,16 +258,24 @@ async def verify_payment(
 
 
 @router.post("/webhook", response_model=WebhookResponse)
+@limiter.limit(RATE_LIMITS["webhook_ip"])
 async def handle_webhook(
     request: Request,
     db: DbSession,
     payment_service: PaymentService = Depends(get_payment_service),
 ) -> Any:
-    """Handle Razorpay webhooks (idempotent).
+    """Handle Razorpay webhooks (idempotent, signature-verified).
 
     Razorpay sends webhooks for:
     - payment.authorized: Payment successful
     - payment.failed: Payment failed
+
+    Security:
+    - Raw request body read before JSON parsing
+    - Signature verified using X-Razorpay-Signature header
+    - Event ID checked for duplicate processing (X-Razorpay-Event-Id)
+    - Amount and currency validated against stored transaction
+    - Generic 400 response for any validation failure (no detail leakage)
 
     Webhook body:
     {
@@ -276,27 +285,50 @@ async def handle_webhook(
           "entity": {
             "id": "pay_xyz...",
             "order_id": "order_abc...",
-            ...
+            "amount": 99900,
+            "currency": "INR"
           }
         }
       }
     }
 
-    This endpoint is idempotent—rerunning with same data is safe.
+    This endpoint is idempotent—rerunning with same event is safe.
     """
     try:
-        # Get webhook payload
-        body = await request.json()
-        event_type = body.get("event", "")
-        webhook_data = body
+        # CRITICAL: Read raw body BEFORE JSON parsing (for signature verification)
+        raw_body = await request.body()
 
-        logger.info(f"Received webhook event: {event_type}")
+        # Get Razorpay headers
+        webhook_signature = request.headers.get("X-Razorpay-Signature")
+        webhook_event_id = request.headers.get("X-Razorpay-Event-Id")
 
-        # Process webhook (idempotent)
+        if not webhook_signature:
+            logger.warning("Webhook missing X-Razorpay-Signature header")
+            raise ValueError("Missing webhook signature")
+
+        if not webhook_event_id:
+            logger.warning("Webhook missing X-Razorpay-Event-Id header")
+            raise ValueError("Missing webhook event ID")
+
+        # Parse webhook payload
+        try:
+            webhook_data = await request.json()
+        except Exception as e:
+            logger.error(f"Invalid JSON in webhook: {e}")
+            raise ValueError("Invalid webhook JSON")
+
+        event_type = webhook_data.get("event", "")
+
+        logger.info(f"Received webhook event: {event_type} (id={webhook_event_id})")
+
+        # Process webhook (validates signature, checks idempotency, activates subscription)
         transaction = await payment_service.process_webhook(
             db,
-            webhook_data,
-            event_type,
+            raw_body=raw_body,
+            webhook_signature=webhook_signature,
+            webhook_event_id=webhook_event_id,
+            webhook_data=webhook_data,
+            event_type=event_type,
         )
 
         if transaction:
@@ -309,8 +341,8 @@ async def handle_webhook(
 
     except ValueError as e:
         logger.error(f"Invalid webhook data: {e}")
-        # Return 400 to signal Razorpay to retry (don't return 500 unless it's our fault)
-        raise HTTPException(status_code=400, detail=str(e))
+        # Return generic 400 (no detail to prevent information leakage)
+        raise HTTPException(status_code=400, detail="Webhook validation failed")
     except Exception as e:
         logger.error(f"Error processing webhook: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to process webhook")
