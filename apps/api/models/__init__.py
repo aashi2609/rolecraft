@@ -11,11 +11,13 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -145,6 +147,14 @@ class User(Base):
 
 class Subscription(Base):
     __tablename__ = "subscriptions"
+    __table_args__ = (
+        Index(
+            "idx_user_live_subscription",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status IN ('pending', 'active')"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -467,6 +477,20 @@ class Company(Base):
 
 class JobPosting(Base):
     __tablename__ = "job_postings"
+    __table_args__ = (
+        Index(
+            "ix_job_postings_status_created",
+            "status",
+            text("created_at DESC"),
+            postgresql_where=text("status = 'live'"),
+        ),
+        Index(
+            "ix_job_postings_company_live",
+            "company_id",
+            text("created_at DESC"),
+            postgresql_where=text("status = 'live'"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -524,6 +548,12 @@ class Application(Base):
     __tablename__ = "applications"
     __table_args__ = (
         UniqueConstraint("candidate_id", "job_id", name="uq_application"),
+        Index("ix_applications_job_status", "job_id", "status"),
+        Index(
+            "ix_applications_candidate_applied",
+            "candidate_id",
+            text("applied_at DESC"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -664,6 +694,13 @@ class Conversation(Base):
 
 class Message(Base):
     __tablename__ = "messages"
+    __table_args__ = (
+        Index(
+            "ix_messages_conversation_sent",
+            "conversation_id",
+            text("sent_at DESC"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -693,6 +730,14 @@ class Message(Base):
 
 class Notification(Base):
     __tablename__ = "notifications"
+    __table_args__ = (
+        Index(
+            "ix_notifications_user_read_created",
+            "user_id",
+            "is_read",
+            text("created_at DESC"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -839,13 +884,19 @@ class WebhookEvent(Base):
     """
 
     __tablename__ = "webhook_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider_event_id", name="uq_webhook_event_provider_event_id"
+        ),
+        Index("ix_webhook_events_provider_event_id", "provider_event_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     provider_event_id: Mapped[str] = mapped_column(
-        String(255), nullable=False, unique=True, index=True
-    )  # X-Razorpay-Event-Id
+        String(255), nullable=False
+    )  # X-Razorpay-Event-Id; uniqueness via uq_webhook_event_provider_event_id
     provider: Mapped[str] = mapped_column(
         String(50), default="razorpay", nullable=False
     )  # Provider name
@@ -884,6 +935,13 @@ class PaymentTransaction(Base):
     """
 
     __tablename__ = "payment_transactions"
+    __table_args__ = (
+        UniqueConstraint("razorpay_order_id", name="uq_razorpay_order_id"),
+        UniqueConstraint("razorpay_payment_id", name="uq_razorpay_payment_id"),
+        UniqueConstraint("idempotency_key", name="uq_idempotency_key"),
+        Index("ix_payment_transactions_razorpay_order_id", "razorpay_order_id"),
+        Index("ix_payment_transactions_razorpay_payment_id", "razorpay_payment_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -911,10 +969,10 @@ class PaymentTransaction(Base):
 
     # Razorpay integration
     razorpay_order_id: Mapped[str] = mapped_column(
-        String(255), nullable=False, unique=True, index=True
+        String(255), nullable=False
     )
     razorpay_payment_id: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True, unique=True, index=True
+        String(255), nullable=True
     )
     razorpay_signature: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True
@@ -939,8 +997,8 @@ class PaymentTransaction(Base):
 
     # Idempotency and replay protection
     idempotency_key: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True, unique=True, index=True
-    )  # Client-provided for replay protection
+        String(255), nullable=True
+    )  # Client-provided for replay protection; uniqueness via uq_idempotency_key
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
