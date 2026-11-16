@@ -18,6 +18,7 @@ from models import (
     Project,
     Resume,
     Skill,
+    SubscriptionStatus,
     UserRole,
 )
 from schemas import (
@@ -39,7 +40,9 @@ from services.candidate_search_service import search_candidates
 from services.embedding_service import refresh_resume_embeddings_for_candidate
 from services.pdf_service import build_resume_pdf_response, resolve_candidate_name
 from services.profile_item_service import ProfileItemService, bump_profile_updated_at
-from services.subscription_service import get_active_subscription
+from services.subscription_service import (
+    get_current_subscription,
+)
 
 # Fields on CandidateProfileUpdate that are resume-relevant
 _RESUME_RELEVANT_FIELDS = {
@@ -395,8 +398,12 @@ async def search_candidates_endpoint(
         )
 
     if user.role == UserRole.company:
-        sub = await get_active_subscription(db, user.id)
-        if not sub or sub.plan_tier not in _ALLOWED_SEARCH_COMPANY_PLANS:
+        sub = await get_current_subscription(db, user.id)
+        if (
+            not sub
+            or sub.status != SubscriptionStatus.active
+            or sub.plan_tier not in _ALLOWED_SEARCH_COMPANY_PLANS
+        ):
             raise HTTPException(
                 status_code=403,
                 detail="Active company subscription required for candidate search. Please upgrade your plan.",

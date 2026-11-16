@@ -9,9 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import NamedTuple, Optional
 
-from sqlalchemy import select
-
-from models import PlanTier, Subscription, SubscriptionStatus, User, UserRole
+from models import PlanTier, SubscriptionStatus, User, UserRole
 
 
 class PlanFeatures(NamedTuple):
@@ -180,25 +178,16 @@ async def get_entitlements(user: User, db) -> PlanFeatures:
     if not user:
         return PLAN_FEATURES["free"]
 
-    # Get active subscription (if any)
-    sub = await db.scalar(
-        select(Subscription).where(
-            Subscription.user_id == user.id,
-            Subscription.status == SubscriptionStatus.active,
-        )
-    )
+    # Single reader: the live (pending/active, non-expired) subscription row
+    from services.subscription_service import get_current_subscription
 
-    if not sub:
-        return PLAN_FEATURES["free"]
+    sub = await get_current_subscription(db, user.id)
 
-    # Check expiry (if renews_at is past, subscription is expired)
-    now = datetime.now(timezone.utc)
-    if sub.renews_at and sub.renews_at < now:
-        # Expired; would normally mark as cancelled via background job
+    if not sub or sub.status != SubscriptionStatus.active:
         return PLAN_FEATURES["free"]
 
     # Return features for this plan
-    plan_key = sub.plan_tier.value
+    plan_key = sub.plan_tier.value if hasattr(sub.plan_tier, "value") else sub.plan_tier
     features = PLAN_FEATURES.get(plan_key, PLAN_FEATURES["free"])
 
     # Adjust valid_until based on subscription

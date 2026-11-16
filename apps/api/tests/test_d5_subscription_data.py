@@ -34,7 +34,7 @@ class TestSubscriptionDataReport:
         # Create users with different subscription statuses
         pending_user = await create_user_with_profile(
             db=db_session,
-            email="pending@test.com",
+            email=f"pending_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.company,
         )
@@ -43,7 +43,7 @@ class TestSubscriptionDataReport:
         # Grant active subscription to another user
         active_user = await create_user_with_profile(
             db=db_session,
-            email="active@test.com",
+            email=f"active_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.company,
         )
@@ -60,7 +60,7 @@ class TestSubscriptionDataReport:
         # Cancel a subscription
         cancelled_user = await create_user_with_profile(
             db=db_session,
-            email="cancelled@test.com",
+            email=f"cancelled_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.company,
         )
@@ -91,7 +91,7 @@ class TestSubscriptionDataReport:
         """Report identifies subscriptions past renewal date."""
         user = await create_user_with_profile(
             db=db_session,
-            email="expired@test.com",
+            email=f"expired_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.company,
         )
@@ -108,6 +108,7 @@ class TestSubscriptionDataReport:
         # Verify it's found as expired
         expired_sub = await db_session.scalar(
             select(Subscription).where(
+                Subscription.user_id == user.id,
                 Subscription.status == SubscriptionStatus.active,
                 Subscription.renews_at < datetime.now(timezone.utc),
             )
@@ -121,7 +122,7 @@ class TestSubscriptionDataReport:
         # Create candidate with free plan
         cand = await create_user_with_profile(
             db=db_session,
-            email="candidate@test.com",
+            email=f"candidate_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.candidate,
         )
@@ -130,7 +131,7 @@ class TestSubscriptionDataReport:
         # Create company with corporate plan
         company = await create_user_with_profile(
             db=db_session,
-            email="company@test.com",
+            email=f"company_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.company,
         )
@@ -152,13 +153,13 @@ class TestSubscriptionDataReport:
         # Create candidate and company
         cand = await create_user_with_profile(
             db=db_session,
-            email="role_cand@test.com",
+            email=f"role_cand_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.candidate,
         )
         company = await create_user_with_profile(
             db=db_session,
-            email="role_company@test.com",
+            email=f"role_company_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.company,
         )
@@ -184,7 +185,7 @@ class TestSubscriptionCleanup:
         """Cleanup script identifies subscriptions for cancellation."""
         user = await create_user_with_profile(
             db=db_session,
-            email="cleanup_expired@test.com",
+            email=f"cleanup_expired_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.company,
         )
@@ -201,6 +202,7 @@ class TestSubscriptionCleanup:
         # Find expired
         expired = await db_session.scalar(
             select(Subscription).where(
+                Subscription.user_id == user.id,
                 Subscription.status == SubscriptionStatus.active,
                 Subscription.renews_at < datetime.now(timezone.utc),
             )
@@ -215,7 +217,7 @@ class TestSubscriptionCleanup:
 
         user = await create_user_with_profile(
             db=db_session,
-            email="cleanup_cancel@test.com",
+            email=f"cleanup_cancel_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.company,
         )
@@ -269,7 +271,7 @@ class TestDataIntegrity:
         """Every user should have exactly one subscription."""
         user = await create_user_with_profile(
             db=db_session,
-            email="integrity_check@test.com",
+            email=f"integrity_check_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.candidate,
         )
@@ -287,7 +289,7 @@ class TestDataIntegrity:
         """Every subscription should reference an existing user."""
         user = await create_user_with_profile(
             db=db_session,
-            email="sub_user_check@test.com",
+            email=f"sub_user_check_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.company,
         )
@@ -306,7 +308,7 @@ class TestDataIntegrity:
         """Subscription role should match user role."""
         user = await create_user_with_profile(
             db=db_session,
-            email="role_match@test.com",
+            email=f"role_match_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.company,
         )
@@ -322,7 +324,7 @@ class TestDataIntegrity:
         """Active subscriptions should have a renewal date."""
         user = await create_user_with_profile(
             db=db_session,
-            email="renewal_check@test.com",
+            email=f"renewal_check_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.company,
         )
@@ -344,7 +346,7 @@ class TestDataIntegrity:
         """Pending subscriptions should NOT have a renewal date."""
         user = await create_user_with_profile(
             db=db_session,
-            email="pending_no_renewal@test.com",
+            email=f"pending_no_renewal_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.company,
         )

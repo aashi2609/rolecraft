@@ -24,16 +24,16 @@ if api_root not in sys.path:
     sys.path.insert(0, api_root)
 
 from sqlalchemy import and_, func, select
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from core.database import engine
 from models import (
+    PlanTier,
     Subscription,
     SubscriptionAuditLog,
     SubscriptionStatus,
     User,
     UserRole,
-    PlanTier,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,6 @@ logging.basicConfig(
 
 async def get_subscription_stats(db) -> dict[str, Any]:
     """Get comprehensive subscription statistics and health report."""
-    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
     report = {}
 
@@ -292,6 +291,146 @@ async def cleanup_expired_subscriptions(db, dry_run: bool = True) -> dict[str, A
     return result
 
 
+async def get_part2_integrity_report(db) -> dict[str, Any]:
+    """Part 2.7 read-only data report on subscription integrity."""
+    from services.subscription_service import LIVE_STATUSES
+
+    report: dict[str, Any] = {}
+
+    total_users = await db.scalar(select(func.count()).select_from(User)) or 0
+    users_with_subs = await db.scalar(
+        select(func.count(func.distinct(Subscription.user_id)))
+    ) or 0
+    report["users_total"] = total_users
+    report["users_with_0_subscription_rows"] = total_users - users_with_subs
+
+    # users with more than 1 row, and more than 1 live row
+    multi_row = (
+        await db.execute(
+            select(Subscription.user_id, func.count().label("c"))
+            .group_by(Subscription.user_id)
+            .having(func.count() > 1)
+        )
+    ).all()
+    report["users_with_multiple_rows"] = len(multi_row)
+
+    live_multi = (
+        await db.execute(
+            select(Subscription.user_id, func.count().label("c"))
+            .where(Subscription.status.in_(LIVE_STATUSES))
+            .group_by(Subscription.user_id)
+            .having(func.count() > 1)
+        )
+    ).all()
+    report["users_with_multiple_live_rows"] = len(live_multi)
+
+    # rows whose role differs from the user's role
+    role_mismatch = await db.scalar(
+        select(func.count())
+        .select_from(Subscription)
+        .join(User, User.id == Subscription.user_id)
+        .where(Subscription.role != User.role)
+    ) or 0
+    report["rows_role_mismatch"] = role_mismatch
+
+    # legacy plan tiers still present
+    all_tiers = (await db.scalars(select(Subscription.plan_tier).distinct())).all()
+    report["plan_tiers_present"] = sorted(t.value for t in all_tiers)
+
+    # active rows past renews_at (expired but not cancelled)
+    expired_active = await db.scalar(
+        select(func.count())
+        .select_from(Subscription)
+        .where(
+            and_(
+                Subscription.status == SubscriptionStatus.active,
+                Subscription.renews_at.is_not(None),
+                Subscription.renews_at < datetime.now(timezone.utc),
+            )
+        )
+    ) or 0
+    report["active_rows_past_valid_until"] = expired_active
+
+    # subscription rows with no user (orphans)
+    orphans = await db.scalar(
+        select(func.count())
+        .select_from(Subscription)
+        .outerjoin(User, User.id == Subscription.user_id)
+        .where(User.id.is_(None))
+    ) or 0
+    report["subscription_rows_without_user"] = orphans
+
+    return report
+
+
+async def cleanup_duplicate_live_subscriptions(db, dry_run: bool = True) -> dict[str, Any]:
+    """For users with >1 live row keep the newest active (else newest pending)
+    and mark the others cancelled with an audit-log entry. Never deletes."""
+    from services.subscription_service import LIVE_STATUSES, log_subscription_change
+
+    live_rows = (
+        (
+            await db.execute(
+                select(Subscription)
+                .where(Subscription.status.in_(LIVE_STATUSES))
+                .order_by(
+                    Subscription.user_id,
+                    Subscription.started_at.desc().nullslast(),
+                    Subscription.id.desc(),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    by_user: dict = {}
+    for s in live_rows:
+        by_user.setdefault(s.user_id, []).append(s)
+
+    result = {
+        "dry_run": dry_run,
+        "users_with_multiple_live_rows": 0,
+        "cancelled": 0,
+        "details": [],
+    }
+
+    for user_id, subs in by_user.items():
+        if len(subs) <= 1:
+            continue
+        result["users_with_multiple_live_rows"] += 1
+        # keep newest active if any, else newest pending (list already sorted desc)
+        keep = next(
+            (s for s in subs if s.status == SubscriptionStatus.active), subs[0]
+        )
+        for s in subs:
+            if s.id == keep.id:
+                continue
+            result["details"].append({
+                "subscription_id": str(s.id),
+                "user_id": str(user_id),
+                "kept_id": str(keep.id),
+                "old_status": s.status.value,
+            })
+            if not dry_run:
+                old = s.status.value
+                s.status = SubscriptionStatus.cancelled
+                await log_subscription_change(
+                    db,
+                    subscription_id=s.id,
+                    user_id=user_id,
+                    action="cancel",
+                    old_status=old,
+                    new_status=SubscriptionStatus.cancelled.value,
+                    reason="Duplicate live subscription cleanup (kept newest)",
+                )
+            result["cancelled"] += 1
+
+    if not dry_run:
+        await db.commit()
+    return result
+
+
 async def main():
     """Generate subscription reconciliation report and cleanup analysis."""
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -344,6 +483,20 @@ async def main():
         else:
             print("  ✅ All checks passed")
         
+        # Part 2.7 integrity report
+        print("\n" + "=" * 80)
+        print("PART 2 DATA REPORT (read-only)")
+        print("=" * 80)
+        p2 = await get_part2_integrity_report(db)
+        for k, v in p2.items():
+            print(f"  {k}: {v}")
+
+        dup = await cleanup_duplicate_live_subscriptions(db, dry_run=True)
+        print(
+            f"\nDuplicate live rows: {dup['users_with_multiple_live_rows']} users, "
+            f"{dup['cancelled']} rows would be cancelled (dry run)"
+        )
+
         # Cleanup analysis (dry run)
         print("\n" + "=" * 80)
         print("CLEANUP ANALYSIS (DRY RUN)")
@@ -364,6 +517,10 @@ if __name__ == "__main__":
         
         async def cleanup():
             async with session_factory() as db:
+                # Duplicate live rows MUST be cleaned before the unique index
+                # migration runs, otherwise CREATE UNIQUE INDEX fails.
+                dup = await cleanup_duplicate_live_subscriptions(db, dry_run=False)
+                print(f"Duplicate live cleanup: {dup['cancelled']} rows cancelled")
                 result = await cleanup_expired_subscriptions(db, dry_run=False)
                 print(f"\nCleanup result: {result['processed']} cancelled, {result['failed']} failed")
         

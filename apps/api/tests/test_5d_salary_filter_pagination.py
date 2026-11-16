@@ -184,7 +184,7 @@ class TestSalaryFilterBeforePagination:
         for i in range(5):
             user = User(
                 id=uuid4(),
-                email=f"cnull_{i}@test.com",
+                email=f"cnull_{i}_{uuid4().hex[:6]}@test.com",
                 password_hash="h",
                 role=UserRole.candidate,
                 is_active=True,
@@ -203,7 +203,7 @@ class TestSalaryFilterBeforePagination:
         for i in range(5):
             user = User(
                 id=uuid4(),
-                email=f"cwith_{i}@test.com",
+                email=f"cwith_{i}_{uuid4().hex[:6]}@test.com",
                 password_hash="h",
                 role=UserRole.candidate,
                 is_active=True,

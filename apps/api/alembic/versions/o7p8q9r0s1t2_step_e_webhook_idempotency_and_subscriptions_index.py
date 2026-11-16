@@ -87,16 +87,16 @@ def upgrade() -> None:
     # This ensures only one active subscription per user at the DB level
     op.execute(
         """
-        CREATE UNIQUE INDEX idx_user_active_subscription 
+        CREATE UNIQUE INDEX idx_user_live_subscription 
         ON subscriptions(user_id) 
-        WHERE status = 'active'
+        WHERE status IN ('pending', 'active')
         """
     )
 
 
 def downgrade() -> None:
     # Drop the partial unique index on subscriptions
-    op.execute("DROP INDEX IF EXISTS idx_user_active_subscription")
+    op.execute("DROP INDEX IF EXISTS idx_user_live_subscription")
 
     # Drop webhook_events table
     op.drop_table("webhook_events")

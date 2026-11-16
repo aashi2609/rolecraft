@@ -119,6 +119,7 @@ class User(Base):
     subscription: Mapped[Optional["Subscription"]] = relationship(
         back_populates="user",
         uselist=False,
+        lazy="raise",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )

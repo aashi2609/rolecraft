@@ -221,7 +221,6 @@ async def get_all_users(
     limit: int = 100,
 ) -> Any:
     query = select(User).options(
-        selectinload(User.subscription),
         selectinload(User.company),
         selectinload(User.candidate_profile),
     )
@@ -232,6 +231,31 @@ async def get_all_users(
     query = query.order_by(User.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     users = result.scalars().all()
+
+    # Batch-load each user's live subscription (single reader) - no N+1
+    from services.subscription_service import LIVE_STATUSES
+
+    user_ids = [u.id for u in users]
+    subs_by_user: dict = {}
+    if user_ids:
+        sub_rows = (
+            (
+                await db.scalars(
+                    select(Subscription)
+                    .where(
+                        Subscription.user_id.in_(user_ids),
+                        Subscription.status.in_(LIVE_STATUSES),
+                    )
+                    .order_by(
+                        Subscription.started_at.desc().nullslast(),
+                        Subscription.id.desc(),
+                    )
+                )
+            )
+            .all()
+        )
+        for s in sub_rows:
+            subs_by_user.setdefault(s.user_id, s)
 
     out = []
     for u in users:
@@ -251,16 +275,17 @@ async def get_all_users(
                 name = u.email.split("@")[0].replace(".", " ").replace("_", " ").title()
         plan_tier = None
         sub_status = None
-        if u.subscription:
+        current_sub = subs_by_user.get(u.id)
+        if current_sub:
             plan_tier = str(
-                u.subscription.plan_tier.value
-                if hasattr(u.subscription.plan_tier, "value")
-                else u.subscription.plan_tier
+                current_sub.plan_tier.value
+                if hasattr(current_sub.plan_tier, "value")
+                else current_sub.plan_tier
             )
             sub_status = str(
-                u.subscription.status.value
-                if hasattr(u.subscription.status, "value")
-                else u.subscription.status
+                current_sub.status.value
+                if hasattr(current_sub.status, "value")
+                else current_sub.status
             )
         out.append(
             AdminUserOut(
@@ -434,6 +459,12 @@ async def update_subscription(
                 status_code=403,
                 detail="Cannot manually activate subscription. Use payment gateway webhook instead.",
             )
+        # Cancelled rows are never reactivated — create a new subscription
+        if old_status == SubscriptionStatus.cancelled.value and new_status != SubscriptionStatus.cancelled:
+            raise HTTPException(
+                status_code=409,
+                detail="Cancelled subscriptions cannot be reactivated. Create a new subscription instead.",
+            )
         sub.status = new_status
 
     if update_data.plan_tier is not None:
@@ -478,9 +509,19 @@ async def create_subscription(
 
     - Always creates with status=pending (default in SubCreate)
     - Must transition to active via payment gateway webhook only
+    - At most one live (pending/active) row per user: 409 otherwise
     """
+    from services.subscription_service import get_current_subscription
+
+    target_user_id = UUID(create_data.user_id)
+    if await get_current_subscription(db, target_user_id) is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="User already has a live subscription (pending or active). Cancel it before creating a new one.",
+        )
+
     sub = Subscription(
-        user_id=UUID(create_data.user_id),
+        user_id=target_user_id,
         role=coerce_enum(UserRole, create_data.role, "role", allow_none=False),
         plan_tier=coerce_enum(
             PlanTier, create_data.plan_tier, "plan_tier", allow_none=False

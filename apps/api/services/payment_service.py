@@ -25,7 +25,6 @@ from models import (
     PricePoint,
     Subscription,
     SubscriptionStatus,
-    SubscriptionAuditLog,
     User,
     WebhookEvent,
 )
@@ -401,15 +400,17 @@ class PaymentService:
         if not user or not price_point:
             raise ValueError("User or price point not found")
 
-        # Step 5: Deactivate ALL previous ACTIVE subscriptions for this user
-        # (must use ACTIVE status, not pending from signup flow)
-        active_subs = await db.scalars(
+        # Step 5: Deactivate ALL previous live subscriptions for this user
+        # (pending signup row AND any active row — at most one live row allowed)
+        from services.subscription_service import LIVE_STATUSES
+
+        live_subs = await db.scalars(
             select(Subscription).where(
                 Subscription.user_id == user.id,
-                Subscription.status == SubscriptionStatus.active,
+                Subscription.status.in_(LIVE_STATUSES),
             )
         )
-        for old_sub in active_subs.all():
+        for old_sub in live_subs.all():
             old_sub.status = SubscriptionStatus.cancelled
             await log_subscription_change(
                 db,

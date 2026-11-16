@@ -8,7 +8,7 @@ from core.rate_limit import RATE_LIMITS, get_user_key, limiter
 from models import Notification
 from schemas import NotificationOut, SubscriptionCreate, SubscriptionOut, UploadOut
 from services.storage_service import upload_file
-from services.subscription_service import get_active_subscription, upsert_subscription
+from services.subscription_service import upsert_subscription
 
 router_notifications = APIRouter(prefix="/notifications", tags=["notifications"])
 router_subscriptions = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
@@ -42,12 +42,30 @@ async def mark_read(notification_id: UUID, user: CurrentUser, db: DbSession):
     return NotificationOut.model_validate(row)
 
 
-@router_subscriptions.get("/me", response_model=SubscriptionOut)
+@router_subscriptions.get("/me")
 async def get_subscription(user: CurrentUser, db: DbSession):
-    sub = await get_active_subscription(db, user.id)
-    if not sub:
-        raise HTTPException(status_code=404, detail="No active subscription")
-    return SubscriptionOut.model_validate(sub)
+    """Current live subscription. No subscription is a normal state: 200 with
+    plan=null, status='none', and no paid entitlements."""
+    from services.entitlement_service import PLAN_FEATURES, get_entitlements
+    from services.subscription_service import get_current_subscription
+
+    sub = await get_current_subscription(db, user.id)
+    entitlements = await get_entitlements(user, db)
+
+    if sub is None:
+        return {
+            "plan": None,
+            "status": "none",
+            "entitlements": PLAN_FEATURES["free"]._asdict(),
+        }
+    return {
+        "plan": sub.plan_tier.value if hasattr(sub.plan_tier, "value") else sub.plan_tier,
+        "status": sub.status.value if hasattr(sub.status, "value") else sub.status,
+        "entitlements": entitlements._asdict(),
+        "id": str(sub.id),
+        "started_at": sub.started_at.isoformat() if sub.started_at else None,
+        "renews_at": sub.renews_at.isoformat() if sub.renews_at else None,
+    }
 
 
 @router_subscriptions.post("", response_model=SubscriptionOut)
