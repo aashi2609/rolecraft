@@ -245,10 +245,13 @@ async def ai_service_error_handler(request: Request, exc: AIServiceError):
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     req_id = _get_request_id(request)
+    headers = {"X-Request-ID": req_id}
+    if exc.headers:
+        headers.update(exc.headers)
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
-        headers={"X-Request-ID": req_id},
+        headers=headers,
     )
 
 

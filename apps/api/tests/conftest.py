@@ -27,7 +27,7 @@ from datetime import datetime
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
@@ -208,7 +208,7 @@ async def other_company_user(db_session):
 async def candidate_client(candidate_user):
     """Authenticated AsyncClient for candidate user."""
     token = create_access_token(user_id=candidate_user.id, role="candidate")
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         client.headers["Authorization"] = f"Bearer {token}"
         yield client
 
@@ -217,7 +217,7 @@ async def candidate_client(candidate_user):
 async def company_client(company_user):
     """Authenticated AsyncClient for company user."""
     token = create_access_token(user_id=company_user.id, role="company")
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         client.headers["Authorization"] = f"Bearer {token}"
         yield client
 
@@ -226,7 +226,33 @@ async def company_client(company_user):
 async def other_company_client(other_company_user):
     """Authenticated AsyncClient for other company user."""
     token = create_access_token(user_id=other_company_user.id, role="company")
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        client.headers["Authorization"] = f"Bearer {token}"
+        yield client
+
+
+@pytest_asyncio.fixture
+async def admin_user(db_session):
+    """Create an admin user for testing."""
+    user = User(
+        id=uuid.uuid4(),
+        email=f"admin_{uuid.uuid4().hex[:8]}@test.com",
+        password_hash="$2b$12$e/a.vjWwM2n06o0rLzT4U.kI441E7.3d88bY1L9Gg7Y65vYvX/jO6",  # "password"
+        role=UserRole.admin,
+        is_active=True,
+        token_version=1,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def admin_client(admin_user):
+    """Authenticated AsyncClient for admin user."""
+    token = create_access_token(user_id=admin_user.id, role="admin")
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         client.headers["Authorization"] = f"Bearer {token}"
         yield client
 
@@ -306,6 +332,37 @@ def db_profiler():
     return profiler
 
 
+class QueryCounter:
+    """Simple query counter for testing O(1) query patterns."""
+
+    def __init__(self):
+        self.count = 0
+        self.queries = []
+
+    def reset(self):
+        self.count = 0
+        self.queries = []
+
+    def record(self, query_str: str):
+        self.count += 1
+        self.queries.append(query_str)
+
+    def assert_constant(self, baseline: int, tolerance: int = 1):
+        """Assert query count stays constant (baseline +/- tolerance)."""
+        assert (
+            baseline - tolerance <= self.count <= baseline + tolerance
+        ), f"Expected ~{baseline} queries (±{tolerance}), got {self.count}"
+
+
+@pytest_asyncio.fixture
+async def query_counter(db_session):
+    """Counter for query profiling in tests."""
+    # Note: This is a simple counter. For real query counting,
+    # use SQLAlchemy event listener or db_profiler fixture above.
+    counter = QueryCounter()
+    yield counter
+
+
 # ── Additional Fixture Factories for Complete Test Coverage ────────────────────
 
 
@@ -358,30 +415,26 @@ async def make_job(db_session, company_user):
 
     async def _make_job(
         title: str = "Senior Software Engineer",
-        status: str = "published",
+        status: str = "live",
         description: str = "Join our team",
+        company_id: uuid.UUID | None = None,
         **kwargs,
     ):
-        from models import Job, JobStatus
-        from datetime import datetime
+        from models import JobPosting, JobStatus
 
-        job_kwargs = {
-            "id": uuid.uuid4(),
-            "company_id": company_user.id,
-            "title": title,
-            "description": description,
-            "salary_min": kwargs.get("salary_min", 80000),
-            "salary_max": kwargs.get("salary_max", 120000),
-            "job_role": kwargs.get("job_role", "backend"),
-            "job_level": kwargs.get("job_level", "mid"),
-            "job_type": kwargs.get("job_type", "full_time"),
-            "location": kwargs.get("location", "Remote"),
-            "required_experience_years": kwargs.get("required_experience_years", 3),
-            "skills": kwargs.get("skills", ["Python", "FastAPI"]),
-            "status": JobStatus(status) if isinstance(status, str) else status,
-            "posted_at": datetime.utcnow(),
-        }
-        job = Job(**job_kwargs)
+        job = JobPosting(
+            id=uuid.uuid4(),
+            company_id=company_id or company_user.id,
+            title=title,
+            description=description,
+            min_salary=kwargs.get("min_salary", 80000),
+            max_salary=kwargs.get("max_salary", 120000),
+            job_role=kwargs.get("job_role", "backend"),
+            job_level=kwargs.get("job_level", "mid"),
+            location=kwargs.get("location", "Remote"),
+            required_skills=kwargs.get("required_skills", ["Python", "FastAPI"]),
+            status=JobStatus(status) if isinstance(status, str) else status,
+        )
         db_session.add(job)
         await db_session.commit()
         await db_session.refresh(job)
@@ -394,16 +447,19 @@ async def make_job(db_session, company_user):
 async def make_application(db_session, candidate_user):
     """Create a job application."""
 
-    async def _make_application(job_id: uuid.UUID, status: str = "submitted", **kwargs):
+    async def _make_application(
+        job_id: uuid.UUID,
+        candidate_id: uuid.UUID | None = None,
+        status: str = "applied",
+        **kwargs,
+    ):
         from models import Application, ApplicationStatus
-        from datetime import datetime
 
         application = Application(
             id=uuid.uuid4(),
-            candidate_id=candidate_user.id,
+            candidate_id=candidate_id or candidate_user.id,
             job_id=job_id,
             status=ApplicationStatus(status) if isinstance(status, str) else status,
-            applied_at=datetime.utcnow(),
         )
         db_session.add(application)
         await db_session.commit()
@@ -418,19 +474,17 @@ async def make_conversation(db_session, candidate_user, company_user):
     """Create a conversation between candidate and company."""
 
     async def _make_conversation(
-        status: str = "open",
         candidate_id: uuid.UUID | None = None,
         company_id: uuid.UUID | None = None,
+        job_id: uuid.UUID | None = None,
     ):
-        from models import Conversation, ConversationStatus
-        from datetime import datetime
+        from models import Conversation
 
         conv = Conversation(
             id=uuid.uuid4(),
             candidate_id=candidate_id or candidate_user.id,
             company_id=company_id or company_user.id,
-            status=ConversationStatus(status) if isinstance(status, str) else status,
-            created_at=datetime.utcnow(),
+            job_id=job_id,
         )
         db_session.add(conv)
         await db_session.commit()
@@ -447,19 +501,22 @@ async def make_message(db_session):
     async def _make_message(
         conversation_id: uuid.UUID,
         sender_id: uuid.UUID,
-        content: str = "Test message",
+        body: str = "Test message",
+        sender_role: str = "company",
         **kwargs,
     ):
-        from models import Message
-        from datetime import datetime
+        from models import Message, UserRole
 
-        message = Message(
+        message_kwargs = dict(
             id=uuid.uuid4(),
             conversation_id=conversation_id,
             sender_id=sender_id,
-            content=content,
-            created_at=datetime.utcnow(),
+            sender_role=UserRole(sender_role),
+            body=body,
         )
+        if kwargs.get("sent_at") is not None:
+            message_kwargs["sent_at"] = kwargs["sent_at"]
+        message = Message(**message_kwargs)
         db_session.add(message)
         await db_session.commit()
         await db_session.refresh(message)

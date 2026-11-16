@@ -535,25 +535,46 @@ async def grant_subscription(
 
     plan_tier = await validate_plan_tier(grant_data.plan_tier.value, user.role)
 
-    # Cancel any existing active subscriptions
-    from services.subscription_service import cancel_active_subscriptions
-
-    await cancel_active_subscriptions(db, user.id, admin_id=current_admin.id)
-
     # Set default dates
     started_at = grant_data.started_at or datetime.now(timezone.utc)
     ends_at = grant_data.ends_at or (started_at + timedelta(days=30))
 
-    # Create active subscription directly (grant bypasses payment)
-    sub = Subscription(
-        user_id=user.id,
-        role=user.role,
-        plan_tier=plan_tier,
-        status=SubscriptionStatus.active,  # Step 6C: Granted subscriptions are immediately active
-        started_at=started_at,
-        renews_at=ends_at,
+    # One subscription per user: activate the existing (e.g. pending) row in
+    # place and cancel any other non-cancelled rows, instead of stacking a
+    # second subscription.
+    subs = (
+        (
+            await db.scalars(
+                select(Subscription)
+                .where(Subscription.user_id == user.id)
+                .order_by(Subscription.started_at.desc().nullslast())
+            )
+        )
+        .all()
     )
-    db.add(sub)
+
+    target: Optional[Subscription] = None
+    for existing in subs:
+        if existing.status == SubscriptionStatus.cancelled:
+            continue
+        if target is None:
+            target = existing
+        else:
+            existing.status = SubscriptionStatus.cancelled
+
+    old_status = target.status.value if target else None
+    old_plan = target.plan_tier.value if target else None
+
+    if target is None:
+        target = Subscription(user_id=user.id)
+        db.add(target)
+
+    target.role = user.role
+    target.plan_tier = plan_tier
+    target.status = SubscriptionStatus.active  # Step 6C: Granted subscriptions are immediately active
+    target.started_at = started_at
+    target.renews_at = ends_at
+    sub = target
     await db.flush()
 
     # Log the grant with admin_id
@@ -563,8 +584,10 @@ async def grant_subscription(
         user_id=user.id,
         admin_id=current_admin.id,
         action="grant",  # Special action type
-        new_plan_tier=plan_tier.value,
+        old_status=old_status,
         new_status=SubscriptionStatus.active.value,
+        old_plan_tier=old_plan,
+        new_plan_tier=plan_tier.value,
         reason=grant_data.reason,  # Admin-provided reason
     )
 
