@@ -15,6 +15,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from core.config import get_settings
+from core.embedding_config import EMBEDDING_DIM
 
 settings = get_settings()
 
@@ -157,7 +158,9 @@ def test_plan_limit_before_groq(client: TestClient) -> None:
                 mock_resume.return_value = {
                     "content": {"summary": "x"},
                     "ats_score": 80,
-                    "embedding": [0.0] * 512,  # Step 5B: 512 dims
+                    "embedding": [0.0] * EMBEDDING_DIM,
+                    "embedding_status": "pending",
+                    "embedding_model": "text-embedding-3-small",
                     "generation_metadata": {},
                 }
                 mock_parse.return_value = {"ok": True}

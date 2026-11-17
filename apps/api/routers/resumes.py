@@ -34,8 +34,28 @@ _GENERATION_TIERS = {
     PlanTier.elite,
 }
 
-router = APIRouter(prefix="/resumes", tags=["resumes"])
-logger = logging.getLogger(__name__)
+# Non-null columns. Omitting them lets the model default apply; writing None fails the insert.
+_EMBEDDING_META_KEYS = (
+    "embedding_status",
+    "embedding_model",
+    "embedding_source_hash",
+)
+
+
+def _embedding_kwargs(payload: dict) -> dict:
+    """Fields safe to pass into Resume().
+
+    ``embedding`` may be None when generation failed. Status, model, and hash
+    are non-null, so a missing or null value must not override the column default.
+    """
+    fields: dict = {}
+    if "embedding" in payload:
+        fields["embedding"] = payload["embedding"]
+    for key in _EMBEDDING_META_KEYS:
+        value = payload.get(key)
+        if value is not None:
+            fields[key] = value
+    return fields
 
 
 async def _profile_with_skills(db, user_id: UUID) -> CandidateProfile:
@@ -139,12 +159,9 @@ async def generate(
             ats_score=payload["ats_score"],
             ats_breakdown=payload.get("ats_breakdown"),
             generation_metadata=payload.get("generation_metadata"),
-            embedding=payload["embedding"],
-            embedding_status=payload.get("embedding_status"),
-            embedding_model=payload.get("embedding_model"),
-            embedding_source_hash=payload.get("embedding_source_hash"),
             is_default=i == 0,
             generated_from_profile_at=profile.profile_updated_at,
+            **_embedding_kwargs(payload),
         )
         db.add(resume)
         created.append(resume)
@@ -219,13 +236,10 @@ async def regenerate(
             ats_score=payload["ats_score"],
             ats_breakdown=payload.get("ats_breakdown"),
             generation_metadata=payload.get("generation_metadata"),
-            embedding=payload["embedding"],
-            embedding_status=payload.get("embedding_status"),
-            embedding_model=payload.get("embedding_model"),
-            embedding_source_hash=payload.get("embedding_source_hash"),
             version=(old.version or 1) + 1,
             is_default=was_default,
             generated_from_profile_at=profile.profile_updated_at,
+            **_embedding_kwargs(payload),
         )
         db.add(new_resume)
         await db.flush()
@@ -281,10 +295,8 @@ async def improve(
     row.ats_score = payload["ats_score"]
     row.ats_breakdown = payload.get("ats_breakdown")
     row.generation_metadata = payload.get("generation_metadata")
-    row.embedding = payload["embedding"]
-    row.embedding_status = payload.get("embedding_status")
-    row.embedding_model = payload.get("embedding_model")
-    row.embedding_source_hash = payload.get("embedding_source_hash")
+    for key, value in _embedding_kwargs(payload).items():
+        setattr(row, key, value)
     row.version = (row.version or 1) + 1
     row.pdf_path = None
     row.generated_from_profile_at = profile.profile_updated_at

@@ -10,13 +10,25 @@ Tests:
 """
 
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import select
 
-from models import Subscription, SubscriptionStatus, User, UserRole, PlanTier
+from models import PlanTier, Subscription, SubscriptionStatus, UserRole
 from services.user_service import create_user_with_profile
+
+
+async def _reload_subscription(db_session, user_id):
+    """Re-read a subscription after another session committed it.
+
+    The test session keeps the pending row in its identity map
+    (expire_on_commit=False), so a plain SELECT would return that stale object.
+    """
+    db_session.expire_all()
+    return await db_session.scalar(
+        select(Subscription).where(Subscription.user_id == user_id)
+    )
 
 
 @pytest.mark.asyncio
@@ -114,10 +126,8 @@ class TestAdminGrant:
         assert result["status"] == "active"
         assert result["plan_tier"] == "corporate_annual"
 
-        # Verify in database
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        # Verify in database (grant commits on the request session, not this one)
+        sub = await _reload_subscription(db_session, user.id)
         assert sub.status == SubscriptionStatus.active
         assert sub.plan_tier == PlanTier.corporate_annual
         assert sub.started_at is not None
@@ -145,12 +155,8 @@ class TestAdminGrant:
         )
         assert response.status_code == 200
 
-        after_grant = datetime.now(timezone.utc)
+        sub = await _reload_subscription(db_session, user.id)
 
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
-        
         # Renewal should be ~30 days from now (allow 1 minute variance)
         expected_renewal = before_grant + timedelta(days=30)
         renewal_delta = abs((sub.renews_at - expected_renewal).total_seconds())
@@ -181,9 +187,7 @@ class TestAdminGrant:
         )
         assert response.status_code == 200
 
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub = await _reload_subscription(db_session, user.id)
         assert sub.started_at is not None
         assert sub.renews_at is not None
 
@@ -265,7 +269,6 @@ class TestSubscriptionGatingForMessaging:
 
     async def test_active_company_allowed_by_subscription_check(self, db_session, admin_client):
         """Verify active company subscription allows messaging via auth check."""
-        from core.messaging_auth import can_company_message_candidate
 
         # Create company with pending subscription
         company = await create_user_with_profile(
@@ -278,7 +281,7 @@ class TestSubscriptionGatingForMessaging:
         await db_session.commit()
 
         # Create candidate
-        candidate = await create_user_with_profile(
+        await create_user_with_profile(
             db=db_session,
             email=f"test_candidate2_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",

@@ -43,6 +43,9 @@ async def log_subscription_change(
         new_status=new_status,
         reason=reason,
         payment_transaction_id=payment_transaction_id,
+        # Postgres now() is the transaction start time, so two inserts in one
+        # transaction share a timestamp and "latest" is undefined. Stamp in Python.
+        created_at=datetime.now(timezone.utc),
     )
     db.add(audit)
 
