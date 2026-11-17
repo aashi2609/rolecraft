@@ -263,3 +263,4 @@ The frontend is deployable to **Vercel** or any Node.js hosting platform with ze
 ## License
 
 Private and proprietary. All rights reserved.
+
