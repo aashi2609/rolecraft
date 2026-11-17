@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
     File,
     HTTPException,
@@ -42,7 +43,7 @@ from schemas import (
     JobStatusUpdate,
     JobUpdate,
 )
-from services.embedding_service import refresh_job_embedding
+from services.embedding_service import refresh_job_embedding_bg
 from services.fitment_service import ranked_candidates_for_job
 from services.jd_parse_service import parse_job_description
 from services.job_search_service import enrich_job, search_jobs
@@ -85,6 +86,7 @@ async def parse_jd(
 @router.post("", response_model=JobOut)
 async def create_job(
     body: JobCreate,
+    background_tasks: BackgroundTasks,
     user: Annotated[User, Depends(require_role(UserRole.company, UserRole.admin))],
     db: DbSession,
 ):
@@ -141,7 +143,7 @@ async def create_job(
     )
     db.add(job)
     await db.flush()
-    await refresh_job_embedding(db, job)
+    background_tasks.add_task(refresh_job_embedding_bg, job.id)
 
     # Load company for enrichment
     await db.refresh(job, ["company"])
@@ -277,7 +279,7 @@ async def get_job(
 
 @router.put("/{job_id:uuid}", response_model=JobOut)
 @router.patch("/{job_id:uuid}", response_model=JobOut)
-async def update_job(job_id: UUID, body: JobUpdate, user: CompanyUser, db: DbSession):
+async def update_job(job_id: UUID, body: JobUpdate, background_tasks: BackgroundTasks, user: CompanyUser, db: DbSession):
     job = await db.get(JobPosting, job_id)
     if not job or job.company_id != user.id:
         raise HTTPException(status_code=404, detail="Not found")
@@ -293,7 +295,7 @@ async def update_job(job_id: UUID, body: JobUpdate, user: CompanyUser, db: DbSes
         else:
             setattr(job, k, v)
     await db.flush()
-    await refresh_job_embedding(db, job)
+    background_tasks.add_task(refresh_job_embedding_bg, job.id)
     await db.refresh(job, ["company"])
 
     from services.job_search_service import get_job_stats

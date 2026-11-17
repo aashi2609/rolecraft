@@ -304,7 +304,8 @@ def downgrade() -> None:
         )
     # 1. Remove FK and index on conversation_id
     op.drop_constraint("fk_messages_conversation_id", "messages", type_="foreignkey")
-    op.drop_index(op.f("ix_messages_conversation_id"), table_name="messages")
+    # n6o7's downgrade may already have dropped this index — keep idempotent
+    op.execute("DROP INDEX IF EXISTS ix_messages_conversation_id")
 
     # 2. Drop new columns before restoring quarantined messages to avoid NOT NULL violation
     op.drop_column("messages", "read_at")
@@ -321,6 +322,6 @@ def downgrade() -> None:
 
     # 4. Drop quarantine and conversations tables
     op.drop_table("messages_quarantine")
-    op.drop_index(op.f("ix_conversations_company_id"), table_name="conversations")
-    op.drop_index(op.f("ix_conversations_candidate_id"), table_name="conversations")
+    op.execute("DROP INDEX IF EXISTS ix_conversations_company_id")
+    op.execute("DROP INDEX IF EXISTS ix_conversations_candidate_id")
     op.drop_table("conversations")

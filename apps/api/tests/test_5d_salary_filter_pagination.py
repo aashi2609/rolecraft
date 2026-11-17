@@ -3,9 +3,21 @@
 from uuid import uuid4
 
 import pytest
+import pytest_asyncio
+from sqlalchemy import text
 
 from models import CandidateProfile, Experience, User, UserRole
 from services.candidate_search_service import search_candidates
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _isolate_test_rows(db_session):
+    """These tests assert absolute result counts; the shared test DB
+    accumulates committed rows across the suite, so start each test from
+    an empty users table (CASCADE clears dependent rows)."""
+    await db_session.execute(text("TRUNCATE users CASCADE"))
+    await db_session.commit()
+    yield
 
 
 @pytest.mark.asyncio
@@ -38,7 +50,7 @@ class TestSalaryFilterBeforePagination:
 
         await db_session.commit()
 
-        # Request page 1, salary 10-20 LPA (matches 12 candidates)
+        # Request page 1, salary 10-20 LPA inclusive => salaries 10..20 = 11 candidates
         result, total = await search_candidates(
             db_session,
             salary_min=10,
@@ -48,7 +60,7 @@ class TestSalaryFilterBeforePagination:
         )
 
         assert len(result) == 10
-        assert total == 12
+        assert total == 11
 
     async def test_total_count_includes_salary_filter(self, db_session):
         """Total count reflects salary filter applied BEFORE LIMIT/OFFSET."""

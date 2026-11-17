@@ -26,6 +26,17 @@ from services.subscription_service import log_subscription_change
 from services.user_service import create_user_with_profile
 
 
+async def _mk_user_with_sub(db, role=UserRole.candidate, plan="complete"):
+    """Create a real user + pending subscription for FK-requiring tests."""
+    return await create_user_with_profile(
+        db=db,
+        email=f"fk_{uuid4().hex[:10]}@test.com",
+        password="Test1234!",
+        role=role,
+        name="FK Test",
+        plan=plan,
+    )
+
 @pytest.mark.asyncio
 class TestSignupCreatesPendingSubscription:
     """Signup should create pending subscriptions, not active."""
@@ -34,14 +45,14 @@ class TestSignupCreatesPendingSubscription:
         """Candidate signup creates subscription with status=pending."""
         user = await create_user_with_profile(
             db=db_session,
-            email="cand@test.com",
+            email=f"cand_{uuid4().hex[:8]}@test.com",
             password="Test1234!",
             role=UserRole.candidate,
             name="Test Candidate",
             plan="resume_builder",
         )
         await db_session.commit()
-        await db_session.refresh(user)
+        await db_session.refresh(user, attribute_names=["subscription"])
 
         assert user.subscription is not None
         assert user.subscription.status == SubscriptionStatus.pending
@@ -52,7 +63,7 @@ class TestSignupCreatesPendingSubscription:
         """Company signup creates subscription with status=pending."""
         user = await create_user_with_profile(
             db=db_session,
-            email="corp@test.com",
+            email=f"corp_{uuid4().hex[:8]}@test.com",
             password="Test1234!",
             role=UserRole.company,
             name="Test Corp",
@@ -60,7 +71,7 @@ class TestSignupCreatesPendingSubscription:
             plan="corporate_annual",
         )
         await db_session.commit()
-        await db_session.refresh(user)
+        await db_session.refresh(user, attribute_names=["subscription"])
 
         assert user.subscription is not None
         assert user.subscription.status == SubscriptionStatus.pending
@@ -71,13 +82,13 @@ class TestSignupCreatesPendingSubscription:
         """Candidate signup without plan defaults to free (but still pending)."""
         user = await create_user_with_profile(
             db=db_session,
-            email="free@test.com",
+            email=f"free_{uuid4().hex[:8]}@test.com",
             password="Test1234!",
             role=UserRole.candidate,
             name="Free User",
         )
         await db_session.commit()
-        await db_session.refresh(user)
+        await db_session.refresh(user, attribute_names=["subscription"])
 
         assert user.subscription.status == SubscriptionStatus.pending
         # Note: "free" is no longer a valid plan tier; defaults to job_search or similar
@@ -90,7 +101,7 @@ class TestSignupCreatesPendingSubscription:
         """
         user = await create_user_with_profile(
             db=db_session,
-            email="pending@test.com",
+            email=f"pending_{uuid4().hex[:8]}@test.com",
             password="Test1234!",
             role=UserRole.candidate,
             plan="complete",
@@ -110,7 +121,7 @@ class TestAuditLogging:
 
         user = await create_user_with_profile(
             db=db_session,
-            email="audit1@test.com",
+            email=f"audit1_{uuid4().hex[:8]}@test.com",
             password="Test1234!",
             role=UserRole.candidate,
             plan="job_search",
@@ -132,8 +143,12 @@ class TestAuditLogging:
     async def test_manual_audit_log_entry(self, db_session):
         """Manual subscription change can be logged."""
 
-        user_id = uuid4()
-        sub_id = uuid4()
+        user = await _mk_user_with_sub(db_session)
+        sub = await db_session.scalar(
+            select(Subscription).where(Subscription.user_id == user.id)
+        )
+        user_id = user.id
+        sub_id = sub.id
 
         await log_subscription_change(
             db=db_session,
@@ -150,7 +165,8 @@ class TestAuditLogging:
 
         audit = await db_session.scalar(
             select(SubscriptionAuditLog).where(
-                SubscriptionAuditLog.subscription_id == sub_id
+                SubscriptionAuditLog.subscription_id == sub_id,
+                SubscriptionAuditLog.action == "update",
             )
         )
         assert audit is not None
@@ -176,7 +192,7 @@ class TestAdminCannotManuallyActivate:
         """Admin can still change plan_tier (just not status to active)."""
         user = await create_user_with_profile(
             db=db_session,
-            email="admin_test@test.com",
+            email=f"admin_test_{uuid4().hex[:8]}@test.com",
             password="Test1234!",
             role=UserRole.candidate,
             plan="job_search",
@@ -193,7 +209,7 @@ class TestAdminCannotManuallyActivate:
             db=db_session,
             subscription_id=user.subscription.id,
             user_id=user.id,
-            admin_id=uuid4(),
+            admin_id=None,  # system action; fabricated UUID would violate users FK
             action="update",
             old_plan_tier=old_plan,
             new_plan_tier=PlanTier.complete.value,
@@ -222,7 +238,7 @@ class TestSoftDelete:
 
         user = await create_user_with_profile(
             db=db_session,
-            email="cancel@test.com",
+            email=f"cancel_{uuid4().hex[:8]}@test.com",
             password="Test1234!",
             role=UserRole.candidate,
         )
@@ -244,7 +260,7 @@ class TestSoftDelete:
             db=db_session,
             subscription_id=sub_id,
             user_id=user_id,
-            admin_id=uuid4(),
+            admin_id=None,  # system action; fabricated UUID would violate users FK
             action="cancel",
             old_status="pending",
             new_status="cancelled",
@@ -269,7 +285,7 @@ class TestSubscriptionTransitions:
         """Subscription transitions pending -> active via payment verification."""
         user = await create_user_with_profile(
             db=db_session,
-            email="payment@test.com",
+            email=f"payment_{uuid4().hex[:8]}@test.com",
             password="Test1234!",
             role=UserRole.candidate,
         )
@@ -294,7 +310,7 @@ class TestSubscriptionTransitions:
             payment_transaction_id="razorpay_payment_id",
         )
         await db_session.commit()
-        await db_session.refresh(user)
+        await db_session.refresh(user, attribute_names=["subscription"])
 
         assert user.subscription.status == SubscriptionStatus.active
         assert user.subscription.renews_at is not None
@@ -303,7 +319,7 @@ class TestSubscriptionTransitions:
         """Active subscription can be cancelled."""
         user = await create_user_with_profile(
             db=db_session,
-            email="cancel_active@test.com",
+            email=f"cancel_active_{uuid4().hex[:8]}@test.com",
             password="Test1234!",
             role=UserRole.candidate,
         )
@@ -322,7 +338,7 @@ class TestSubscriptionTransitions:
             reason="User cancellation request",
         )
         await db_session.commit()
-        await db_session.refresh(user)
+        await db_session.refresh(user, attribute_names=["subscription"])
 
         assert user.subscription.status == SubscriptionStatus.cancelled
 
@@ -333,8 +349,15 @@ class TestNoBackdoorActivation:
 
     async def test_cannot_bypass_activation_check(self, db_session):
         """Direct subscription creation uses pending by default."""
+        user = await _mk_user_with_sub(db_session)
+        # cancel the signup pending row so our insert is the only live row
+        old = await db_session.scalar(
+            select(Subscription).where(Subscription.user_id == user.id)
+        )
+        old.status = SubscriptionStatus.cancelled
+        await db_session.flush()
         sub = Subscription(
-            user_id=uuid4(),
+            user_id=user.id,
             role=UserRole.candidate,
             plan_tier=PlanTier.complete,
             status=SubscriptionStatus.pending,  # ← Default
@@ -363,9 +386,14 @@ class TestAuditLogIntegrity:
 
     async def test_audit_entry_has_all_fields(self, db_session):
         """Audit log entry includes all trackable fields."""
-        admin_id = uuid4()
-        sub_id = uuid4()
-        user_id = uuid4()
+        user = await _mk_user_with_sub(db_session)
+        sub = await db_session.scalar(
+            select(Subscription).where(Subscription.user_id == user.id)
+        )
+        admin = await _mk_user_with_sub(db_session, role=UserRole.admin, plan="complete")
+        admin_id = admin.id
+        sub_id = sub.id
+        user_id = user.id
 
         await log_subscription_change(
             db=db_session,
@@ -382,7 +410,8 @@ class TestAuditLogIntegrity:
 
         audit = await db_session.scalar(
             select(SubscriptionAuditLog).where(
-                SubscriptionAuditLog.subscription_id == sub_id
+                SubscriptionAuditLog.subscription_id == sub_id,
+                SubscriptionAuditLog.action == "update_status",
             )
         )
 

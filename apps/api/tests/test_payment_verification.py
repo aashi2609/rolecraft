@@ -78,6 +78,24 @@ async def test_user(db_session: AsyncSession) -> User:
     return user
 
 
+async def _cancel_live_subs(db: AsyncSession, user_id) -> None:
+    """Cancel pending/active rows so tests can insert their own live row
+    under the idx_user_live_subscription invariant."""
+    subs = (
+        await db.scalars(
+            select(Subscription).where(
+                Subscription.user_id == user_id,
+                Subscription.status.in_(
+                    (SubscriptionStatus.pending, SubscriptionStatus.active)
+                ),
+            )
+        )
+    ).all()
+    for sub in subs:
+        sub.status = SubscriptionStatus.cancelled
+    await db.flush()
+
+
 @pytest_asyncio.fixture
 async def price_point(db_session: AsyncSession) -> PricePoint:
     """Get or create a unique test price point.
@@ -533,6 +551,8 @@ async def test_unique_index_prevents_multiple_active_subscriptions(
     This test verifies the partial unique index on (user_id) WHERE status='active'
     prevents duplicate active subscriptions even at the database level.
     """
+    await _cancel_live_subs(db_session, test_user.id)
+
     # Create first active subscription
     sub1 = Subscription(
         user_id=test_user.id,
@@ -566,6 +586,8 @@ async def test_expired_subscription_gives_no_access(
     """Test that expired subscriptions do not grant access to paid features."""
     from datetime import timedelta
 
+    await _cancel_live_subs(db_session, test_user.id)
+
     # Create expired subscription
     now = datetime.now(timezone.utc)
     sub = Subscription(
@@ -593,6 +615,7 @@ async def test_lifetime_subscription_never_expires(
 ) -> None:
     """Test that lifetime subscriptions never expire (renews_at is None)."""
     # Create lifetime subscription
+    await _cancel_live_subs(db_session, test_user.id)
     sub = Subscription(
         user_id=test_user.id,
         role=test_user.role,
@@ -619,6 +642,8 @@ async def test_no_admin_direct_activation_in_update(
     Admin update endpoint explicitly blocks transitions to 'active' status.
     Only webhook and admin grant can create active subscriptions.
     """
+    await _cancel_live_subs(db_session, test_user.id)
+
     # Create a pending subscription
     sub = Subscription(
         user_id=test_user.id,
@@ -662,6 +687,8 @@ async def test_activation_service_deactivates_old_subscriptions(
     price_point: PricePoint,
 ) -> None:
     """Test that activate_subscription deactivates previous active subscriptions."""
+    await _cancel_live_subs(db_session, test_user.id)
+
     # Create old active subscription
     old_sub = Subscription(
         user_id=test_user.id,
@@ -898,7 +925,8 @@ async def test_idempotency_prevents_duplicate_subscription(
         select(Subscription).where(Subscription.user_id == user_id)
     )
     sub_list = subscriptions.all()
-    assert len(sub_list) == 1, f"Idempotency broken: {len(sub_list)} subscriptions instead of 1"
+    live = [x for x in sub_list if x.status != SubscriptionStatus.cancelled]
+    assert len(live) == 1, f"Idempotency broken: {len(live)} live subscriptions instead of 1"
 
 
 @pytest.mark.asyncio

@@ -23,6 +23,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.database import Base
+from core.embedding_config import EMBEDDING_MODEL
 
 
 class UserRole(str, enum.Enum):
@@ -431,14 +432,17 @@ class Resume(Base):
     )
     ats_breakdown: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     embedding = mapped_column(
-        Vector(512), nullable=True
-    )  # OpenAI text-embedding-3-small: 512 dims
+        Vector(1536), nullable=True
+    )  # OpenAI text-embedding-3-small native dim
     embedding_status: Mapped[str] = mapped_column(
         Enum(EmbeddingStatus, name="embedding_status", create_constraint=False),
         default=EmbeddingStatus.pending.value,
     )
     embedding_model: Mapped[str] = mapped_column(
-        String(64), default="text-embedding-3-small"
+        String(64), default=EMBEDDING_MODEL
+    )
+    embedding_source_hash: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True
     )
     generation_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     version: Mapped[int] = mapped_column(Integer, default=1)
@@ -525,14 +529,17 @@ class JobPosting(Base):
         Enum(JobStatus, name="job_status"), default=JobStatus.draft
     )
     embedding = mapped_column(
-        Vector(512), nullable=True
-    )  # OpenAI text-embedding-3-small: 512 dims
+        Vector(1536), nullable=True
+    )  # OpenAI text-embedding-3-small native dim
     embedding_status: Mapped[str] = mapped_column(
         Enum(EmbeddingStatus, name="embedding_status", create_constraint=False),
         default=EmbeddingStatus.pending.value,
     )
     embedding_model: Mapped[str] = mapped_column(
-        String(64), default="text-embedding-3-small"
+        String(64), default=EMBEDDING_MODEL
+    )
+    embedding_source_hash: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

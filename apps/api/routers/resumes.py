@@ -140,6 +140,9 @@ async def generate(
             ats_breakdown=payload.get("ats_breakdown"),
             generation_metadata=payload.get("generation_metadata"),
             embedding=payload["embedding"],
+            embedding_status=payload.get("embedding_status"),
+            embedding_model=payload.get("embedding_model"),
+            embedding_source_hash=payload.get("embedding_source_hash"),
             is_default=i == 0,
             generated_from_profile_at=profile.profile_updated_at,
         )
@@ -217,6 +220,9 @@ async def regenerate(
             ats_breakdown=payload.get("ats_breakdown"),
             generation_metadata=payload.get("generation_metadata"),
             embedding=payload["embedding"],
+            embedding_status=payload.get("embedding_status"),
+            embedding_model=payload.get("embedding_model"),
+            embedding_source_hash=payload.get("embedding_source_hash"),
             version=(old.version or 1) + 1,
             is_default=was_default,
             generated_from_profile_at=profile.profile_updated_at,
@@ -276,6 +282,9 @@ async def improve(
     row.ats_breakdown = payload.get("ats_breakdown")
     row.generation_metadata = payload.get("generation_metadata")
     row.embedding = payload["embedding"]
+    row.embedding_status = payload.get("embedding_status")
+    row.embedding_model = payload.get("embedding_model")
+    row.embedding_source_hash = payload.get("embedding_source_hash")
     row.version = (row.version or 1) + 1
     row.pdf_path = None
     row.generated_from_profile_at = profile.profile_updated_at

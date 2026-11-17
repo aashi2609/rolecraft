@@ -6,6 +6,8 @@ from typing import List
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from core.embedding_config import EMBEDDING_MODEL
+
 _logger = logging.getLogger("rolecraft.config")
 
 # ── Known-weak / placeholder secrets that MUST be rejected in production ──
@@ -46,7 +48,7 @@ class Settings(BaseSettings):
     groq_ats_model: str = "openai/gpt-oss-20b"
     fitment_llm_rationales: bool = True
     embedding_api_key: str = ""
-    embedding_model: str = "text-embedding-3-small"
+    embedding_model: str = EMBEDDING_MODEL
     embedding_api_base: str = "https://api.openai.com/v1"
     resume_max_fix_iterations: int = 3
     # When true, skip Groq and always use deterministic resume generation (API-key backup).
