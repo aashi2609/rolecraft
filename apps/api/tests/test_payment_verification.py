@@ -21,12 +21,9 @@ from datetime import datetime, timezone
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.security import create_access_token
-from main import app
 from models import (
     BillingPeriod,
     PaymentStatus,
@@ -39,8 +36,7 @@ from models import (
     UserRole,
     WebhookEvent,
 )
-from services.payment_service import PaymentService, PRICES
-
+from services.payment_service import PRICES, PaymentService
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -657,7 +653,6 @@ async def test_no_admin_direct_activation_in_update(
     # Verify the endpoint would reject status=active transition
     # (This is tested in the existing routers/admin.py tests)
     # For this test, we verify the code path:
-    from routers.admin import update_subscription
 
     # Code check: The route explicitly checks:
     # if new_status == SubscriptionStatus.active and old_status != "active":
@@ -765,7 +760,6 @@ async def test_no_payment_without_server_order(
     Client cannot craft a payment verification for an order never created server-side.
     """
     # Attempt to verify a non-existent order should fail
-    from routers.payments import verify_payment
 
     # Verify would fail because razorpay_order_id doesn't exist in DB
     # (This is tested via the 404 response in the endpoint)

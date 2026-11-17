@@ -12,6 +12,12 @@ concurrency:
 permissions:
   contents: read
 
+defaults:
+  run:
+    # GitHub's bash shell already runs -eo pipefail; declared explicitly so
+    # every run step (incl. multi-line) inherits errexit + pipefail.
+    shell: bash
+
 jobs:
   backend:
     name: Backend (Python 3.11.9)
@@ -20,7 +26,8 @@ jobs:
 
     services:
       postgres:
-        image: pgvector/pgvector:pg15
+        # pgvector image matching Neon major version (PG 18)
+        image: pgvector/pgvector:pg18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -44,6 +51,17 @@ jobs:
           cache: pip
           cache-dependency-path: apps/api/requirements.txt
 
+      - name: Verify Python version is exactly 3.11.9
+        run: |
+          cd apps/api
+          set -euo pipefail
+          actual="$(python --version 2>&1)"
+          echo "python --version => $actual"
+          test "$actual" = "Python 3.11.9" || {
+            echo "::error::Expected Python 3.11.9, got: $actual"
+            exit 1
+          }
+
       - name: Print Python version and working directory
         run: |
           python --version
@@ -64,11 +82,13 @@ jobs:
           cd apps/api
           ruff format --check .
 
-      - name: Type check with mypy (non-blocking)
+      - name: Type check with mypy (reporting only — non-blocking)
+        # mypy: reporting only — continue-on-error is intentional; type
+        # coverage is advisory until the codebase is fully annotated.
         continue-on-error: true
         run: |
           cd apps/api
-          mypy . --ignore-missing-imports || true
+          mypy . --ignore-missing-imports
 
       - name: Security audit with pip-audit
         run: |
@@ -83,6 +103,27 @@ jobs:
         run: |
           cd apps/api
           psql -c "CREATE DATABASE test_isolated;"
+
+      - name: Enable pgvector extension
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          psql -d test_db -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          psql -d test_isolated -c "CREATE EXTENSION IF NOT EXISTS vector;"
+
+      - name: Alembic single head
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
+        run: |
+          cd apps/api
+          set -euo pipefail
+          export PYTHONPATH=.
+          heads="$(alembic heads)"
+          echo "$heads"
+          count="$(echo "$heads" | grep -c '(.\+)' || true)"
+          test "$count" -eq 1 || { echo "::error::Expected exactly 1 alembic head, got $count"; exit 1; }
 
       - name: Run Alembic check
         env:
@@ -108,9 +149,33 @@ jobs:
           RATE_LIMIT_ENABLED: 'false'
         run: |
           cd apps/api
+          set -o pipefail
           pytest tests/ -v --tb=short --durations=15 \
             --cov=. --cov-report=xml --cov-report=term-missing \
             --junit-xml=junit.xml 2>&1 | tee test_output.log
+
+      - name: Fail if junit XML contains skipped tests
+        if: always()
+        run: |
+          cd apps/api
+          set -euo pipefail
+          python - <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          junit = Path("junit.xml")
+          if not junit.exists():
+              print("::error::junit.xml missing — pytest step did not produce results")
+              sys.exit(1)
+          root = ET.parse(junit).getroot()
+          skipped = sum(int(s.get("skipped", 0)) for s in root.iter("testsuite"))
+          skipped += sum(int(tc.get("skipped", 1)) for tc in root.iter("testcase") if tc.find("skipped") is not None)
+          print(f"junit skipped count: {skipped}")
+          if skipped:
+              print(f"::error::{skipped} skipped test(s) — skips are not allowed in CI")
+              sys.exit(1)
+          PY
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
@@ -138,10 +203,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 20.19.0
+      - name: Set up Node.js (version from .nvmrc)
         uses: actions/setup-node@v4
         with:
-          node-version: 20.19.0
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
@@ -188,10 +253,11 @@ jobs:
           ! git ls-tree -r HEAD --name-only | grep -E '\.(dump|env)$|frozen_' || \
           (echo "Tracked secret files found" && exit 1)
 
-      - name: Check OpenAPI types diff
+      - name: OpenAPI type check (placeholder — reporting only)
+        # Placeholder step: kept non-blocking until openapi type
+        # generation is wired up. Label: openapi-check reporting only.
         continue-on-error: true
         run: |
-          # Placeholder: Add openapi type generation check when available
           echo "OpenAPI type check (placeholder)"
 
   status:

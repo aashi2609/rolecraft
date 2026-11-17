@@ -14,12 +14,9 @@ Tests:
 import uuid
 
 import pytest
-from sqlalchemy import select
 
 from models import (
     CandidateProfile,
-    Conversation,
-    Message,
     User,
     UserRole,
 )
@@ -208,7 +205,7 @@ class TestDeletedUserHandling:
     ):
         """Thread with deleted candidate should return 200 with label='Former user'."""
         # Create conversation
-        conv = await make_conversation(
+        await make_conversation(
             candidate_id=candidate_user.id, company_id=company_user.id
         )
 
@@ -356,9 +353,10 @@ class TestNegativeControls:
           .order_by(Experience.candidate_id, desc(Experience.from_date.nullslast()))
         Then this test should fail.
         """
-        from services.user_service import create_user_with_profile
-        from models import Experience
         from datetime import date
+
+        from models import Experience
+        from services.user_service import create_user_with_profile
 
         # Create candidate
         candidate = await create_user_with_profile(

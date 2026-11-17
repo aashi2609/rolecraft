@@ -11,16 +11,23 @@ Tests verify that:
 """
 
 import uuid
-from datetime import datetime, timezone, timedelta
 
 import pytest
-from sqlalchemy import select
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 
-from main import app
-from models import Subscription, SubscriptionStatus, UserRole, JobPosting, Application, ApplicationStatus, JobStatus
-from services.user_service import create_user_with_profile
 from core.security import create_access_token
+from main import app
+from models import (
+    Application,
+    ApplicationStatus,
+    JobPosting,
+    JobStatus,
+    Subscription,
+    SubscriptionStatus,
+    UserRole,
+)
+from services.user_service import create_user_with_profile
 
 
 @pytest.mark.asyncio
@@ -30,7 +37,7 @@ class TestFrontendThreadListingContract:
     async def test_thread_list_has_required_fields(self, company_client, make_conversation, candidate_user, company_user, db_session):
         """Thread list items have all required ThreadOut fields."""
         # Create a thread
-        conv = await make_conversation(
+        await make_conversation(
             candidate_id=candidate_user.id, company_id=company_user.id
         )
 
@@ -65,7 +72,7 @@ class TestFrontendThreadListingContract:
 
     async def test_thread_list_no_pii_in_participant_label(self, company_client, make_conversation, candidate_user, company_user):
         """Participant label should not contain email or phone."""
-        conv = await make_conversation(
+        await make_conversation(
             candidate_id=candidate_user.id, company_id=company_user.id
         )
 
@@ -83,7 +90,7 @@ class TestFrontendThreadListingContract:
 
     async def test_thread_id_is_valid_uuid(self, company_client, make_conversation, candidate_user, company_user):
         """Thread IDs should be valid UUIDs."""
-        conv = await make_conversation(
+        await make_conversation(
             candidate_id=candidate_user.id, company_id=company_user.id
         )
 

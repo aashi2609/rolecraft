@@ -56,7 +56,6 @@ def _is_primary() -> bool:
 async def _iter_candidates(db, table, batch_size, limit, retry_failed):
     """Keyset-paginate rows so per-batch commits don't kill a server-side cursor."""
     model = Resume if table == "resumes" else JobPosting
-    status_ok = [EmbeddingStatus.pending.value, EmbeddingStatus.failed.value]
     last_id = None
     produced = 0
     while True:

@@ -8,19 +8,19 @@ Tests for:
 4. Data integrity checks
 """
 
-from datetime import datetime, timezone, timedelta
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import select
 
 from models import (
+    PlanTier,
     Subscription,
-    SubscriptionStatus,
     SubscriptionAuditLog,
+    SubscriptionStatus,
     User,
     UserRole,
-    PlanTier,
 )
 from services.user_service import create_user_with_profile
 
@@ -32,7 +32,7 @@ class TestSubscriptionDataReport:
     async def test_report_counts_by_status(self, db_session):
         """Report correctly counts subscriptions by status."""
         # Create users with different subscription statuses
-        pending_user = await create_user_with_profile(
+        await create_user_with_profile(
             db=db_session,
             email=f"pending_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
@@ -151,13 +151,13 @@ class TestSubscriptionDataReport:
     async def test_report_counts_by_user_role(self, db_session):
         """Report counts subscriptions by user role."""
         # Create candidate and company
-        cand = await create_user_with_profile(
+        await create_user_with_profile(
             db=db_session,
             email=f"role_cand_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",
             role=UserRole.candidate,
         )
-        company = await create_user_with_profile(
+        await create_user_with_profile(
             db=db_session,
             email=f"role_company_{uuid.uuid4().hex[:8]}@test.com",
             password="TestPass123",

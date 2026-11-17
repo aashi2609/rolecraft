@@ -19,7 +19,6 @@ from sqlalchemy import select
 from models import (
     CandidateProfile,
     Notification,
-    Message,
     PlanTier,
     Subscription,
     SubscriptionStatus,
@@ -108,7 +107,7 @@ class TestThreadListing:
         self, company_client, make_conversation, candidate_user, company_user
     ):
         """Thread list items have all required fields, no PII."""
-        conv = await make_conversation(
+        await make_conversation(
             candidate_id=candidate_user.id, company_id=company_user.id
         )
 
@@ -480,13 +479,11 @@ class TestNegativeControls:
         self, company_user, candidate_user, db_session
     ):
         """NEGATIVE: Company without active subscription cannot send messages."""
-        from core.dependencies import CurrentUser
-        from fastapi import HTTPException
-        from core.messaging_auth import can_company_message_candidate
-        
         # Ensure company has no active subscription
         # (fixture may have created one; delete it)
         from sqlalchemy import delete
+
+        from core.messaging_auth import can_company_message_candidate
         from models import Subscription
 
         await db_session.execute(

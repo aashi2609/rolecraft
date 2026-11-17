@@ -10,7 +10,6 @@ Read-only: only SELECTs.
 """
 
 import asyncio
-import os
 import sys
 from pathlib import Path
 
