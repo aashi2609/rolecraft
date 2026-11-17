@@ -179,15 +179,11 @@ class TestAuditLogging:
 class TestAdminCannotManuallyActivate:
     """Admin routes should prevent manual activation."""
 
-    async def test_patch_endpoint_rejects_status_to_active(
-        self, db_session, admin_client
-    ):
+    async def test_patch_endpoint_rejects_status_to_active(self, db_session, admin_client):
         """PATCH /admin/subscriptions/{id} rejects status=active (403)."""
         user = await _mk_user_with_sub(db_session)
         await db_session.commit()
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub = await db_session.scalar(select(Subscription).where(Subscription.user_id == user.id))
         assert sub is not None
 
         response = await admin_client.patch(
@@ -243,18 +239,14 @@ class TestSoftDelete:
         """DELETE /admin/subscriptions/{id} returns 405 (soft-delete only)."""
         user = await _mk_user_with_sub(db_session)
         await db_session.commit()
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub = await db_session.scalar(select(Subscription).where(Subscription.user_id == user.id))
         assert sub is not None
 
         response = await admin_client.delete(f"/admin/subscriptions/{sub.id}")
         assert response.status_code == 405, response.text
 
         # Row must still exist — nothing was hard-deleted
-        still_there = await db_session.scalar(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        still_there = await db_session.scalar(select(Subscription).where(Subscription.id == sub.id))
         assert still_there is not None
 
     async def test_mark_as_cancelled_preserves_audit(self, db_session):
