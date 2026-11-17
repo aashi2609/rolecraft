@@ -180,12 +180,25 @@ class TestAdminCannotManuallyActivate:
     """Admin routes should prevent manual activation."""
 
     async def test_patch_endpoint_rejects_status_to_active(
-        self, db_session, candidate_user, current_admin
+        self, db_session, admin_client
     ):
-        """PATCH /admin/subscriptions/{id} rejects status=active."""
-        # This test requires a proper admin user and route setup
-        # Placeholder for integration test - skip for now
-        pytest.skip("Integration test placeholder - requires full route setup")
+        """PATCH /admin/subscriptions/{id} rejects status=active (403)."""
+        user = await _mk_user_with_sub(db_session)
+        await db_session.commit()
+        sub = await db_session.scalar(
+            select(Subscription).where(Subscription.user_id == user.id)
+        )
+        assert sub is not None
+
+        response = await admin_client.patch(
+            f"/admin/subscriptions/{sub.id}", json={"status": "active"}
+        )
+        assert response.status_code == 403, response.text
+        assert "payment" in response.json()["detail"].lower()
+
+        # Status must remain unchanged
+        await db_session.refresh(sub)
+        assert sub.status == SubscriptionStatus.pending
 
     async def test_admin_can_modify_plan_tier(self, db_session):
         """Admin can still change plan_tier (just not status to active)."""
@@ -226,11 +239,23 @@ class TestAdminCannotManuallyActivate:
 class TestSoftDelete:
     """Hard delete disabled; must use soft delete (mark as cancelled)."""
 
-    async def test_delete_endpoint_disabled(self, db_session, candidate_user):
-        """DELETE /admin/subscriptions/{id} returns 405."""
-        # Integration test would call the route and assert 405
-        # Placeholder for route testing - skip for now
-        pytest.skip("Integration test placeholder - requires full route setup")
+    async def test_delete_endpoint_disabled(self, db_session, admin_client):
+        """DELETE /admin/subscriptions/{id} returns 405 (soft-delete only)."""
+        user = await _mk_user_with_sub(db_session)
+        await db_session.commit()
+        sub = await db_session.scalar(
+            select(Subscription).where(Subscription.user_id == user.id)
+        )
+        assert sub is not None
+
+        response = await admin_client.delete(f"/admin/subscriptions/{sub.id}")
+        assert response.status_code == 405, response.text
+
+        # Row must still exist — nothing was hard-deleted
+        still_there = await db_session.scalar(
+            select(Subscription).where(Subscription.id == sub.id)
+        )
+        assert still_there is not None
 
     async def test_mark_as_cancelled_preserves_audit(self, db_session):
         """Cancelling a subscription preserves audit history."""

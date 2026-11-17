@@ -29,7 +29,9 @@ class PoolSettings:
                 max_overflow=0,
                 pool_timeout=30.0,
                 pool_recycle=3600.0,
-                pool_pre_ping=False,
+                # Neon drops idle pooled connections; pre-ping discards dead
+                # ones before checkout instead of failing mid-query.
+                pool_pre_ping=True,
                 statement_cache_size=0,
             )
 
