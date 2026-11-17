@@ -187,14 +187,6 @@ jobs:
           count="$(echo "$heads" | grep -c '(.\+)' || true)"
           test "$count" -eq 1 || { echo "::error::Expected exactly 1 alembic head, got $count"; exit 1; }
 
-      - name: Run Alembic check
-        env:
-          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
-          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_isolated
-        run: |
-          cd apps/api
-          alembic check
-
       - name: Run migrations on test database
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
@@ -202,6 +194,14 @@ jobs:
         run: |
           cd apps/api
           alembic upgrade head
+
+      - name: Run Alembic check
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_isolated
+        run: |
+          cd apps/api
+          alembic check
 
       - name: Run pytest with coverage
         env:
