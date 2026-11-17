@@ -16,9 +16,7 @@ from models import Application, JobPosting
 logger = logging.getLogger(__name__)
 
 
-async def can_company_view_resume(
-    company_id: UUID, resume_id: UUID, db: AsyncSession
-) -> bool:
+async def can_company_view_resume(company_id: UUID, resume_id: UUID, db: AsyncSession) -> bool:
     """True only if an application exists whose resume_id is THIS resume
     and whose job belongs to THIS company."""
     app = await db.scalar(
@@ -33,9 +31,7 @@ async def can_company_view_resume(
     return app is not None
 
 
-async def get_resume_application(
-    company_id: UUID, resume_id: UUID, db: AsyncSession
-):
+async def get_resume_application(company_id: UUID, resume_id: UUID, db: AsyncSession):
     """Return the matching Application (for audit logging) or None."""
     return await db.scalar(
         select(Application)

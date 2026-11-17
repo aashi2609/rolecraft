@@ -95,9 +95,7 @@ class PaymentService:
             )
         )
         if not price_point:
-            raise ValueError(
-                f"No active pricing for {plan_tier.value}/{billing_period.value}"
-            )
+            raise ValueError(f"No active pricing for {plan_tier.value}/{billing_period.value}")
 
         # Check for idempotency (if key provided)
         if idempotency_key:
@@ -236,7 +234,7 @@ class PaymentService:
         # Step 2: Insert webhook_events row FIRST (idempotency key)
         # Handle IntegrityError on duplicate UNIQUE(provider, provider_event_id)
         from sqlalchemy.exc import IntegrityError
-        
+
         webhook_event = WebhookEvent(
             provider_event_id=webhook_event_id,
             provider="razorpay",
@@ -245,24 +243,22 @@ class PaymentService:
             processed=False,
         )
         db.add(webhook_event)
-        
+
         try:
             await db.flush()
         except IntegrityError:
             # Duplicate event_id: this webhook was already processed
             await db.rollback()
-            
+
             # Query to get the existing event (for logging)
             existing_event = await db.scalar(
-                select(WebhookEvent).where(
-                    WebhookEvent.provider_event_id == webhook_event_id
-                )
+                select(WebhookEvent).where(WebhookEvent.provider_event_id == webhook_event_id)
             )
-            
+
             logger.info(
                 f"Duplicate webhook event {webhook_event_id}; skipping (already processed={existing_event.processed if existing_event else '?'})"
             )
-            
+
             # Return the transaction from earlier processing if it exists
             if existing_event and existing_event.payment_transaction_id:
                 return await db.get(PaymentTransaction, existing_event.payment_transaction_id)
@@ -373,7 +369,7 @@ class PaymentService:
             .where(PaymentTransaction.id == transaction.id)
             .with_for_update()  # SELECT ... FOR UPDATE
         )
-        
+
         if not locked_transaction:
             raise ValueError(f"Transaction {transaction.id} not found or deleted")
 
@@ -474,22 +470,18 @@ class PaymentService:
         await db.flush()
         return sub
 
-    async def _handle_payment_captured(
-        self, db, webhook_data: dict
-    ) -> PaymentTransaction:
+    async def _handle_payment_captured(self, db, webhook_data: dict) -> PaymentTransaction:
         """Handle payment.captured webhook (primary event with auto-capture enabled).
 
         Validates:
         - Amount and currency match transaction
         - Order exists in database
         - Idempotency (no duplicate activation)
-        
+
         Reference: https://razorpay.com/docs/webhooks/payloads/payments/
         Triggered when a payment is successfully captured.
         """
-        payment_data = (
-            webhook_data.get("payload", {}).get("payment", {}).get("entity", {})
-        )
+        payment_data = webhook_data.get("payload", {}).get("payment", {}).get("entity", {})
 
         razorpay_payment_id = payment_data.get("id")
         razorpay_order_id = payment_data.get("order_id")
@@ -526,8 +518,7 @@ class PaymentService:
 
         if currency and currency != "INR":
             logger.error(
-                f"CURRENCY MISMATCH for order {razorpay_order_id}: "
-                f"expected INR, got {currency}"
+                f"CURRENCY MISMATCH for order {razorpay_order_id}: " f"expected INR, got {currency}"
             )
             transaction.status = PaymentStatus.failed
             transaction.failure_reason = f"Invalid currency in webhook: {currency}"
@@ -552,14 +543,12 @@ class PaymentService:
         await db.flush()
         return transaction
 
-    async def _handle_payment_authorized(
-        self, db, webhook_data: dict
-    ) -> PaymentTransaction:
+    async def _handle_payment_authorized(self, db, webhook_data: dict) -> PaymentTransaction:
         """Handle payment.authorized webhook (fallback for manual-capture accounts).
 
         Most accounts use auto-capture (default), which triggers payment.captured.
         For accounts with manual capture enabled, payment.authorized is the event.
-        
+
         Validates:
         - Amount and currency match transaction
         - Order exists in database
@@ -568,9 +557,7 @@ class PaymentService:
         Reference: https://razorpay.com/docs/webhooks/payloads/payments/
         Triggered when a payment is authorised.
         """
-        payment_data = (
-            webhook_data.get("payload", {}).get("payment", {}).get("entity", {})
-        )
+        payment_data = webhook_data.get("payload", {}).get("payment", {}).get("entity", {})
 
         razorpay_payment_id = payment_data.get("id")
         razorpay_order_id = payment_data.get("order_id")
@@ -606,8 +593,7 @@ class PaymentService:
 
         if currency and currency != "INR":
             logger.error(
-                f"CURRENCY MISMATCH for order {razorpay_order_id}: "
-                f"expected INR, got {currency}"
+                f"CURRENCY MISMATCH for order {razorpay_order_id}: " f"expected INR, got {currency}"
             )
             transaction.status = PaymentStatus.failed
             transaction.failure_reason = f"Invalid currency in webhook: {currency}"
@@ -631,13 +617,9 @@ class PaymentService:
         await db.flush()
         return transaction
 
-    async def _handle_payment_failed(
-        self, db, webhook_data: dict
-    ) -> PaymentTransaction:
+    async def _handle_payment_failed(self, db, webhook_data: dict) -> PaymentTransaction:
         """Handle payment.failed webhook."""
-        payment_data = (
-            webhook_data.get("payload", {}).get("payment", {}).get("entity", {})
-        )
+        payment_data = webhook_data.get("payload", {}).get("payment", {}).get("entity", {})
 
         razorpay_payment_id = payment_data.get("id")
         razorpay_order_id = payment_data.get("order_id")
@@ -658,9 +640,7 @@ class PaymentService:
 
         # Idempotency: if already failed, return
         if transaction.status == PaymentStatus.failed:
-            logger.info(
-                f"Transaction {razorpay_order_id} already marked failed, skipping"
-            )
+            logger.info(f"Transaction {razorpay_order_id} already marked failed, skipping")
             return transaction
 
         # Update transaction status

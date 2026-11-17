@@ -81,9 +81,7 @@ async def _cancel_live_subs(db: AsyncSession, user_id) -> None:
         await db.scalars(
             select(Subscription).where(
                 Subscription.user_id == user_id,
-                Subscription.status.in_(
-                    (SubscriptionStatus.pending, SubscriptionStatus.active)
-                ),
+                Subscription.status.in_((SubscriptionStatus.pending, SubscriptionStatus.active)),
             )
         )
     ).all()
@@ -95,23 +93,25 @@ async def _cancel_live_subs(db: AsyncSession, user_id) -> None:
 @pytest_asyncio.fixture
 async def price_point(db_session: AsyncSession) -> PricePoint:
     """Get or create a unique test price point.
-    
+
     Uses database-local ID to ensure even in shared test DB, we reuse the
     same price point rather than creating duplicates.
     """
     # Try to find existing price point
     result = await db_session.execute(
-        select(PricePoint).where(
+        select(PricePoint)
+        .where(
             PricePoint.plan_tier == PlanTier.complete,
             PricePoint.billing_period == BillingPeriod.annual,
-        ).limit(1)
+        )
+        .limit(1)
     )
     pp = result.scalar_one_or_none()
-    
+
     # If it exists, return it (rolled back per session)
     if pp:
         return pp
-    
+
     # Otherwise create new
     pp = PricePoint(
         plan_tier=PlanTier.complete,
@@ -156,7 +156,7 @@ async def test_valid_webhook_signature_activates_subscription(
     """Test that a valid webhook signature activates the subscription."""
     # Store user ID before fixtures are detached
     user_id = test_user.id
-    
+
     # Prepare webhook data with unique payment ID
     razorpay_payment_id = f"pay_{uuid.uuid4().hex[:12]}"
     razorpay_order_id = payment_transaction.razorpay_order_id
@@ -178,9 +178,7 @@ async def test_valid_webhook_signature_activates_subscription(
 
     # Create raw body and compute valid signature
     raw_body = json.dumps(webhook_data).encode()
-    expected_signature = hmac.new(
-        webhook_secret.encode(), raw_body, hashlib.sha256
-    ).hexdigest()
+    expected_signature = hmac.new(webhook_secret.encode(), raw_body, hashlib.sha256).hexdigest()
 
     webhook_event_id = f"evt_{uuid.uuid4().hex[:16]}"
 
@@ -212,9 +210,7 @@ async def test_valid_webhook_signature_activates_subscription(
 
     # Verify webhook event is marked processed
     webhook_event = await db_session.scalar(
-        select(WebhookEvent).where(
-            WebhookEvent.provider_event_id == webhook_event_id
-        )
+        select(WebhookEvent).where(WebhookEvent.provider_event_id == webhook_event_id)
     )
     assert webhook_event is not None
     assert webhook_event.processed is True
@@ -257,9 +253,7 @@ async def test_invalid_webhook_signature_rejected(
 
     # Verify nothing was created
     subscription = await db_session.scalar(
-        select(Subscription).where(
-            Subscription.user_id == payment_transaction.user_id
-        )
+        select(Subscription).where(Subscription.user_id == payment_transaction.user_id)
     )
     assert subscription is None or subscription.status != SubscriptionStatus.active
 
@@ -275,7 +269,7 @@ async def test_amount_mismatch_rejects_payment(
     """Test that amount mismatch in webhook causes payment rejection."""
     # Store user ID before fixtures are detached
     user_id = test_user.id
-    
+
     webhook_data = {
         "event": "payment.captured",  # Primary event (auto-capture is default)
         "payload": {
@@ -291,9 +285,7 @@ async def test_amount_mismatch_rejects_payment(
     }
 
     raw_body = json.dumps(webhook_data).encode()
-    valid_signature = hmac.new(
-        webhook_secret.encode(), raw_body, hashlib.sha256
-    ).hexdigest()
+    valid_signature = hmac.new(webhook_secret.encode(), raw_body, hashlib.sha256).hexdigest()
 
     # Process webhook
     transaction = await payment_service.process_webhook(
@@ -332,7 +324,7 @@ async def test_duplicate_webhook_event_idempotent(
     """Test that duplicate webhook events are processed only once."""
     # Store user ID before fixtures are detached
     user_id = test_user.id
-    
+
     webhook_data = {
         "event": "payment.captured",  # Primary event (auto-capture is default)
         "payload": {
@@ -348,9 +340,7 @@ async def test_duplicate_webhook_event_idempotent(
     }
 
     raw_body = json.dumps(webhook_data).encode()
-    valid_signature = hmac.new(
-        webhook_secret.encode(), raw_body, hashlib.sha256
-    ).hexdigest()
+    valid_signature = hmac.new(webhook_secret.encode(), raw_body, hashlib.sha256).hexdigest()
     webhook_event_id = f"evt_{uuid.uuid4().hex[:16]}"
 
     # Process webhook first time
@@ -400,7 +390,7 @@ async def test_payment_failed_webhook_no_activation(
     """Test that payment.failed webhook does not activate subscription."""
     # Store user ID before fixtures are detached
     user_id = test_user.id
-    
+
     webhook_data = {
         "event": "payment.failed",
         "payload": {
@@ -417,9 +407,7 @@ async def test_payment_failed_webhook_no_activation(
     }
 
     raw_body = json.dumps(webhook_data).encode()
-    valid_signature = hmac.new(
-        webhook_secret.encode(), raw_body, hashlib.sha256
-    ).hexdigest()
+    valid_signature = hmac.new(webhook_secret.encode(), raw_body, hashlib.sha256).hexdigest()
 
     # Process webhook
     transaction = await payment_service.process_webhook(
@@ -469,9 +457,7 @@ async def test_valid_signature_with_correct_raw_body(
     }
 
     raw_body = json.dumps(webhook_dict, separators=(",", ":")).encode()
-    valid_signature = hmac.new(
-        webhook_secret.encode(), raw_body, hashlib.sha256
-    ).hexdigest()
+    valid_signature = hmac.new(webhook_secret.encode(), raw_body, hashlib.sha256).hexdigest()
 
     # Process webhook with original signature should work
     transaction = await payment_service.process_webhook(
@@ -514,9 +500,7 @@ async def test_reserialized_json_with_original_signature_fails(
 
     # Original raw body (compact format)
     raw_body = json.dumps(webhook_dict, separators=(",", ":")).encode()
-    valid_signature = hmac.new(
-        webhook_secret.encode(), raw_body, hashlib.sha256
-    ).hexdigest()
+    valid_signature = hmac.new(webhook_secret.encode(), raw_body, hashlib.sha256).hexdigest()
 
     # Re-serialize with different format (sorted keys)
     re_dumped = json.dumps(webhook_dict, sort_keys=True).encode()
@@ -543,7 +527,7 @@ async def test_unique_index_prevents_multiple_active_subscriptions(
     test_user: User,
 ) -> None:
     """Test that DB unique index prevents user from having multiple active subscriptions.
-    
+
     This test verifies the partial unique index on (user_id) WHERE status='active'
     prevents duplicate active subscriptions even at the database level.
     """
@@ -634,7 +618,7 @@ async def test_no_admin_direct_activation_in_update(
     test_user: User,
 ) -> None:
     """Test that PATCH /admin/subscriptions/{id} cannot manually set status=active.
-    
+
     Admin update endpoint explicitly blocks transitions to 'active' status.
     Only webhook and admin grant can create active subscriptions.
     """
@@ -666,7 +650,7 @@ async def test_payments_mode_disabled_blocks_orders(
     test_user: User,
 ) -> None:
     """Test that PAYMENTS_MODE=disabled returns 503 for order endpoints.
-    
+
     When payments are disabled, checkout should not be available.
     """
     # This test would require a monkeypatch of settings to test
@@ -719,10 +703,9 @@ async def test_activation_service_deactivates_old_subscriptions(
 
 
 @pytest.mark.asyncio
-async def test_prices_table_enforced(
-) -> None:
+async def test_prices_table_enforced() -> None:
     """Test that PRICES table constants are enforced.
-    
+
     Client cannot override amount - it comes from PRICES table server-side.
     """
     # Verify PRICES table exists and has correct structure
@@ -740,7 +723,7 @@ async def test_wrong_role_order_rejected(
     webhook_secret: str,
 ) -> None:
     """Test that candidate ordering company plan is rejected.
-    
+
     Role-based plan restrictions must be enforced at order creation.
     This is part of E2 (order creation validation).
     """
@@ -756,7 +739,7 @@ async def test_no_payment_without_server_order(
     test_user: User,
 ) -> None:
     """Test that verify endpoint rejects payments for non-existent orders.
-    
+
     Client cannot craft a payment verification for an order never created server-side.
     """
     # Attempt to verify a non-existent order should fail
@@ -771,9 +754,9 @@ async def test_no_payment_without_server_order(
 @pytest.mark.asyncio
 async def test_skip_signature_compare_allows_bypass():
     """NEGATIVE CONTROL: If we skip hmac.compare_digest, ANY signature accepted.
-    
+
     This test proves signature verification is essential.
-    
+
     To demonstrate:
     1. Comment out: is_valid = hmac.compare_digest(expected, razorpay_signature)
     2. Replace with: is_valid = True  (INSECURE: always accepts)
@@ -792,7 +775,7 @@ async def test_reparsed_json_breaks_signature(
     payment_transaction: PaymentTransaction,
 ) -> None:
     """NEGATIVE CONTROL: If we use re-serialized JSON, signature fails.
-    
+
     Proves we MUST use raw body, not json.dumps(parsed).
     """
     webhook_dict = {
@@ -811,16 +794,14 @@ async def test_reparsed_json_breaks_signature(
 
     # Original raw body with specific serialization
     raw_body_original = json.dumps(webhook_dict, separators=(",", ":")).encode()
-    sig_original = hmac.new(
-        webhook_secret.encode(), raw_body_original, hashlib.sha256
-    ).hexdigest()
+    sig_original = hmac.new(webhook_secret.encode(), raw_body_original, hashlib.sha256).hexdigest()
 
     # Re-serialize with sorted keys (DIFFERENT BYTES)
     raw_body_reserialized = json.dumps(webhook_dict, sort_keys=True).encode()
 
     # Signatures must differ
     assert raw_body_original != raw_body_reserialized
-    
+
     # Original signature works
     await payment_service.process_webhook(
         db_session,
@@ -830,7 +811,7 @@ async def test_reparsed_json_breaks_signature(
         webhook_data=webhook_dict,
         event_type="payment.captured",
     )
-    
+
     # But reserialized body with original signature FAILS
     with pytest.raises(ValueError, match="Invalid webhook signature"):
         await payment_service.process_webhook(
@@ -856,13 +837,13 @@ async def test_idempotency_prevents_duplicate_subscription(
     This is a POSITIVE control test verifying that idempotency works correctly.
     When the same webhook event is replayed (same event_id), the subscription
     must not be created again.
-    
+
     To break: Comment out the WebhookEvent insertion/UNIQUE check in process_webhook()
     Result: test_duplicate_webhook_event_idempotent would FAIL (gets 2+ subscriptions)
     """
     # Store user ID before fixtures are detached
     user_id = test_user.id
-    
+
     webhook_data = {
         "event": "payment.captured",  # Primary event (auto-capture is default)
         "payload": {
@@ -878,9 +859,7 @@ async def test_idempotency_prevents_duplicate_subscription(
     }
 
     raw_body = json.dumps(webhook_data).encode()
-    valid_signature = hmac.new(
-        webhook_secret.encode(), raw_body, hashlib.sha256
-    ).hexdigest()
+    valid_signature = hmac.new(webhook_secret.encode(), raw_body, hashlib.sha256).hexdigest()
     webhook_event_id = f"evt_{uuid.uuid4().hex[:16]}"
 
     # First webhook processing
@@ -895,9 +874,7 @@ async def test_idempotency_prevents_duplicate_subscription(
     await db_session.commit()
 
     # Verify subscription created
-    sub1 = await db_session.scalar(
-        select(Subscription).where(Subscription.user_id == user_id)
-    )
+    sub1 = await db_session.scalar(select(Subscription).where(Subscription.user_id == user_id))
     assert sub1 is not None
 
     # Replay webhook (SAME event_id)
@@ -932,9 +909,9 @@ async def test_trust_request_amount_allows_underpayment(
     test_user: User,
 ) -> None:
     """NEGATIVE CONTROL: If we don't validate amount, client pays less, gets full access.
-    
+
     This test proves amount validation is critical.
-    
+
     To break: Comment out amount check in _handle_payment_authorized()
     Result: Webhook with wrong amount would activate (payment for ₹100 grants ₹9,999 access)
     """
@@ -954,9 +931,7 @@ async def test_trust_request_amount_allows_underpayment(
     }
 
     raw_body = json.dumps(webhook_data).encode()
-    valid_signature = hmac.new(
-        webhook_secret.encode(), raw_body, hashlib.sha256
-    ).hexdigest()
+    valid_signature = hmac.new(webhook_secret.encode(), raw_body, hashlib.sha256).hexdigest()
 
     # Process webhook with wrong amount
     transaction = await payment_service.process_webhook(
@@ -970,8 +945,9 @@ async def test_trust_request_amount_allows_underpayment(
     await db_session.commit()
 
     # Must be marked failed (NOT completed)
-    assert transaction.status == PaymentStatus.failed, \
-        f"Amount mismatch should mark failed, but got {transaction.status}"
+    assert (
+        transaction.status == PaymentStatus.failed
+    ), f"Amount mismatch should mark failed, but got {transaction.status}"
 
     # No subscription should be active
     active_sub = await db_session.scalar(
@@ -992,13 +968,13 @@ async def test_activate_in_orders_endpoint_would_bypass_payment(
 ) -> None:
     """NEGATIVE CONTROL: If POST /payments/orders calls activate_subscription...
     ...user gets immediate access without paying.
-    
+
     This test documents what MUST NOT happen.
-    
+
     To break: Add this to POST /payments/orders endpoint:
         await activate_subscription(db, transaction)
     Result: User would have active subscription immediately
-    
+
     To prove protection works: Verify activate_subscription is ONLY called from webhook
     """
     # Get initial subscription state (users start with pending from signup)
@@ -1025,10 +1001,10 @@ async def test_activate_in_orders_endpoint_would_bypass_payment(
             Subscription.user_id == test_user.id,
         )
     )
-    assert current_sub.status == SubscriptionStatus.pending, \
-        "Order endpoint should NOT activate subscription"
+    assert (
+        current_sub.status == SubscriptionStatus.pending
+    ), "Order endpoint should NOT activate subscription"
 
     # Transaction should not be linked to subscription yet
     assert transaction.status == PaymentStatus.pending
     assert transaction.subscription_id is None
-

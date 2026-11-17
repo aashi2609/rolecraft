@@ -41,9 +41,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/signup", response_model=TokenResponse)
 @limiter.limit(RATE_LIMITS["signup_ip"])
-async def signup(
-    request: Request, response: Response, body: SignupRequest, db: DbSession
-):
+async def signup(request: Request, response: Response, body: SignupRequest, db: DbSession):
     # Password complexity + role Literal already enforced by SignupRequest
     role = UserRole(body.role)
     existing = await db.scalar(select(User).where(User.email == body.email.lower()))
@@ -63,9 +61,7 @@ async def signup(
     token = create_access_token(
         user_id=user.id, role=user.role.value, token_version=user.token_version
     )
-    refresh_token = create_refresh_token(
-        user_id=user.id, token_version=user.token_version
-    )
+    refresh_token = create_refresh_token(user_id=user.id, token_version=user.token_version)
     return TokenResponse(
         access_token=token,
         refresh_token=refresh_token,
@@ -77,13 +73,9 @@ async def signup(
 
 @router.post("/signin", response_model=TokenResponse)
 @limiter.limit(RATE_LIMITS["signin_ip"])
-async def signin(
-    request: Request, response: Response, body: SigninRequest, db: DbSession
-):
+async def signin(request: Request, response: Response, body: SigninRequest, db: DbSession):
     email = body.email.lower()
-    result = await db.execute(
-        select(User).where(User.email == email)
-    )
+    result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user or not verify_password(body.password, user.password_hash):
         # Per-email failed-attempt budget (does not reveal whether the email exists)
@@ -100,14 +92,13 @@ async def signin(
         )
 
     from services.subscription_service import get_current_subscription
+
     _sub = await get_current_subscription(db, user.id)
     plan = _sub.plan_tier.value if _sub and _sub.status == SubscriptionStatus.active else None
     token = create_access_token(
         user_id=user.id, role=user.role.value, token_version=user.token_version
     )
-    refresh_token = create_refresh_token(
-        user_id=user.id, token_version=user.token_version
-    )
+    refresh_token = create_refresh_token(user_id=user.id, token_version=user.token_version)
     return TokenResponse(
         access_token=token,
         refresh_token=refresh_token,
@@ -132,9 +123,7 @@ async def refresh_access_token(body: RefreshTokenRequest, db: DbSession):
         )
 
     token_version = payload.get("token_version")
-    result = await db.execute(
-        select(User).where(User.id == user_id)
-    )
+    result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(
@@ -150,14 +139,13 @@ async def refresh_access_token(body: RefreshTokenRequest, db: DbSession):
 
     # Issue new access and rotated refresh token
     from services.subscription_service import get_current_subscription
+
     _sub = await get_current_subscription(db, user.id)
     plan = _sub.plan_tier.value if _sub and _sub.status == SubscriptionStatus.active else None
     new_token = create_access_token(
         user_id=user.id, role=user.role.value, token_version=user.token_version
     )
-    new_refresh = create_refresh_token(
-        user_id=user.id, token_version=user.token_version
-    )
+    new_refresh = create_refresh_token(user_id=user.id, token_version=user.token_version)
     return TokenResponse(
         access_token=new_token,
         refresh_token=new_refresh,
@@ -193,9 +181,7 @@ async def forgot_password(
     enforce_limit("forgot_password_email", email)
 
     # Find active user
-    user = await db.scalar(
-        select(User).where(User.email == email, User.is_active.is_(True))
-    )
+    user = await db.scalar(select(User).where(User.email == email, User.is_active.is_(True)))
 
     if user:
         # Invalidate earlier unused tokens
@@ -270,11 +256,7 @@ async def reset_password(
         .options(selectinload(PasswordResetToken.user))
     )
 
-    if (
-        not reset_token
-        or reset_token.used_at
-        or reset_token.expires_at < datetime.utcnow()
-    ):
+    if not reset_token or reset_token.used_at or reset_token.expires_at < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
     user = await db.get(User, reset_token.user_id)

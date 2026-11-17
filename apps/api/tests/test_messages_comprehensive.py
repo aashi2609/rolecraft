@@ -118,9 +118,7 @@ class TestThreadPayloadPIIProtection:
         self, company_client, make_conversation, candidate_user, company_user
     ):
         """ThreadOut must have exact allowlist of keys (no extras leaking)."""
-        await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         response = await company_client.get("/messages/threads")
         assert response.status_code == 200
@@ -151,9 +149,7 @@ class TestThreadPayloadPIIProtection:
         self, company_client, make_conversation, candidate_user, company_user
     ):
         """ThreadOut must NOT contain email, phone, address fields."""
-        await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         response = await company_client.get("/messages/threads")
         assert response.status_code == 200
@@ -161,29 +157,19 @@ class TestThreadPayloadPIIProtection:
 
         for thread in threads:
             # These fields must not exist
-            assert (
-                "email" not in thread
-            ), "ThreadOut must not include email (PII)"
-            assert (
-                "phone" not in thread
-            ), "ThreadOut must not include phone (PII)"
-            assert (
-                "address" not in thread
-            ), "ThreadOut must not include address (PII)"
+            assert "email" not in thread, "ThreadOut must not include email (PII)"
+            assert "phone" not in thread, "ThreadOut must not include phone (PII)"
+            assert "address" not in thread, "ThreadOut must not include address (PII)"
             assert (
                 "candidate_email" not in thread
             ), "ThreadOut must not include candidate_email (PII)"
-            assert (
-                "company_email" not in thread
-            ), "ThreadOut must not include company_email (PII)"
+            assert "company_email" not in thread, "ThreadOut must not include company_email (PII)"
 
     async def test_participant_label_no_email_pattern(
         self, company_client, make_conversation, candidate_user, company_user
     ):
         """Participant label should not contain @."""
-        await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         response = await company_client.get("/messages/threads")
         assert response.status_code == 200
@@ -191,9 +177,7 @@ class TestThreadPayloadPIIProtection:
 
         for thread in threads:
             label = thread.get("participant_label", "")
-            assert (
-                "@" not in label
-            ), f"Participant label should not contain email: {label}"
+            assert "@" not in label, f"Participant label should not contain email: {label}"
 
 
 @pytest.mark.asyncio
@@ -205,9 +189,7 @@ class TestDeletedUserHandling:
     ):
         """Thread with deleted candidate should return 200 with label='Former user'."""
         # Create conversation
-        await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         # Delete the candidate
         await db_session.delete(candidate_user)
@@ -215,7 +197,7 @@ class TestDeletedUserHandling:
 
         # List threads as company
         response = await company_client.get("/messages/threads")
-        
+
         # Should succeed (200), not 500
         if response.status_code == 200:
             threads = response.json()
@@ -234,9 +216,7 @@ class TestDeletedUserHandling:
     ):
         """Thread with deactivated candidate should still be readable."""
         # Create conversation
-        conv = await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        conv = await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         # Deactivate the candidate
         candidate_user.is_active = False
@@ -246,9 +226,7 @@ class TestDeletedUserHandling:
         response = await company_client.get("/messages/threads")
         assert response.status_code == 200
         threads = response.json()
-        thread = next(
-            (t for t in threads if str(t["thread_id"]) == str(conv.id)), None
-        )
+        thread = next((t for t in threads if str(t["thread_id"]) == str(conv.id)), None)
         assert thread is not None, "Thread should still be listed"
         assert (
             thread["participant_label"] == "Former user"
@@ -264,7 +242,14 @@ class TestConcurrentThreadCreation:
     """Verify concurrent thread creation returns existing conversation (idempotent)."""
 
     async def test_duplicate_thread_creation_returns_existing(
-        self, company_client, candidate_user, company_user, admin_client, db_session, make_job, make_application
+        self,
+        company_client,
+        candidate_user,
+        company_user,
+        admin_client,
+        db_session,
+        make_job,
+        make_application,
     ):
         """Creating a thread twice should return the same conversation, not 500."""
         # Grant company active subscription
@@ -314,23 +299,21 @@ class TestThirdPartyAccess:
     ):
         """Third-party company cannot access another company's conversation (404, not 403)."""
         # Create conversation between candidate and company_user
-        conv = await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        conv = await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         # Try to access as third party (other_company_client)
         response = await other_company_client.get(f"/messages/threads/{conv.id}")
-        
+
         # Should be 404 (not found), not 403 (forbidden) or 200 (success)
-        assert response.status_code == 404, f"Third party should get 404, got {response.status_code}"
+        assert (
+            response.status_code == 404
+        ), f"Third party should get 404, got {response.status_code}"
 
     async def test_third_party_cannot_reply_to_others_thread(
         self, company_client, other_company_client, make_conversation, candidate_user, company_user
     ):
         """Third-party cannot reply to another company's conversation."""
-        conv = await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        conv = await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         response = await other_company_client.post(
             f"/messages/threads/{conv.id}",
@@ -347,7 +330,7 @@ class TestNegativeControls:
     async def test_broken_ordering_would_fail_experience_test(self, db_session):
         """
         If batch_load_experiences used wrong ordering, experience loading would fail.
-        
+
         This test documents what WOULD break if we revert the D1 SQL fix.
         To run negative control: temporarily change to:
           .order_by(Experience.candidate_id, desc(Experience.from_date.nullslast()))
@@ -401,9 +384,7 @@ class TestNegativeControls:
 
         # Should get the CURRENT experience (is_current=True) first
         loaded_exp = experiences.get(candidate.id)
-        assert (
-            loaded_exp is not None
-        ), "Should load an experience"
+        assert loaded_exp is not None, "Should load an experience"
         assert (
             loaded_exp.is_current is True
         ), f"Should load current experience first, got {loaded_exp.designation}"
@@ -413,16 +394,14 @@ class TestNegativeControls:
     ):
         """
         If get_conversation_permission check was removed, third party could access.
-        
+
         Current test: third party gets 404
         If auth removed: third party would get 200 (FAIL)
         """
-        conv = await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        conv = await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         response = await other_company_client.get(f"/messages/threads/{conv.id}")
-        
+
         # Must be 404, not 200
         assert response.status_code == 404, "Auth check missing: third party got access"
 
@@ -431,7 +410,7 @@ class TestNegativeControls:
     ):
         """
         If can_company_message_candidate always returned True, unrelated candidate test fails.
-        
+
         Current: company can only message applicants (403 for non-applicant)
         If policy broken: would get 403 or success (FAIL)
         """

@@ -40,9 +40,7 @@ def _get_client() -> httpx.AsyncClient:
     global _client
     if _client is None or _client.is_closed:
         _client = httpx.AsyncClient(
-            timeout=httpx.Timeout(
-                TOTAL_TIMEOUT, connect=CONNECT_TIMEOUT, read=READ_TIMEOUT
-            )
+            timeout=httpx.Timeout(TOTAL_TIMEOUT, connect=CONNECT_TIMEOUT, read=READ_TIMEOUT)
         )
     return _client
 
@@ -95,9 +93,7 @@ async def fetch_embeddings(
         try:
             response = await client.post(url, headers=headers, json=body)
             if response.status_code in _RETRYABLE_STATUS:
-                last_error = EmbeddingServiceError(
-                    f"Embedding API HTTP {response.status_code}"
-                )
+                last_error = EmbeddingServiceError(f"Embedding API HTTP {response.status_code}")
                 if attempt < retries - 1:
                     await asyncio.sleep(_retry_delay(response, attempt + 1))
                     continue
@@ -107,9 +103,7 @@ async def fetch_embeddings(
         except httpx.HTTPStatusError as exc:
             # Non-retryable 4xx (400/401/403): fail immediately.
             last_error = exc
-            raise EmbeddingServiceError(
-                f"Embedding API HTTP {exc.response.status_code}"
-            ) from exc
+            raise EmbeddingServiceError(f"Embedding API HTTP {exc.response.status_code}") from exc
         except (httpx.TransportError, asyncio.TimeoutError) as exc:
             last_error = exc
             if attempt < retries - 1:

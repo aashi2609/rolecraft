@@ -63,15 +63,11 @@ def _sync_candidate_embeddings(background_tasks: BackgroundTasks, candidate_id: 
 
 
 # Initialize profile item services
-_education_service = ProfileItemService(
-    Education, EducationIn, EducationIn, EducationOut
-)
+_education_service = ProfileItemService(Education, EducationIn, EducationIn, EducationOut)
 _certification_service = ProfileItemService(
     Certification, CertificationIn, CertificationIn, CertificationOut
 )
-_experience_service = ProfileItemService(
-    Experience, ExperienceIn, ExperienceIn, ExperienceOut
-)
+_experience_service = ProfileItemService(Experience, ExperienceIn, ExperienceIn, ExperienceOut)
 _project_service = ProfileItemService(Project, ProjectIn, ProjectIn, ProjectOut)
 
 
@@ -125,9 +121,7 @@ def _to_out(profile: CandidateProfile) -> CandidateProfileOut:
         annual_family_income=profile.annual_family_income,
         skills=[cs.skill.name for cs in profile.skills if cs.skill],
         education=[EducationOut.model_validate(e) for e in profile.education],
-        certifications=[
-            CertificationOut.model_validate(c) for c in profile.certifications
-        ],
+        certifications=[CertificationOut.model_validate(c) for c in profile.certifications],
         experience=[ExperienceOut.model_validate(e) for e in profile.experience],
         projects=[ProjectOut.model_validate(p) for p in profile.projects],
         profile_updated_at=profile.profile_updated_at,
@@ -157,9 +151,7 @@ def _to_public_out(profile: CandidateProfile) -> CandidatePublicProfileOut:
         strengths=profile.strengths or [],
         weblinks=_public_weblinks(profile.weblinks or {}),
         education=[EducationOut.model_validate(e) for e in profile.education],
-        certifications=[
-            CertificationOut.model_validate(c) for c in profile.certifications
-        ],
+        certifications=[CertificationOut.model_validate(c) for c in profile.certifications],
         experience=[ExperienceOut.model_validate(e) for e in profile.experience],
         projects=[ProjectOut.model_validate(p) for p in profile.projects],
     )
@@ -171,7 +163,12 @@ async def get_me(user: CandidateUser, db: DbSession):
 
 
 @router.put("/me", response_model=CandidateProfileOut)
-async def update_me(body: CandidateProfileUpdate, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks):
+async def update_me(
+    body: CandidateProfileUpdate,
+    user: CandidateUser,
+    db: DbSession,
+    background_tasks: BackgroundTasks,
+):
     profile = await _load_profile(db, user.id)
     data = body.model_dump(exclude_unset=True)
     links = dict(profile.weblinks or {})
@@ -198,7 +195,9 @@ async def list_education(user: CandidateUser, db: DbSession):
 
 
 @router.post("/me/education", response_model=EducationOut)
-async def add_education(body: EducationIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks):
+async def add_education(
+    body: EducationIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     out = await _education_service.create_item(db, user.id, body)
     _sync_candidate_embeddings(background_tasks, user.id)
     return out
@@ -206,14 +205,21 @@ async def add_education(body: EducationIn, user: CandidateUser, db: DbSession, b
 
 @router.put("/me/education/{item_id}", response_model=EducationOut)
 async def update_education(
-    item_id: UUID, body: EducationIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks):
+    item_id: UUID,
+    body: EducationIn,
+    user: CandidateUser,
+    db: DbSession,
+    background_tasks: BackgroundTasks,
+):
     out = await _education_service.update_item(db, item_id, user.id, body)
     _sync_candidate_embeddings(background_tasks, user.id)
     return out
 
 
 @router.delete("/me/education/{item_id}")
-async def delete_education(item_id: UUID, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks):
+async def delete_education(
+    item_id: UUID, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     result = await _education_service.delete_item(db, item_id, user.id)
     _sync_candidate_embeddings(background_tasks, user.id)
     return result
@@ -226,7 +232,9 @@ async def list_certs(user: CandidateUser, db: DbSession):
 
 
 @router.post("/me/certifications", response_model=CertificationOut)
-async def add_cert(body: CertificationIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks):
+async def add_cert(
+    body: CertificationIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     out = await _certification_service.create_item(db, user.id, body)
     _sync_candidate_embeddings(background_tasks, user.id)
     return out
@@ -234,14 +242,21 @@ async def add_cert(body: CertificationIn, user: CandidateUser, db: DbSession, ba
 
 @router.put("/me/certifications/{item_id}", response_model=CertificationOut)
 async def update_cert(
-    item_id: UUID, body: CertificationIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks):
+    item_id: UUID,
+    body: CertificationIn,
+    user: CandidateUser,
+    db: DbSession,
+    background_tasks: BackgroundTasks,
+):
     out = await _certification_service.update_item(db, item_id, user.id, body)
     _sync_candidate_embeddings(background_tasks, user.id)
     return out
 
 
 @router.delete("/me/certifications/{item_id}")
-async def delete_cert(item_id: UUID, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks):
+async def delete_cert(
+    item_id: UUID, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     result = await _certification_service.delete_item(db, item_id, user.id)
     _sync_candidate_embeddings(background_tasks, user.id)
     return result
@@ -254,7 +269,9 @@ async def list_exp(user: CandidateUser, db: DbSession):
 
 
 @router.post("/me/experience", response_model=ExperienceOut)
-async def add_exp(body: ExperienceIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks):
+async def add_exp(
+    body: ExperienceIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     out = await _experience_service.create_item(db, user.id, body)
     _sync_candidate_embeddings(background_tasks, user.id)
     return out
@@ -262,14 +279,21 @@ async def add_exp(body: ExperienceIn, user: CandidateUser, db: DbSession, backgr
 
 @router.put("/me/experience/{item_id}", response_model=ExperienceOut)
 async def update_exp(
-    item_id: UUID, body: ExperienceIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks):
+    item_id: UUID,
+    body: ExperienceIn,
+    user: CandidateUser,
+    db: DbSession,
+    background_tasks: BackgroundTasks,
+):
     out = await _experience_service.update_item(db, item_id, user.id, body)
     _sync_candidate_embeddings(background_tasks, user.id)
     return out
 
 
 @router.delete("/me/experience/{item_id}")
-async def delete_exp(item_id: UUID, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks):
+async def delete_exp(
+    item_id: UUID, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     result = await _experience_service.delete_item(db, item_id, user.id)
     _sync_candidate_embeddings(background_tasks, user.id)
     return result
@@ -282,7 +306,9 @@ async def list_projects(user: CandidateUser, db: DbSession):
 
 
 @router.post("/me/projects", response_model=ProjectOut)
-async def add_project(body: ProjectIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks):
+async def add_project(
+    body: ProjectIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     out = await _project_service.create_item(db, user.id, body)
     _sync_candidate_embeddings(background_tasks, user.id)
     return out
@@ -290,14 +316,21 @@ async def add_project(body: ProjectIn, user: CandidateUser, db: DbSession, backg
 
 @router.put("/me/projects/{item_id}", response_model=ProjectOut)
 async def update_project(
-    item_id: UUID, body: ProjectIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks):
+    item_id: UUID,
+    body: ProjectIn,
+    user: CandidateUser,
+    db: DbSession,
+    background_tasks: BackgroundTasks,
+):
     out = await _project_service.update_item(db, item_id, user.id, body)
     _sync_candidate_embeddings(background_tasks, user.id)
     return out
 
 
 @router.delete("/me/projects/{item_id}")
-async def delete_project(item_id: UUID, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks):
+async def delete_project(
+    item_id: UUID, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     result = await _project_service.delete_item(db, item_id, user.id)
     _sync_candidate_embeddings(background_tasks, user.id)
     return result
@@ -322,16 +355,12 @@ async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
             seen.add(key)
             unique_names.append(name)
 
-    await db.execute(
-        delete(CandidateSkill).where(CandidateSkill.candidate_id == candidate_id)
-    )
+    await db.execute(delete(CandidateSkill).where(CandidateSkill.candidate_id == candidate_id))
     await db.flush()
 
     linked: set[UUID] = set()
     for name in unique_names:
-        skill = await db.scalar(
-            select(Skill).where(func.lower(Skill.name) == name.lower())
-        )
+        skill = await db.scalar(select(Skill).where(func.lower(Skill.name) == name.lower()))
         if not skill:
             stmt = (
                 insert(Skill)
@@ -339,9 +368,7 @@ async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
                 .on_conflict_do_nothing(index_elements=["name"])
             )
             await db.execute(stmt)
-            skill = await db.scalar(
-                select(Skill).where(func.lower(Skill.name) == name.lower())
-            )
+            skill = await db.scalar(select(Skill).where(func.lower(Skill.name) == name.lower()))
         if not skill:
             continue
         skill_id = skill.id
@@ -425,17 +452,13 @@ async def search_candidates_endpoint(
 
 
 @router.get("/{candidate_id}/public-profile", response_model=CandidatePublicProfileOut)
-async def get_candidate_public_profile(
-    candidate_id: UUID, user: CompanyUser, db: DbSession
-):
+async def get_candidate_public_profile(candidate_id: UUID, user: CompanyUser, db: DbSession):
     """Employer-facing profile — no PII (address, income, DOB, family, etc.)."""
     return _to_public_out(await _load_profile(db, candidate_id))
 
 
 @router.get("/{candidate_id}/resume.pdf")
-async def download_candidate_resume_pdf(
-    candidate_id: UUID, user: CompanyUser, db: DbSession
-):
+async def download_candidate_resume_pdf(candidate_id: UUID, user: CompanyUser, db: DbSession):
     """Employer download — ONLY the resume submitted on an application to
     this company's job (Step C). Latest/default resumes are never exposed."""
     from services.resume_access import (
@@ -455,9 +478,7 @@ async def download_candidate_resume_pdf(
         .order_by(Application.applied_at.desc().nullslast())
         .limit(1)
     )
-    if app is None or not await can_company_view_resume(
-        user.id, app.resume_id, db
-    ):
+    if app is None or not await can_company_view_resume(user.id, app.resume_id, db):
         raise HTTPException(status_code=404, detail="Resume not found")
 
     resume = await db.get(Resume, app.resume_id)
@@ -475,9 +496,7 @@ async def download_candidate_resume_pdf(
         weblinks=weblinks,
         filename=filename,
         candidate_name=resolve_candidate_name(weblinks=weblinks, email=email),
-        location=(profile.preferred_locations or [None])[0]
-        or profile.present_address
-        or "",
+        location=(profile.preferred_locations or [None])[0] or profile.present_address or "",
     )
 
 

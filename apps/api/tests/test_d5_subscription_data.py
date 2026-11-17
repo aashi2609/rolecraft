@@ -98,9 +98,7 @@ class TestSubscriptionDataReport:
         await db_session.flush()
 
         # Set subscription to active with past renewal date
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub = await db_session.scalar(select(Subscription).where(Subscription.user_id == user.id))
         sub.status = SubscriptionStatus.active
         sub.renews_at = datetime.now(timezone.utc) - timedelta(days=10)
         await db_session.flush()
@@ -192,9 +190,7 @@ class TestSubscriptionCleanup:
         await db_session.flush()
 
         # Set to expired
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub = await db_session.scalar(select(Subscription).where(Subscription.user_id == user.id))
         sub.status = SubscriptionStatus.active
         sub.renews_at = datetime.now(timezone.utc) - timedelta(days=5)
         await db_session.flush()
@@ -223,9 +219,7 @@ class TestSubscriptionCleanup:
         )
         await db_session.flush()
 
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub = await db_session.scalar(select(Subscription).where(Subscription.user_id == user.id))
         sub.status = SubscriptionStatus.active
         sub.renews_at = datetime.now(timezone.utc) - timedelta(days=5)
         await db_session.flush()
@@ -246,9 +240,7 @@ class TestSubscriptionCleanup:
         await db_session.flush()
 
         # Verify it's cancelled
-        updated_sub = await db_session.scalar(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        updated_sub = await db_session.scalar(select(Subscription).where(Subscription.id == sub.id))
         assert updated_sub.status == SubscriptionStatus.cancelled
 
         # Verify audit log entry
@@ -278,9 +270,7 @@ class TestDataIntegrity:
         await db_session.flush()
 
         # Count subscriptions for this user
-        subs = await db_session.scalars(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        subs = await db_session.scalars(select(Subscription).where(Subscription.user_id == user.id))
         subs_list = subs.all()
 
         assert len(subs_list) == 1, "Every user should have exactly one subscription"
@@ -295,9 +285,7 @@ class TestDataIntegrity:
         )
         await db_session.flush()
 
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub = await db_session.scalar(select(Subscription).where(Subscription.user_id == user.id))
 
         # Verify user exists
         referenced_user = await db_session.get(User, sub.user_id)
@@ -314,9 +302,7 @@ class TestDataIntegrity:
         )
         await db_session.flush()
 
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub = await db_session.scalar(select(Subscription).where(Subscription.user_id == user.id))
 
         assert sub.role == user.role, "Subscription role should match user role"
 
@@ -330,16 +316,12 @@ class TestDataIntegrity:
         )
         await db_session.flush()
 
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub = await db_session.scalar(select(Subscription).where(Subscription.user_id == user.id))
         sub.status = SubscriptionStatus.active
         sub.renews_at = datetime.now(timezone.utc) + timedelta(days=30)
         await db_session.flush()
 
-        updated_sub = await db_session.scalar(
-            select(Subscription).where(Subscription.id == sub.id)
-        )
+        updated_sub = await db_session.scalar(select(Subscription).where(Subscription.id == sub.id))
         assert updated_sub.renews_at is not None, "Active subscription should have renewal date"
 
     async def test_pending_subscription_has_no_renewal_date(self, db_session):
@@ -352,8 +334,6 @@ class TestDataIntegrity:
         )
         await db_session.flush()
 
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub = await db_session.scalar(select(Subscription).where(Subscription.user_id == user.id))
         assert sub.status == SubscriptionStatus.pending
         assert sub.renews_at is None, "Pending subscription should NOT have renewal date"

@@ -52,9 +52,7 @@ async def _participant_label(db: DbSession, user_id: UUID) -> str:
         if company and company.name:
             return company.name
         return "Unknown"
-    profile = await db.scalar(
-        select(CandidateProfile).where(CandidateProfile.user_id == user_id)
-    )
+    profile = await db.scalar(select(CandidateProfile).where(CandidateProfile.user_id == user_id))
     if profile and profile.weblinks and profile.weblinks.get("display_name"):
         return profile.weblinks["display_name"]
     # return candidate real name if available
@@ -101,9 +99,7 @@ async def list_threads(user: CurrentUser, db: DbSession):
         return []
 
     conversations = (
-        (await db.execute(stmt.order_by(Conversation.last_message_at.desc())))
-        .scalars()
-        .all()
+        (await db.execute(stmt.order_by(Conversation.last_message_at.desc()))).scalars().all()
     )
 
     if not conversations:
@@ -117,9 +113,7 @@ async def list_threads(user: CurrentUser, db: DbSession):
 
     for conv in conversations:
         # Determine other user's ID
-        other_id = (
-            conv.company_id if user.role == UserRole.candidate else conv.candidate_id
-        )
+        other_id = conv.company_id if user.role == UserRole.candidate else conv.candidate_id
         user_ids.append(other_id)
 
         if user.role == UserRole.company:
@@ -137,17 +131,13 @@ async def list_threads(user: CurrentUser, db: DbSession):
 
     # Query 4-6: Participants, experiences, jobs
     companies, profiles, users = await batch_load_participants(db, user_ids)
-    experiences = (
-        await batch_load_experiences(db, candidate_ids) if candidate_ids else {}
-    )
+    experiences = await batch_load_experiences(db, candidate_ids) if candidate_ids else {}
     jobs = await batch_load_jobs(db, job_ids) if job_ids else {}
 
     # Single serialization pass with all data pre-loaded
     out: list[ThreadOut] = []
     for conv in conversations:
-        other_id = (
-            conv.company_id if user.role == UserRole.candidate else conv.candidate_id
-        )
+        other_id = conv.company_id if user.role == UserRole.candidate else conv.candidate_id
 
         # Get participant info from pre-loaded dicts
         other_user = users.get(other_id)
@@ -155,11 +145,7 @@ async def list_threads(user: CurrentUser, db: DbSession):
         if user.role == UserRole.candidate:
             # Other side is company
             company = companies.get(other_id)
-            is_former = (
-                other_user is None
-                or not other_user.is_active
-                or company is None
-            )
+            is_former = other_user is None or not other_user.is_active or company is None
             if is_former:
                 label = "Former user"
                 avatar_url = None
@@ -171,11 +157,7 @@ async def list_threads(user: CurrentUser, db: DbSession):
         else:
             # Other side is candidate
             profile = profiles.get(other_id)
-            is_former = (
-                other_user is None
-                or not other_user.is_active
-                or profile is None
-            )
+            is_former = other_user is None or not other_user.is_active or profile is None
 
             if is_former:
                 # Deleted or deactivated participant: safe label, no PII
@@ -241,9 +223,7 @@ async def start_thread(
 
     candidate_id = body.recipient_id
     if not candidate_id:
-        raise HTTPException(
-            status_code=400, detail="recipient_id is required"
-        )
+        raise HTTPException(status_code=400, detail="recipient_id is required")
 
     # Use centralized authorization
     allowed, reason = await can_company_message_candidate(user.id, candidate_id, db)
@@ -411,9 +391,7 @@ async def reply_thread(
     conv = await db.get(Conversation, id)
 
     # Threads with a deleted or deactivated participant are read-only.
-    other_id = (
-        conv.candidate_id if user.role == UserRole.company else conv.company_id
-    )
+    other_id = conv.candidate_id if user.role == UserRole.company else conv.company_id
     if await _other_party_is_former(db, other_id):
         raise HTTPException(
             status_code=403,
@@ -441,9 +419,7 @@ async def reply_thread(
     conv.last_message_at = sa.func.now()
 
     # Create notification for recipient
-    recipient_id = (
-        conv.company_id if user.role == UserRole.candidate else conv.candidate_id
-    )
+    recipient_id = conv.company_id if user.role == UserRole.candidate else conv.candidate_id
     notif = Notification(
         user_id=recipient_id,
         type="new_message",

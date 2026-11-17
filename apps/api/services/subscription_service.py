@@ -118,9 +118,7 @@ async def validate_plan_tier(tier_str: str, user_role: UserRole) -> PlanTier:
     return tier
 
 
-async def cancel_live_subscriptions(
-    db, user_id: UUID, admin_id: Optional[UUID] = None
-) -> None:
+async def cancel_live_subscriptions(db, user_id: UUID, admin_id: Optional[UUID] = None) -> None:
     """Cancel all live (pending/active) subscriptions for a user.
 
     Cancelled rows are never reactivated; a new row is created instead.

@@ -283,9 +283,7 @@ class TestRefreshEmbeddingHandlesFailure:
         mock_db.execute.return_value = mock_result
 
         # Mock embed_text to succeed (1536-dim per EMBEDDING_DIM)
-        with patch(
-            "services.embedding_service.embed_text", new=AsyncMock()
-        ) as mock_embed:
+        with patch("services.embedding_service.embed_text", new=AsyncMock()) as mock_embed:
             mock_embed.return_value = [0.1] * 1536
 
             success_count = await refresh_resume_embeddings_for_candidate(
@@ -303,9 +301,7 @@ class TestFitmentScoringMethodTracking:
         """FitmentResult created from embedding has scoring_method='embedding'."""
         from models import FitmentResult
 
-        fr = FitmentResult(
-            job_id="j1", candidate_id="c1", score=85.0, scoring_method="embedding"
-        )
+        fr = FitmentResult(job_id="j1", candidate_id="c1", score=85.0, scoring_method="embedding")
 
         assert fr.scoring_method == "embedding"
 
@@ -313,9 +309,7 @@ class TestFitmentScoringMethodTracking:
         """FitmentResult from heuristic fallback has scoring_method='heuristic'."""
         from models import FitmentResult
 
-        fr = FitmentResult(
-            job_id="j1", candidate_id="c1", score=60.0, scoring_method="heuristic"
-        )
+        fr = FitmentResult(job_id="j1", candidate_id="c1", score=60.0, scoring_method="heuristic")
 
         assert fr.scoring_method == "heuristic"
 

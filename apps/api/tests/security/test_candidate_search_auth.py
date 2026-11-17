@@ -22,7 +22,6 @@ _SEED_CANCELLED_COMPANY_ID = uuid.UUID("5f7f4c5d-6fb3-41e1-8b12-5bb7d1670de1")
 
 
 async def _seed_users() -> None:
-
     from sqlalchemy import select
 
     from core.database import AsyncSessionLocal
@@ -53,9 +52,7 @@ async def _seed_users() -> None:
             db.add(Company(user_id=comp.id, name="Seed Co"))
         subs = (
             await db.scalars(
-                select(Subscription).where(
-                    Subscription.user_id == _SEED_CANCELLED_COMPANY_ID
-                )
+                select(Subscription).where(Subscription.user_id == _SEED_CANCELLED_COMPANY_ID)
             )
         ).all()
         if not subs:
@@ -89,9 +86,7 @@ def _activate_company_search_subscription(user_id: str) -> None:
     async def _act() -> None:
         async with AsyncSessionLocal() as db:
             sub = await db.scalar(
-                select(Subscription).where(
-                    Subscription.user_id == uuid.UUID(user_id)
-                )
+                select(Subscription).where(Subscription.user_id == uuid.UUID(user_id))
             )
             if sub is not None:
                 sub.status = SubscriptionStatus.active
@@ -99,7 +94,6 @@ def _activate_company_search_subscription(user_id: str) -> None:
             await db.commit()
 
     asyncio.run(_act())
-
 
 
 def _signup(client: TestClient, role: str = "candidate") -> tuple[str, str]:

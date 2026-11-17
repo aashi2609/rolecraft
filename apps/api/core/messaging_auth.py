@@ -98,9 +98,7 @@ async def can_company_message_candidate(
     # truth), never an ad-hoc subscription query.
     company_user = await db.get(User, company_id)
     entitlements = (
-        await get_entitlements(company_user, db)
-        if company_user
-        else PLAN_FEATURES["free"]
+        await get_entitlements(company_user, db) if company_user else PLAN_FEATURES["free"]
     )
 
     if not entitlements.is_active or not entitlements.candidate_messaging:

@@ -49,12 +49,8 @@ class TestErrorClassification:
             mock_settings.groq_model = "test-model"
 
             # Mock HTTP error
-            http_error = httpx.HTTPStatusError(
-                "401", request=MagicMock(), response=mock_response
-            )
-            mock_client.return_value.__aenter__.return_value.post.side_effect = (
-                http_error
-            )
+            http_error = httpx.HTTPStatusError("401", request=MagicMock(), response=mock_response)
+            mock_client.return_value.__aenter__.return_value.post.side_effect = http_error
 
             with pytest.raises(AIServiceError) as exc_info:
                 await generate_content("test prompt")
@@ -87,12 +83,8 @@ class TestErrorClassification:
             mock_settings.groq_api_key = "test-key"
             mock_settings.groq_model = "test-model"
 
-            http_error = httpx.HTTPStatusError(
-                "400", request=MagicMock(), response=mock_response
-            )
-            mock_client.return_value.__aenter__.return_value.post.side_effect = (
-                http_error
-            )
+            http_error = httpx.HTTPStatusError("400", request=MagicMock(), response=mock_response)
+            mock_client.return_value.__aenter__.return_value.post.side_effect = http_error
 
             with pytest.raises(AIServiceError) as exc_info:
                 await generate_content("test prompt")
@@ -120,19 +112,13 @@ class TestErrorClassification:
         with (
             patch("services.ai_client.settings") as mock_settings,
             patch("services.ai_client.httpx.AsyncClient") as mock_client,
-            patch(
-                "services.ai_client.asyncio.sleep", new_callable=AsyncMock
-            ) as mock_sleep,
+            patch("services.ai_client.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
         ):
             mock_settings.groq_api_key = "test-key"
             mock_settings.groq_model = "test-model"
 
-            http_error = httpx.HTTPStatusError(
-                "429", request=MagicMock(), response=mock_response
-            )
-            mock_client.return_value.__aenter__.return_value.post.side_effect = (
-                http_error
-            )
+            http_error = httpx.HTTPStatusError("429", request=MagicMock(), response=mock_response)
+            mock_client.return_value.__aenter__.return_value.post.side_effect = http_error
 
             with pytest.raises(AIServiceError) as exc_info:
                 await generate_content("test prompt", retries=3)
@@ -295,9 +281,7 @@ class TestRequestDeadline:
 
             # Simulate time passing - provide enough values for all time.time() calls
             start_time = 1000.0
-            times = [start_time] + [
-                start_time + 301
-            ] * 20  # First call + enough for retries
+            times = [start_time] + [start_time + 301] * 20  # First call + enough for retries
             mock_time.side_effect = times
 
             mock_client.return_value.__aenter__.return_value.post.side_effect = (
@@ -393,9 +377,7 @@ class TestErrorCodesToClient:
         mock_request.url.path = "/test"
 
         # Error with sensitive data in message
-        exc = AIServiceError(
-            "Groq API key sk-proj-abc123 is invalid", error_code="ai_auth_failed"
-        )
+        exc = AIServiceError("Groq API key sk-proj-abc123 is invalid", error_code="ai_auth_failed")
 
         response = await ai_service_error_handler(mock_request, exc)
         response_body = response.body.decode()

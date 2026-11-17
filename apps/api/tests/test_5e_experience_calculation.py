@@ -287,12 +287,8 @@ class TestExperienceInRole:
     def test_no_matching_roles(self):
         """No roles match returns 0.0."""
         exp = [
-            MockExperience(
-                from_date=date(2020, 1, 1), to_date=date(2021, 1, 1), role="Sales"
-            ),
-            MockExperience(
-                from_date=date(2021, 1, 1), to_date=date(2022, 1, 1), role="Marketing"
-            ),
+            MockExperience(from_date=date(2020, 1, 1), to_date=date(2021, 1, 1), role="Sales"),
+            MockExperience(from_date=date(2021, 1, 1), to_date=date(2022, 1, 1), role="Marketing"),
         ]
         years = experience_in_role(exp, target_job_role="Engineering")
         assert years == 0.0

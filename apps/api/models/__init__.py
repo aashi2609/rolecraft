@@ -103,21 +103,13 @@ class ApplicationStatus(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    email: Mapped[str] = mapped_column(
-        String(320), unique=True, nullable=False, index=True
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole, name="user_role"), nullable=False
-    )
+    role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     token_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     subscription: Mapped[Optional["Subscription"]] = relationship(
         back_populates="user",
@@ -157,9 +149,7 @@ class Subscription(Base):
         ),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
@@ -169,19 +159,13 @@ class Subscription(Base):
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, name="user_role", create_constraint=False), nullable=False
     )
-    plan_tier: Mapped[PlanTier] = mapped_column(
-        Enum(PlanTier, name="plan_tier"), nullable=False
-    )
+    plan_tier: Mapped[PlanTier] = mapped_column(Enum(PlanTier, name="plan_tier"), nullable=False)
     status: Mapped[SubscriptionStatus] = mapped_column(
         Enum(SubscriptionStatus, name="subscription_status"),
         default=SubscriptionStatus.active,
     )
-    started_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    renews_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    renews_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="subscription")
 
@@ -191,9 +175,7 @@ class SubscriptionAuditLog(Base):
 
     __tablename__ = "subscription_audit_log"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     subscription_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("subscriptions.id", ondelete="CASCADE"),
@@ -246,12 +228,8 @@ class CandidateProfile(Base):
     marital_status: Mapped[Optional[str]] = mapped_column(String(32))
     present_address: Mapped[Optional[str]] = mapped_column(Text)
     permanent_address: Mapped[Optional[str]] = mapped_column(Text)
-    preferred_locations: Mapped[Optional[list]] = mapped_column(
-        ARRAY(String), default=list
-    )
-    preferred_sectors: Mapped[Optional[list]] = mapped_column(
-        ARRAY(String), default=list
-    )
+    preferred_locations: Mapped[Optional[list]] = mapped_column(ARRAY(String), default=list)
+    preferred_sectors: Mapped[Optional[list]] = mapped_column(ARRAY(String), default=list)
     strengths: Mapped[Optional[list]] = mapped_column(ARRAY(String), default=list)
     weaknesses: Mapped[Optional[list]] = mapped_column(ARRAY(String), default=list)
     weblinks: Mapped[Optional[dict]] = mapped_column(JSONB, default=dict)
@@ -284,9 +262,7 @@ class CandidateProfile(Base):
 class Education(Base):
     __tablename__ = "education"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     candidate_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("candidate_profiles.user_id", ondelete="CASCADE"),
@@ -307,9 +283,7 @@ class Education(Base):
 class Certification(Base):
     __tablename__ = "certifications"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     candidate_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("candidate_profiles.user_id", ondelete="CASCADE"),
@@ -323,17 +297,13 @@ class Certification(Base):
     description: Mapped[Optional[str]] = mapped_column(Text)
     file_url: Mapped[Optional[str]] = mapped_column(String(1024))
 
-    candidate: Mapped["CandidateProfile"] = relationship(
-        back_populates="certifications"
-    )
+    candidate: Mapped["CandidateProfile"] = relationship(back_populates="certifications")
 
 
 class Experience(Base):
     __tablename__ = "experience"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     candidate_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("candidate_profiles.user_id", ondelete="CASCADE"),
@@ -359,19 +329,13 @@ class Experience(Base):
 class Skill(Base):
     __tablename__ = "skills"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    name: Mapped[str] = mapped_column(
-        String(128), unique=True, nullable=False, index=True
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
 
 
 class CandidateSkill(Base):
     __tablename__ = "candidate_skills"
-    __table_args__ = (
-        UniqueConstraint("candidate_id", "skill_id", name="uq_candidate_skill"),
-    )
+    __table_args__ = (UniqueConstraint("candidate_id", "skill_id", name="uq_candidate_skill"),)
 
     candidate_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -392,9 +356,7 @@ class CandidateSkill(Base):
 class Project(Base):
     __tablename__ = "projects"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     candidate_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("candidate_profiles.user_id", ondelete="CASCADE"),
@@ -415,9 +377,7 @@ class Project(Base):
 class Resume(Base):
     __tablename__ = "resumes"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     candidate_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("candidate_profiles.user_id", ondelete="CASCADE"),
@@ -438,12 +398,8 @@ class Resume(Base):
         Enum(EmbeddingStatus, name="embedding_status", create_constraint=False),
         default=EmbeddingStatus.pending.value,
     )
-    embedding_model: Mapped[str] = mapped_column(
-        String(64), default=EMBEDDING_MODEL
-    )
-    embedding_source_hash: Mapped[Optional[str]] = mapped_column(
-        String(64), nullable=True
-    )
+    embedding_model: Mapped[str] = mapped_column(String(64), default=EMBEDDING_MODEL)
+    embedding_source_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     generation_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     version: Mapped[int] = mapped_column(Integer, default=1)
     gcs_path: Mapped[Optional[str]] = mapped_column(String(1024))
@@ -452,9 +408,7 @@ class Resume(Base):
     generated_from_profile_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     candidate: Mapped["CandidateProfile"] = relationship(back_populates="resumes")
 
@@ -496,9 +450,7 @@ class JobPosting(Base):
         ),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("companies.user_id", ondelete="CASCADE"),
@@ -535,15 +487,9 @@ class JobPosting(Base):
         Enum(EmbeddingStatus, name="embedding_status", create_constraint=False),
         default=EmbeddingStatus.pending.value,
     )
-    embedding_model: Mapped[str] = mapped_column(
-        String(64), default=EMBEDDING_MODEL
-    )
-    embedding_source_hash: Mapped[Optional[str]] = mapped_column(
-        String(64), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    embedding_model: Mapped[str] = mapped_column(String(64), default=EMBEDDING_MODEL)
+    embedding_source_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     company: Mapped["Company"] = relationship(back_populates="jobs")
     applications: Mapped[list["Application"]] = relationship(
@@ -563,9 +509,7 @@ class Application(Base):
         ),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     candidate_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("candidate_profiles.user_id", ondelete="CASCADE"),
@@ -583,9 +527,7 @@ class Application(Base):
         Enum(ApplicationStatus, name="application_status"),
         default=ApplicationStatus.applied,
     )
-    applied_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     job: Mapped["JobPosting"] = relationship(back_populates="applications")
     resume: Mapped[Optional["Resume"]] = relationship()
@@ -605,9 +547,7 @@ class SavedJob(Base):
         primary_key=True,
         index=True,
     )
-    saved_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class HiddenJob(Base):
@@ -624,18 +564,14 @@ class HiddenJob(Base):
         primary_key=True,
         index=True,
     )
-    hidden_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    hidden_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class FitmentResult(Base):
     __tablename__ = "fitment_results"
     __table_args__ = (UniqueConstraint("job_id", "candidate_id", name="uq_fitment"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     job_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("job_postings.id", ondelete="CASCADE"),
@@ -660,14 +596,10 @@ class FitmentResult(Base):
 class Conversation(Base):
     __tablename__ = "conversations"
     __table_args__ = (
-        UniqueConstraint(
-            "company_id", "candidate_id", name="uq_conversation_participants"
-        ),
+        UniqueConstraint("company_id", "candidate_id", name="uq_conversation_participants"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("companies.user_id", ondelete="CASCADE"),
@@ -685,9 +617,7 @@ class Conversation(Base):
         ForeignKey("job_postings.id", ondelete="SET NULL"),
         nullable=True,
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_message_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -709,9 +639,7 @@ class Message(Base):
         ),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     conversation_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("conversations.id", ondelete="CASCADE"),
@@ -725,12 +653,8 @@ class Message(Base):
         Enum(UserRole, name="user_role", create_constraint=False)
     )
     body: Mapped[str] = mapped_column(Text, nullable=False)
-    sent_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-    read_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     conversation: Mapped["Conversation"] = relationship(back_populates="messages")
 
@@ -746,9 +670,7 @@ class Notification(Base):
         ),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
@@ -756,9 +678,7 @@ class Notification(Base):
     body: Mapped[str] = mapped_column(Text, nullable=False)
     related_id: Mapped[Optional[str]] = mapped_column(String(64))
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="notifications")
 
@@ -774,22 +694,14 @@ class PasswordResetToken(Base):
 
     __tablename__ = "password_reset_tokens"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     token_hash: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    used_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     requested_ip: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
 
 
@@ -798,9 +710,7 @@ class FileRecord(Base):
 
     __tablename__ = "file_records"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
@@ -810,9 +720,7 @@ class FileRecord(Base):
     storage_path: Mapped[str] = mapped_column(String(1024), nullable=False)
     original_filename: Mapped[Optional[str]] = mapped_column(String(512))
     mime_type: Mapped[Optional[str]] = mapped_column(String(128))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     owner: Mapped["User"] = relationship()
 
@@ -849,29 +757,21 @@ class PricePoint(Base):
     """
 
     __tablename__ = "price_points"
-    __table_args__ = (
-        UniqueConstraint("plan_tier", "billing_period", name="uq_plan_period"),
-    )
+    __table_args__ = (UniqueConstraint("plan_tier", "billing_period", name="uq_plan_period"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     plan_tier: Mapped[PlanTier] = mapped_column(
         Enum(PlanTier, name="plan_tier"), nullable=False, index=True
     )
     billing_period: Mapped[BillingPeriod] = mapped_column(
         Enum(BillingPeriod, name="billing_period"), nullable=False, index=True
     )
-    amount_paise: Mapped[int] = mapped_column(
-        Integer, nullable=False
-    )  # in paise (₹0.01)
+    amount_paise: Mapped[int] = mapped_column(Integer, nullable=False)  # in paise (₹0.01)
     currency: Mapped[str] = mapped_column(String(3), default="INR", nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # Audit trail
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -892,15 +792,11 @@ class WebhookEvent(Base):
 
     __tablename__ = "webhook_events"
     __table_args__ = (
-        UniqueConstraint(
-            "provider_event_id", name="uq_webhook_event_provider_event_id"
-        ),
+        UniqueConstraint("provider_event_id", name="uq_webhook_event_provider_event_id"),
         Index("ix_webhook_events_provider_event_id", "provider_event_id"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     provider_event_id: Mapped[str] = mapped_column(
         String(255), nullable=False
     )  # X-Razorpay-Event-Id; uniqueness via uq_webhook_event_provider_event_id
@@ -910,9 +806,7 @@ class WebhookEvent(Base):
     event_type: Mapped[str] = mapped_column(
         String(50), nullable=False, index=True
     )  # e.g. payment.authorized
-    processed: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False, index=True
-    )
+    processed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     payment_transaction_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("payment_transactions.id", ondelete="SET NULL"),
@@ -926,9 +820,7 @@ class WebhookEvent(Base):
     received_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
-    processed_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class PaymentTransaction(Base):
@@ -950,9 +842,7 @@ class PaymentTransaction(Base):
         Index("ix_payment_transactions_razorpay_payment_id", "razorpay_payment_id"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # User and subscription
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -975,15 +865,9 @@ class PaymentTransaction(Base):
     )  # Snapshot at transaction time
 
     # Razorpay integration
-    razorpay_order_id: Mapped[str] = mapped_column(
-        String(255), nullable=False
-    )
-    razorpay_payment_id: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True
-    )
-    razorpay_signature: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True
-    )
+    razorpay_order_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    razorpay_payment_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    razorpay_signature: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Status and audit
     status: Mapped[PaymentStatus] = mapped_column(
@@ -1014,9 +898,7 @@ class PaymentTransaction(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
-    completed_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="payment_transactions")

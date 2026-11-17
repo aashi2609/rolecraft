@@ -96,9 +96,7 @@ def _resume_to_out(resume: Resume, profile_updated_at=None) -> ResumeOut:
 async def _get_profile_updated_at(db, user_id: UUID):
     """Get the profile_updated_at timestamp for stale computation."""
     result = await db.execute(
-        select(CandidateProfile.profile_updated_at).where(
-            CandidateProfile.user_id == user_id
-        )
+        select(CandidateProfile.profile_updated_at).where(CandidateProfile.user_id == user_id)
     )
     return result.scalar_one_or_none()
 
@@ -136,13 +134,9 @@ async def generate(
     db: DbSession,
 ):
     if not body.target_verticals:
-        raise HTTPException(
-            status_code=400, detail="Select at least one target vertical"
-        )
+        raise HTTPException(status_code=400, detail="Select at least one target vertical")
 
-    await check_plan_limit(
-        user, db, "resume_verticals", extra=len(body.target_verticals)
-    )
+    await check_plan_limit(user, db, "resume_verticals", extra=len(body.target_verticals))
 
     profile = await _profile_with_skills(db, user.id)
     skill_names = [cs.skill.name for cs in profile.skills if cs.skill]
@@ -308,9 +302,7 @@ async def improve(
 @router.get("/{resume_id}/download")
 @router.get("/{resume_id}/pdf")
 @limiter.limit("60/hour", key_func=lambda r: f"co-resume:{get_user_key(r)}")
-async def download_pdf(
-    request: Request, resume_id: UUID, user: CurrentUser, db: DbSession
-):
+async def download_pdf(request: Request, resume_id: UUID, user: CurrentUser, db: DbSession):
     """Download a resume PDF.
 
     Access rule (Step C): candidates see their own resumes, admins see all,
@@ -384,9 +376,7 @@ async def download_tailored_resume(
         email=user.email,
         weblinks=profile.weblinks or {},
         filename=filename,
-        candidate_name=resolve_candidate_name(
-            weblinks=profile.weblinks or {}, email=user.email
-        ),
+        candidate_name=resolve_candidate_name(weblinks=profile.weblinks or {}, email=user.email),
         location=(profile.preferred_locations or [None])[0] or "",
     )
 

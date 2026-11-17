@@ -223,9 +223,7 @@ async def verify_payment(
                 ok=True,
                 transaction_id=str(transaction.id),
                 subscription_id=(
-                    str(transaction.subscription_id)
-                    if transaction.subscription_id
-                    else None
+                    str(transaction.subscription_id) if transaction.subscription_id else None
                 ),
                 status="completed",
                 message="Payment already verified",
@@ -242,9 +240,7 @@ async def verify_payment(
             ok=True,
             transaction_id=str(transaction.id),
             subscription_id=(
-                str(transaction.subscription_id)
-                if transaction.subscription_id
-                else None
+                str(transaction.subscription_id) if transaction.subscription_id else None
             ),
             status="completed",
             message="Payment verified successfully",
@@ -333,9 +329,7 @@ async def handle_webhook(
 
         if transaction:
             await db.commit()
-            logger.info(
-                f"Webhook processed: {event_type} for transaction {transaction.id}"
-            )
+            logger.info(f"Webhook processed: {event_type} for transaction {transaction.id}")
 
         return WebhookResponse(ok=True, message="Webhook processed")
 

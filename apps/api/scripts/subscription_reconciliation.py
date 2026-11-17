@@ -38,8 +38,7 @@ from models import (
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 
@@ -51,11 +50,12 @@ async def get_subscription_stats(db) -> dict[str, Any]:
     # 1. Total subscriptions by status
     status_counts = {}
     for status in SubscriptionStatus:
-        count = await db.scalar(
-            select(func.count())
-            .select_from(Subscription)
-            .where(Subscription.status == status)
-        ) or 0
+        count = (
+            await db.scalar(
+                select(func.count()).select_from(Subscription).where(Subscription.status == status)
+            )
+            or 0
+        )
         status_counts[status.value] = count
 
     report["subscriptions_by_status"] = status_counts
@@ -63,28 +63,32 @@ async def get_subscription_stats(db) -> dict[str, Any]:
     # 2. Subscriptions by plan tier
     tier_counts = {}
     for tier in PlanTier:
-        count = await db.scalar(
-            select(func.count())
-            .select_from(Subscription)
-            .where(Subscription.plan_tier == tier)
-        ) or 0
+        count = (
+            await db.scalar(
+                select(func.count()).select_from(Subscription).where(Subscription.plan_tier == tier)
+            )
+            or 0
+        )
         if count > 0:
             tier_counts[tier.value] = count
 
     report["subscriptions_by_plan_tier"] = tier_counts
 
     # 3. Expired subscriptions (renews_at < now, status=active)
-    expired_count = await db.scalar(
-        select(func.count())
-        .select_from(Subscription)
-        .where(
-            and_(
-                Subscription.status == SubscriptionStatus.active,
-                Subscription.renews_at.is_not(None),
-                Subscription.renews_at < datetime.now(timezone.utc),
+    expired_count = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Subscription)
+            .where(
+                and_(
+                    Subscription.status == SubscriptionStatus.active,
+                    Subscription.renews_at.is_not(None),
+                    Subscription.renews_at < datetime.now(timezone.utc),
+                )
             )
         )
-    ) or 0
+        or 0
+    )
 
     report["expired_active_subscriptions"] = expired_count
 
@@ -100,29 +104,34 @@ async def get_subscription_stats(db) -> dict[str, Any]:
         )
         .order_by(Subscription.renews_at.asc())
     )
-    
+
     expired_details = []
     for sub in expired_subs.all():
         user = await db.get(User, sub.user_id)
-        expired_details.append({
-            "subscription_id": str(sub.id),
-            "user_id": str(sub.user_id),
-            "user_email": user.email if user else "Unknown",
-            "plan_tier": sub.plan_tier.value,
-            "expired_at": sub.renews_at.isoformat() if sub.renews_at else None,
-            "days_expired": (datetime.now(timezone.utc) - sub.renews_at).days if sub.renews_at else None,
-        })
+        expired_details.append(
+            {
+                "subscription_id": str(sub.id),
+                "user_id": str(sub.user_id),
+                "user_email": user.email if user else "Unknown",
+                "plan_tier": sub.plan_tier.value,
+                "expired_at": sub.renews_at.isoformat() if sub.renews_at else None,
+                "days_expired": (datetime.now(timezone.utc) - sub.renews_at).days
+                if sub.renews_at
+                else None,
+            }
+        )
 
     report["expired_subscriptions_detail"] = expired_details
 
     # 5. Subscriptions by user role
     role_counts = {}
     for role in UserRole:
-        count = await db.scalar(
-            select(func.count())
-            .select_from(Subscription)
-            .where(Subscription.role == role)
-        ) or 0
+        count = (
+            await db.scalar(
+                select(func.count()).select_from(Subscription).where(Subscription.role == role)
+            )
+            or 0
+        )
         if count > 0:
             role_counts[role.value] = count
 
@@ -142,11 +151,14 @@ async def get_subscription_stats(db) -> dict[str, Any]:
     # 7. Audit log summary
     audit_actions = {}
     for action in ["create", "update_plan", "update_status", "cancel", "grant"]:
-        count = await db.scalar(
-            select(func.count())
-            .select_from(SubscriptionAuditLog)
-            .where(SubscriptionAuditLog.action == action)
-        ) or 0
+        count = (
+            await db.scalar(
+                select(func.count())
+                .select_from(SubscriptionAuditLog)
+                .where(SubscriptionAuditLog.action == action)
+            )
+            or 0
+        )
         if count > 0:
             audit_actions[action] = count
 
@@ -154,33 +166,36 @@ async def get_subscription_stats(db) -> dict[str, Any]:
 
     # 8. Recent audit changes (last 10)
     recent_audits = await db.scalars(
-        select(SubscriptionAuditLog)
-        .order_by(SubscriptionAuditLog.created_at.desc())
-        .limit(10)
+        select(SubscriptionAuditLog).order_by(SubscriptionAuditLog.created_at.desc()).limit(10)
     )
 
     recent_changes = []
     for audit in recent_audits.all():
         user = await db.get(User, audit.user_id)
-        recent_changes.append({
-            "action": audit.action,
-            "user_email": user.email if user else "Unknown",
-            "old_status": audit.old_status,
-            "new_status": audit.new_status,
-            "old_plan_tier": audit.old_plan_tier,
-            "new_plan_tier": audit.new_plan_tier,
-            "reason": audit.reason,
-            "timestamp": audit.created_at.isoformat(),
-        })
+        recent_changes.append(
+            {
+                "action": audit.action,
+                "user_email": user.email if user else "Unknown",
+                "old_status": audit.old_status,
+                "new_status": audit.new_status,
+                "old_plan_tier": audit.old_plan_tier,
+                "new_plan_tier": audit.new_plan_tier,
+                "reason": audit.reason,
+                "timestamp": audit.created_at.isoformat(),
+            }
+        )
 
     report["recent_audit_changes"] = recent_changes
 
     # 9. Pending subscriptions (user signup, awaiting payment)
-    pending_count = await db.scalar(
-        select(func.count())
-        .select_from(Subscription)
-        .where(Subscription.status == SubscriptionStatus.pending)
-    ) or 0
+    pending_count = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Subscription)
+            .where(Subscription.status == SubscriptionStatus.pending)
+        )
+        or 0
+    )
 
     report["pending_subscriptions_awaiting_payment"] = pending_count
 
@@ -189,21 +204,21 @@ async def get_subscription_stats(db) -> dict[str, Any]:
 
     # Check for users without subscriptions
     users_without_subs = await db.scalars(
-        select(User).where(
-            ~User.id.in_(select(Subscription.user_id))
-        )
+        select(User).where(~User.id.in_(select(Subscription.user_id)))
     )
     users_without_subs_list = users_without_subs.all()
     if users_without_subs_list:
-        integrity_issues.append({
-            "issue": "Users without subscriptions",
-            "count": len(users_without_subs_list),
-            "severity": "high",
-            "users": [
-                {"id": str(u.id), "email": u.email, "role": u.role.value}
-                for u in users_without_subs_list[:5]
-            ],
-        })
+        integrity_issues.append(
+            {
+                "issue": "Users without subscriptions",
+                "count": len(users_without_subs_list),
+                "severity": "high",
+                "users": [
+                    {"id": str(u.id), "email": u.email, "role": u.role.value}
+                    for u in users_without_subs_list[:5]
+                ],
+            }
+        )
 
     report["data_integrity_issues"] = integrity_issues
 
@@ -213,10 +228,10 @@ async def get_subscription_stats(db) -> dict[str, Any]:
 async def cleanup_expired_subscriptions(db, dry_run: bool = True) -> dict[str, Any]:
     """
     Identify and optionally cancel expired subscriptions.
-    
+
     D5 implementation: Only identify for now. Actual cancellation is manual
     to prevent accidental loss of service.
-    
+
     Returns:
         dict with summary of actions
     """
@@ -247,7 +262,7 @@ async def cleanup_expired_subscriptions(db, dry_run: bool = True) -> dict[str, A
     for sub in expired_list:
         try:
             user = await db.get(User, sub.user_id)
-            
+
             sub_info = {
                 "subscription_id": str(sub.id),
                 "user_id": str(sub.user_id),
@@ -277,10 +292,12 @@ async def cleanup_expired_subscriptions(db, dry_run: bool = True) -> dict[str, A
         except Exception as exc:
             logger.error(f"Error processing subscription {sub.id}: {exc}")
             result["failed"] += 1
-            result["errors"].append({
-                "subscription_id": str(sub.id),
-                "error": str(exc),
-            })
+            result["errors"].append(
+                {
+                    "subscription_id": str(sub.id),
+                    "error": str(exc),
+                }
+            )
 
     if not dry_run:
         await db.commit()
@@ -298,9 +315,7 @@ async def get_part2_integrity_report(db) -> dict[str, Any]:
     report: dict[str, Any] = {}
 
     total_users = await db.scalar(select(func.count()).select_from(User)) or 0
-    users_with_subs = await db.scalar(
-        select(func.count(func.distinct(Subscription.user_id)))
-    ) or 0
+    users_with_subs = await db.scalar(select(func.count(func.distinct(Subscription.user_id)))) or 0
     report["users_total"] = total_users
     report["users_with_0_subscription_rows"] = total_users - users_with_subs
 
@@ -325,12 +340,15 @@ async def get_part2_integrity_report(db) -> dict[str, Any]:
     report["users_with_multiple_live_rows"] = len(live_multi)
 
     # rows whose role differs from the user's role
-    role_mismatch = await db.scalar(
-        select(func.count())
-        .select_from(Subscription)
-        .join(User, User.id == Subscription.user_id)
-        .where(Subscription.role != User.role)
-    ) or 0
+    role_mismatch = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Subscription)
+            .join(User, User.id == Subscription.user_id)
+            .where(Subscription.role != User.role)
+        )
+        or 0
+    )
     report["rows_role_mismatch"] = role_mismatch
 
     # legacy plan tiers still present
@@ -338,26 +356,32 @@ async def get_part2_integrity_report(db) -> dict[str, Any]:
     report["plan_tiers_present"] = sorted(t.value for t in all_tiers)
 
     # active rows past renews_at (expired but not cancelled)
-    expired_active = await db.scalar(
-        select(func.count())
-        .select_from(Subscription)
-        .where(
-            and_(
-                Subscription.status == SubscriptionStatus.active,
-                Subscription.renews_at.is_not(None),
-                Subscription.renews_at < datetime.now(timezone.utc),
+    expired_active = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Subscription)
+            .where(
+                and_(
+                    Subscription.status == SubscriptionStatus.active,
+                    Subscription.renews_at.is_not(None),
+                    Subscription.renews_at < datetime.now(timezone.utc),
+                )
             )
         )
-    ) or 0
+        or 0
+    )
     report["active_rows_past_valid_until"] = expired_active
 
     # subscription rows with no user (orphans)
-    orphans = await db.scalar(
-        select(func.count())
-        .select_from(Subscription)
-        .outerjoin(User, User.id == Subscription.user_id)
-        .where(User.id.is_(None))
-    ) or 0
+    orphans = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Subscription)
+            .outerjoin(User, User.id == Subscription.user_id)
+            .where(User.id.is_(None))
+        )
+        or 0
+    )
     report["subscription_rows_without_user"] = orphans
 
     return report
@@ -400,18 +424,18 @@ async def cleanup_duplicate_live_subscriptions(db, dry_run: bool = True) -> dict
             continue
         result["users_with_multiple_live_rows"] += 1
         # keep newest active if any, else newest pending (list already sorted desc)
-        keep = next(
-            (s for s in subs if s.status == SubscriptionStatus.active), subs[0]
-        )
+        keep = next((s for s in subs if s.status == SubscriptionStatus.active), subs[0])
         for s in subs:
             if s.id == keep.id:
                 continue
-            result["details"].append({
-                "subscription_id": str(s.id),
-                "user_id": str(user_id),
-                "kept_id": str(keep.id),
-                "old_status": s.status.value,
-            })
+            result["details"].append(
+                {
+                    "subscription_id": str(s.id),
+                    "user_id": str(user_id),
+                    "kept_id": str(keep.id),
+                    "old_status": s.status.value,
+                }
+            )
             if not dry_run:
                 old = s.status.value
                 s.status = SubscriptionStatus.cancelled
@@ -437,44 +461,50 @@ async def main():
 
     async with session_factory() as db:
         logger.info("Starting subscription reconciliation report...")
-        
+
         # Generate stats report
         stats = await get_subscription_stats(db)
-        
+
         print("\n" + "=" * 80)
         print("SUBSCRIPTION RECONCILIATION REPORT")
         print("=" * 80)
         print(f"Generated: {datetime.now(timezone.utc).isoformat()}\n")
-        
+
         print("SUBSCRIPTIONS BY STATUS:")
         for status, count in stats.get("subscriptions_by_status", {}).items():
             print(f"  {status}: {count}")
-        
+
         print("\nSUBSCRIPTIONS BY PLAN TIER:")
         for tier, count in stats.get("subscriptions_by_plan_tier", {}).items():
             print(f"  {tier}: {count}")
-        
+
         print("\nSUBSCRIPTIONS BY USER ROLE:")
         for role, count in stats.get("subscriptions_by_user_role", {}).items():
             print(f"  {role}: {count}")
-        
+
         expired_count = stats.get("expired_active_subscriptions", 0)
         print(f"\nEXPIRED ACTIVE SUBSCRIPTIONS: {expired_count}")
         if expired_count > 0:
             print("\nExpired subscription details:")
             for exp in stats.get("expired_subscriptions_detail", [])[:10]:
-                print(f"  - {exp['user_email']} ({exp['plan_tier']}): expired {exp['days_expired']} days ago")
-        
-        print(f"\nPENDING SUBSCRIPTIONS (awaiting payment): {stats.get('pending_subscriptions_awaiting_payment', 0)}")
-        
+                print(
+                    f"  - {exp['user_email']} ({exp['plan_tier']}): expired {exp['days_expired']} days ago"
+                )
+
+        print(
+            f"\nPENDING SUBSCRIPTIONS (awaiting payment): {stats.get('pending_subscriptions_awaiting_payment', 0)}"
+        )
+
         print("\nAUDIT LOG SUMMARY:")
         for action, count in stats.get("audit_log_by_action", {}).items():
             print(f"  {action}: {count}")
-        
+
         print("\nRECENT AUDIT CHANGES (last 10):")
         for change in stats.get("recent_audit_changes", []):
-            print(f"  - {change['action']}: {change['user_email']} ({change.get('new_status', 'N/A')})")
-        
+            print(
+                f"  - {change['action']}: {change['user_email']} ({change.get('new_status', 'N/A')})"
+            )
+
         print("\nDATA INTEGRITY CHECKS:")
         integrity = stats.get("data_integrity_issues", [])
         if integrity:
@@ -482,7 +512,7 @@ async def main():
                 print(f"  ⚠️  {issue['issue']} ({issue['severity']}): {issue['count']}")
         else:
             print("  ✅ All checks passed")
-        
+
         # Part 2.7 integrity report
         print("\n" + "=" * 80)
         print("PART 2 DATA REPORT (read-only)")
@@ -505,16 +535,16 @@ async def main():
         print(f"Expired subscriptions found: {cleanup_result['expired_found']}")
         print("To actually cancel expired subscriptions, use:")
         print("  python subscription_reconciliation.py --cleanup")
-        
+
         print("\n" + "=" * 80)
 
 
 if __name__ == "__main__":
     if "--cleanup" in sys.argv:
         logger.warning("Running cleanup mode: SUBSCRIPTIONS WILL BE CANCELLED")
-        
+
         session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-        
+
         async def cleanup():
             async with session_factory() as db:
                 # Duplicate live rows MUST be cleaned before the unique index
@@ -522,8 +552,10 @@ if __name__ == "__main__":
                 dup = await cleanup_duplicate_live_subscriptions(db, dry_run=False)
                 print(f"Duplicate live cleanup: {dup['cancelled']} rows cancelled")
                 result = await cleanup_expired_subscriptions(db, dry_run=False)
-                print(f"\nCleanup result: {result['processed']} cancelled, {result['failed']} failed")
-        
+                print(
+                    f"\nCleanup result: {result['processed']} cancelled, {result['failed']} failed"
+                )
+
         asyncio.run(cleanup())
     else:
         asyncio.run(main())

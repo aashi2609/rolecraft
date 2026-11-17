@@ -155,9 +155,7 @@ async def candidate_user(db_session):
     )
     db_session.add(user)
 
-    profile = CandidateProfile(
-        user_id=user.id, weblinks={"full_name": "Test Candidate"}
-    )
+    profile = CandidateProfile(user_id=user.id, weblinks={"full_name": "Test Candidate"})
     db_session.add(profile)
     await db_session.commit()
     await db_session.refresh(user)
@@ -378,15 +376,9 @@ async def grant_plan(db_session):
         from models import Subscription, SubscriptionStatus
 
         # Remove existing subscription if any
-        await db_session.execute(
-            select(Subscription).where(Subscription.user_id == user_id)
-        )
+        await db_session.execute(select(Subscription).where(Subscription.user_id == user_id))
         existing = (
-            (
-                await db_session.execute(
-                    select(Subscription).where(Subscription.user_id == user_id)
-                )
-            )
+            (await db_session.execute(select(Subscription).where(Subscription.user_id == user_id)))
             .scalars()
             .all()
         )
@@ -535,9 +527,7 @@ def mock_ai_service(monkeypatch):
     """
 
     class MockAIService:
-        async def generate_resume(
-            self, candidate_id: uuid.UUID, force_deterministic: bool = False
-        ):
+        async def generate_resume(self, candidate_id: uuid.UUID, force_deterministic: bool = False):
             return {
                 "id": uuid.uuid4(),
                 "candidate_id": candidate_id,
@@ -563,9 +553,7 @@ def mock_ai_service(monkeypatch):
                 "missing_skills": [],
             }
 
-        async def get_fitment_rationale(
-            self, candidate_id: uuid.UUID, job_id: uuid.UUID
-        ):
+        async def get_fitment_rationale(self, candidate_id: uuid.UUID, job_id: uuid.UUID):
             return {
                 "rationale": "Mock rationale: Candidate has strong Python skills matching job requirements",
                 "source": "template",

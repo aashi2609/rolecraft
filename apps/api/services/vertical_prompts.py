@@ -373,9 +373,7 @@ VERTICALS: dict[str, VerticalPrompt] = {
             "Highlight: strongest transferable skills from all domains, leadership roles, "
             "team projects, achievements with measurable impact."
         ),
-        de_emphasis_rules=(
-            "Keep all experience — reframe for the specific role if possible."
-        ),
+        de_emphasis_rules=("Keep all experience — reframe for the specific role if possible."),
     ),
 }
 
@@ -383,10 +381,7 @@ VERTICALS: dict[str, VerticalPrompt] = {
 def classify_vertical(vertical: str) -> str:
     """Map a free-form vertical string to a known bucket key."""
     v = vertical.lower()
-    if any(
-        k in v
-        for k in ("electron", "ece", "hardware", "embedded", "circuit", "vlsi", "fpga")
-    ):
+    if any(k in v for k in ("electron", "ece", "hardware", "embedded", "circuit", "vlsi", "fpga")):
         return "electronics"
     if any(k in v for k in ("market", "content", "seo", "brand", "growth")):
         return "marketing"

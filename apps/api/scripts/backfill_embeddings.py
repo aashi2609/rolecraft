@@ -91,8 +91,10 @@ async def run(args) -> int:
     label = _db_label()
     print(f"Target DB: {label}")
     if _is_primary() and not args.target_primary:
-        print("REFUSING: this looks like the primary database. "
-              "Pass --target primary and confirm to proceed.")
+        print(
+            "REFUSING: this looks like the primary database. "
+            "Pass --target primary and confirm to proceed."
+        )
         return 2
     if _is_primary() and args.target_primary:
         confirm = input("Type 'yes' to run the backfill on PRIMARY: ").strip()

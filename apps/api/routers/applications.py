@@ -80,10 +80,7 @@ async def _app_out(
         if not candidate_name:
             email_prefix = user.email.split("@")[0]
             candidate_name = (
-                email_prefix.replace(".", " ")
-                .replace("_", " ")
-                .replace("-", " ")
-                .title()
+                email_prefix.replace(".", " ").replace("_", " ").replace("-", " ").title()
             )
 
     return ApplicationOut(
@@ -124,9 +121,7 @@ async def apply(body: ApplicationCreate, user: CandidateUser, db: DbSession):
 
         target_vertical = job.title or "Job Application"
         try:
-            resume_id = await get_or_generate_resume(
-                db, user.id, target_vertical, user.email
-            )
+            resume_id = await get_or_generate_resume(db, user.id, target_vertical, user.email)
             if not resume_id:
                 raise HTTPException(
                     status_code=400,
@@ -143,9 +138,7 @@ async def apply(body: ApplicationCreate, user: CandidateUser, db: DbSession):
     try:
         await db.flush()
     except exc.IntegrityError:
-        raise HTTPException(
-            status_code=400, detail="You have already applied for this job"
-        )
+        raise HTTPException(status_code=400, detail="You have already applied for this job")
 
     # Refresh to load relationships and convert to output
     await db.refresh(app)
@@ -386,8 +379,6 @@ async def unsave_job(job_id: UUID, user: CandidateUser, db: DbSession):
 @router.get("/saved-jobs/me")
 async def list_saved(user: CandidateUser, db: DbSession):
     rows = (
-        (await db.execute(select(SavedJob).where(SavedJob.candidate_id == user.id)))
-        .scalars()
-        .all()
+        (await db.execute(select(SavedJob).where(SavedJob.candidate_id == user.id))).scalars().all()
     )
     return {"job_ids": [str(r.job_id) for r in rows]}

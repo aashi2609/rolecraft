@@ -26,9 +26,7 @@ async def _reload_subscription(db_session, user_id):
     (expire_on_commit=False), so a plain SELECT would return that stale object.
     """
     db_session.expire_all()
-    return await db_session.scalar(
-        select(Subscription).where(Subscription.user_id == user_id)
-    )
+    return await db_session.scalar(select(Subscription).where(Subscription.user_id == user_id))
 
 
 @pytest.mark.asyncio
@@ -47,9 +45,7 @@ class TestSignupCreatesSubscription:
         await db_session.commit()
 
         # Verify subscription was created with status=pending
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub = await db_session.scalar(select(Subscription).where(Subscription.user_id == user.id))
         assert sub is not None, "Subscription should be created during signup"
         assert sub.status == SubscriptionStatus.pending, "Signup subscription should be pending"
         assert sub.plan_tier == PlanTier.free, "Candidate default plan is free"
@@ -67,9 +63,7 @@ class TestSignupCreatesSubscription:
         )
         await db_session.commit()
 
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub = await db_session.scalar(select(Subscription).where(Subscription.user_id == user.id))
         assert sub is not None
         assert sub.status == SubscriptionStatus.pending, "Company signup should be pending"
         assert sub.plan_tier == PlanTier.corporate_annual
@@ -85,9 +79,7 @@ class TestSignupCreatesSubscription:
         )
         await db_session.commit()
 
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub = await db_session.scalar(select(Subscription).where(Subscription.user_id == user.id))
         assert sub.renews_at is None, "Pending subscription should have no renewal date"
 
 
@@ -160,7 +152,9 @@ class TestAdminGrant:
         # Renewal should be ~30 days from now (allow 1 minute variance)
         expected_renewal = before_grant + timedelta(days=30)
         renewal_delta = abs((sub.renews_at - expected_renewal).total_seconds())
-        assert renewal_delta < 60, f"Renewal date not ~30 days: {sub.renews_at} vs {expected_renewal}"
+        assert (
+            renewal_delta < 60
+        ), f"Renewal date not ~30 days: {sub.renews_at} vs {expected_renewal}"
 
     async def test_admin_grant_with_custom_dates(self, admin_client, db_session):
         """Admin can specify custom start and end dates for grant."""

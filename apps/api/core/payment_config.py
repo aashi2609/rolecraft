@@ -73,9 +73,7 @@ class PaymentConfig:
             if not razorpay_key_secret:
                 logger.warning("RAZORPAY_KEY_SECRET not set (using mock for test mode)")
             if not razorpay_webhook_secret:
-                logger.warning(
-                    "RAZORPAY_WEBHOOK_SECRET not set (using mock for test mode)"
-                )
+                logger.warning("RAZORPAY_WEBHOOK_SECRET not set (using mock for test mode)")
             logger.info("Payments in TEST mode (provider calls will be mocked)")
             return
 

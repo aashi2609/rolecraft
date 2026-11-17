@@ -13,9 +13,7 @@ from models import (
 
 
 def parse_plan(plan: str | None, role: UserRole) -> PlanTier:
-    default_tier = (
-        PlanTier.free if role == UserRole.candidate else PlanTier.corporate_annual
-    )
+    default_tier = PlanTier.free if role == UserRole.candidate else PlanTier.corporate_annual
     if not plan:
         return default_tier
     raw = plan.strip().lower()

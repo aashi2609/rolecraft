@@ -116,9 +116,7 @@ async def test_pdf_company_different_resume_404(
 
 
 @pytest.mark.asyncio
-async def test_pdf_unrelated_company_404(
-    db_session, other_company_user, applied_resume
-):
+async def test_pdf_unrelated_company_404(db_session, other_company_user, applied_resume):
     r1, _ = applied_resume
     async with await _client_for(other_company_user) as c:
         r = await c.get(f"/resumes/{r1.id}/pdf")
@@ -142,9 +140,7 @@ async def test_pdf_anonymous_401(db_session, applied_resume):
 
 
 @pytest.mark.asyncio
-async def test_pdf_deactivated_company_401(
-    db_session, company_user, applied_resume
-):
+async def test_pdf_deactivated_company_401(db_session, company_user, applied_resume):
     company_user.is_active = False
     await db_session.commit()
     r1, _ = applied_resume

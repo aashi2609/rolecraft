@@ -179,8 +179,9 @@ class TestClient:
         fake = AsyncMock()
         fake.post = post
         fake.is_closed = False
-        with patch("services.embedding_client._get_client", return_value=fake), patch(
-            "services.embedding_client.asyncio.sleep", new=AsyncMock()
+        with (
+            patch("services.embedding_client._get_client", return_value=fake),
+            patch("services.embedding_client.asyncio.sleep", new=AsyncMock()),
         ):
             vecs = await fetch_embeddings(["x"], retries=3)
         assert len(calls) == 2
@@ -281,7 +282,7 @@ class TestDbLevel:
         near_c = await mk_resume(near)
         mid_c = await mk_resume(mid)
         far_c = await mk_resume(far)
-        null_c = await mk_resume(None)                     # NULL embedding -> excluded
+        null_c = await mk_resume(None)  # NULL embedding -> excluded
         other_c = await mk_resume(near, model="old-model")  # other model -> excluded
         await db_session.commit()
 
@@ -299,8 +300,11 @@ class TestDbLevel:
         await db_session.flush()
         job = JobPosting(
             company_id=cu.id,
-            title="J", job_role="eng", required_skills=["py"],
-            embedding=near, embedding_status="scored",
+            title="J",
+            job_role="eng",
+            required_skills=["py"],
+            embedding=near,
+            embedding_status="scored",
             embedding_model=EMBEDDING_MODEL,
         )
         db_session.add(job)
@@ -320,7 +324,9 @@ class TestDbLevel:
     async def test_write_path_hash_noop_zero_api_calls(self, db_session):
         probe = JobPosting(title="Eng", job_role="backend", required_skills=["py"])
         job = JobPosting(
-            title="Eng", job_role="backend", required_skills=["py"],
+            title="Eng",
+            job_role="backend",
+            required_skills=["py"],
             embedding=make_vector(),
             embedding_status="scored",
             embedding_model=EMBEDDING_MODEL,
@@ -332,8 +338,11 @@ class TestDbLevel:
 
     async def test_write_path_changed_text_calls_api_once(self, db_session):
         job = JobPosting(
-            title="Eng", job_role="backend", required_skills=["py"],
-            embedding=make_vector(), embedding_status="scored",
+            title="Eng",
+            job_role="backend",
+            required_skills=["py"],
+            embedding=make_vector(),
+            embedding_status="scored",
             embedding_model=EMBEDDING_MODEL,
             embedding_source_hash="stale-hash",
         )
@@ -343,8 +352,7 @@ class TestDbLevel:
         ) as m:
             await es.refresh_job_embedding(db_session, job)
         assert m.call_count == 1
-        assert job.embedding_source_hash == es.content_hash(
-            es.build_job_embedding_text(job))
+        assert job.embedding_source_hash == es.content_hash(es.build_job_embedding_text(job))
 
 
 class TestBackfillScript:
@@ -449,12 +457,8 @@ class TestBackfillApply:
                 raise es.EmbeddingError("provider down")
             return [make_vector() for _ in texts]
 
-        with patch(
-            "scripts.backfill_embeddings.embed_texts", new=AsyncMock(side_effect=flaky)
-        ):
-            rc = await bf.run(
-                self._args("--table", "resumes", "--apply", "--batch-size", "1")
-            )
+        with patch("scripts.backfill_embeddings.embed_texts", new=AsyncMock(side_effect=flaky)):
+            rc = await bf.run(self._args("--table", "resumes", "--apply", "--batch-size", "1"))
         # batch 1 fails -> its row marked failed; later batches still processed
         assert rc == 1
         assert calls["n"] >= 2

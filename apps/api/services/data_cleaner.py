@@ -144,9 +144,7 @@ def _clean_education(edu_list) -> tuple[list[dict[str, Any]], list[str]]:
         # Dedup key
         key = f"{degree}|{institute}|{field_of_study}".lower()
         if key in seen_keys:
-            warnings.append(
-                f"Duplicate education entry removed: {degree} at {institute}"
-            )
+            warnings.append(f"Duplicate education entry removed: {degree} at {institute}")
             continue
         seen_keys.add(key)
 
@@ -231,9 +229,7 @@ def _clean_projects(proj_list) -> tuple[list[dict[str, Any]], list[str]]:
         name = _normalise_text(getattr(proj, "project_name", None) or "")
         org = _normalise_text(getattr(proj, "org", None) or "")
         tools = _normalise_text(getattr(proj, "tools_used", None) or "")
-        responsibilities = _normalise_text(
-            getattr(proj, "responsibilities", None) or ""
-        )
+        responsibilities = _normalise_text(getattr(proj, "responsibilities", None) or "")
         achievements = _normalise_text(getattr(proj, "achievements", None) or "")
 
         key = name.lower()
@@ -318,9 +314,7 @@ def clean_profile(profile: CandidateProfile, user_email: str = "") -> CleanedPro
                 raw_skills.append(normalised)
     skills = _dedupe_strings(raw_skills)
     if not skills:
-        warnings.append(
-            "No skills found — resume will rely on experience and education only"
-        )
+        warnings.append("No skills found — resume will rely on experience and education only")
 
     # Education
     education, edu_warnings = _clean_education(profile.education)
@@ -335,9 +329,7 @@ def clean_profile(profile: CandidateProfile, user_email: str = "") -> CleanedPro
     warnings.extend(proj_warnings)
 
     # Certifications
-    certifications, cert_warnings = _clean_certifications(
-        getattr(profile, "certifications", [])
-    )
+    certifications, cert_warnings = _clean_certifications(getattr(profile, "certifications", []))
     warnings.extend(cert_warnings)
 
     # Strengths
@@ -345,9 +337,7 @@ def clean_profile(profile: CandidateProfile, user_email: str = "") -> CleanedPro
 
     # Name + weblinks
     raw_links = profile.weblinks or {}
-    weblinks = {
-        k: _normalise_text(v) for k, v in raw_links.items() if _normalise_text(v)
-    }
+    weblinks = {k: _normalise_text(v) for k, v in raw_links.items() if _normalise_text(v)}
     name = _normalise_text(raw_links.get("display_name", ""))
 
     # Locations / sectors

@@ -34,12 +34,12 @@ from services.user_service import create_user_with_profile
 class TestFrontendThreadListingContract:
     """Verify thread listing response matches frontend ThreadOut schema."""
 
-    async def test_thread_list_has_required_fields(self, company_client, make_conversation, candidate_user, company_user, db_session):
+    async def test_thread_list_has_required_fields(
+        self, company_client, make_conversation, candidate_user, company_user, db_session
+    ):
         """Thread list items have all required ThreadOut fields."""
         # Create a thread
-        await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         response = await company_client.get("/messages/threads")
         assert response.status_code == 200
@@ -70,11 +70,11 @@ class TestFrontendThreadListingContract:
         assert isinstance(thread["unread_count"], int), "unread_count must be int"
         # avatar_url, job_title, subtitle can be null or string
 
-    async def test_thread_list_no_pii_in_participant_label(self, company_client, make_conversation, candidate_user, company_user):
+    async def test_thread_list_no_pii_in_participant_label(
+        self, company_client, make_conversation, candidate_user, company_user
+    ):
         """Participant label should not contain email or phone."""
-        await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         response = await company_client.get("/messages/threads")
         assert response.status_code == 200
@@ -88,11 +88,11 @@ class TestFrontendThreadListingContract:
         assert "@" not in label, "Participant label should not contain email"
         assert "+" not in label, "Participant label should avoid email patterns"
 
-    async def test_thread_id_is_valid_uuid(self, company_client, make_conversation, candidate_user, company_user):
+    async def test_thread_id_is_valid_uuid(
+        self, company_client, make_conversation, candidate_user, company_user
+    ):
         """Thread IDs should be valid UUIDs."""
-        await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         response = await company_client.get("/messages/threads")
         assert response.status_code == 200
@@ -113,7 +113,15 @@ class TestFrontendThreadListingContract:
 class TestFrontendMessageSendingContract:
     """Verify message send response matches frontend MessageOut schema."""
 
-    async def test_message_send_returns_201(self, company_client, candidate_user, company_user, admin_client, make_conversation, db_session):
+    async def test_message_send_returns_201(
+        self,
+        company_client,
+        candidate_user,
+        company_user,
+        admin_client,
+        make_conversation,
+        db_session,
+    ):
         """Sending a message returns status 201."""
         # Grant company active subscription first
         response = await admin_client.post(
@@ -148,18 +156,26 @@ class TestFrontendMessageSendingContract:
         await db_session.commit()
 
         # Create conversation
-        conv = await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        conv = await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         response = await company_client.post(
             f"/messages/threads/{conv.id}",
             json={"body": "Test message"},
         )
 
-        assert response.status_code == 201, f"Send should return 201, got {response.status_code}: {response.json()}"
+        assert (
+            response.status_code == 201
+        ), f"Send should return 201, got {response.status_code}: {response.json()}"
 
-    async def test_message_response_has_required_fields(self, company_client, candidate_user, company_user, admin_client, make_conversation, db_session):
+    async def test_message_response_has_required_fields(
+        self,
+        company_client,
+        candidate_user,
+        company_user,
+        admin_client,
+        make_conversation,
+        db_session,
+    ):
         """Message response has all required MessageOut fields."""
         # Grant subscription
         await admin_client.post(
@@ -171,9 +187,7 @@ class TestFrontendMessageSendingContract:
             },
         )
 
-        conv = await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        conv = await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         response = await company_client.post(
             f"/messages/threads/{conv.id}",
@@ -195,7 +209,9 @@ class TestFrontendMessageSendingContract:
         assert isinstance(msg["body"], str), "body must be string"
         assert isinstance(msg["sent_at"], str), "sent_at must be ISO datetime string"
 
-    async def test_message_body_truncated_to_2000_chars(self, company_client, candidate_user, company_user, admin_client, make_conversation):
+    async def test_message_body_truncated_to_2000_chars(
+        self, company_client, candidate_user, company_user, admin_client, make_conversation
+    ):
         """Message body is limited to 2000 characters."""
         # Grant subscription
         await admin_client.post(
@@ -207,9 +223,7 @@ class TestFrontendMessageSendingContract:
             },
         )
 
-        conv = await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        conv = await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         # Send message with content > 2000 chars
         long_body = "x" * 3000
@@ -221,7 +235,7 @@ class TestFrontendMessageSendingContract:
 
         assert response.status_code == 201
         msg = response.json()
-        
+
         # Body should be truncated
         assert len(msg["body"]) <= 2000, f"Body should be ≤2000 chars, got {len(msg['body'])}"
 
@@ -255,12 +269,16 @@ class TestFrontendSubscriptionErrorHandling:
 
             assert response.status_code == 403, "Should block with pending subscription"
             error = response.json()
-            
+
             assert "detail" in error
             detail = error["detail"].lower()
-            assert "subscription" in detail or "upgrade" in detail, "Error should mention subscription"
+            assert (
+                "subscription" in detail or "upgrade" in detail
+            ), "Error should mention subscription"
 
-    async def test_cancelled_subscription_error_message(self, db_session, candidate_user, admin_client):
+    async def test_cancelled_subscription_error_message(
+        self, db_session, candidate_user, admin_client
+    ):
         """Cancelled subscription error message is clear."""
         # Create company and cancel subscription
         company = await create_user_with_profile(
@@ -298,7 +316,9 @@ class TestFrontendSubscriptionErrorHandling:
 class TestFrontendThreadReplyContract:
     """Verify replying to threads works correctly."""
 
-    async def test_reply_to_thread_returns_201(self, candidate_client, company_user, candidate_user, admin_client, make_conversation):
+    async def test_reply_to_thread_returns_201(
+        self, candidate_client, company_user, candidate_user, admin_client, make_conversation
+    ):
         """Replying to thread returns 201."""
         # Grant company subscription
         await admin_client.post(
@@ -310,9 +330,7 @@ class TestFrontendThreadReplyContract:
             },
         )
 
-        conv = await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        conv = await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         # Candidate replies
         response = await candidate_client.post(
@@ -322,7 +340,15 @@ class TestFrontendThreadReplyContract:
 
         assert response.status_code == 201
 
-    async def test_get_thread_returns_messages_in_order(self, company_client, candidate_client, company_user, candidate_user, admin_client, make_conversation):
+    async def test_get_thread_returns_messages_in_order(
+        self,
+        company_client,
+        candidate_client,
+        company_user,
+        candidate_user,
+        admin_client,
+        make_conversation,
+    ):
         """Getting thread messages returns them in chronological order."""
         # Grant subscription
         await admin_client.post(
@@ -334,9 +360,7 @@ class TestFrontendThreadReplyContract:
             },
         )
 
-        conv = await make_conversation(
-            candidate_id=candidate_user.id, company_id=company_user.id
-        )
+        conv = await make_conversation(candidate_id=candidate_user.id, company_id=company_user.id)
 
         # Company sends first message
         response1 = await company_client.post(

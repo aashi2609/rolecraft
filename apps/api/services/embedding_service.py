@@ -117,31 +117,23 @@ def build_resume_embedding_text(resume: Resume, profile: Any = None) -> str:
             continue
         jobs.append(
             " | ".join(
-                str(e.get(k) or "")
-                for k in ("title", "company", "role", "responsibilities")
+                str(e.get(k) or "") for k in ("title", "company", "role", "responsibilities")
             ).strip(" |")
         )
     education = content.get("education") or []
     if not isinstance(education, list):
         education = []
     edu_fields = [
-        str(e.get("field") or e.get("degree") or "")
-        for e in education
-        if isinstance(e, dict)
+        str(e.get("field") or e.get("degree") or "") for e in education if isinstance(e, dict)
     ]
-    skills = _sorted_skills(
-        content.get("highlightedSkills") or content.get("skills") or []
-    )
+    skills = _sorted_skills(content.get("highlightedSkills") or content.get("skills") or [])
     projects = content.get("projects") or []
     project_text = " ".join(
-        str(p.get("name") or p.get("description") or "")
-        for p in projects
-        if isinstance(p, dict)
+        str(p.get("name") or p.get("description") or "") for p in projects if isinstance(p, dict)
     )
     certifications = content.get("certifications") or []
     cert_text = " ".join(
-        str(c.get("name") or c) if isinstance(c, dict) else str(c)
-        for c in certifications
+        str(c.get("name") or c) if isinstance(c, dict) else str(c) for c in certifications
     )
     profile_bits = ""
     if profile is not None:
@@ -179,9 +171,7 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
         logger.error("Embedding API failed: %s", exc)
         raise EmbeddingError(f"Embedding API unavailable: {exc}") from exc
     if len(vectors) != len(texts):
-        raise EmbeddingError(
-            f"Embedding count mismatch: expected {len(texts)}, got {len(vectors)}"
-        )
+        raise EmbeddingError(f"Embedding count mismatch: expected {len(texts)}, got {len(vectors)}")
     for text, vector in zip(texts, vectors):
         validate_embedding(vector, text)
     return vectors
@@ -243,14 +233,10 @@ async def refresh_candidate_embeddings_bg(candidate_id: UUID) -> None:
             await refresh_resume_embeddings_for_candidate(db, candidate_id)
             await db.commit()
     except Exception as exc:
-        logger.warning(
-            "Background resume embedding refresh failed: %s", type(exc).__name__
-        )
+        logger.warning("Background resume embedding refresh failed: %s", type(exc).__name__)
 
 
-async def refresh_resume_embeddings_for_candidate(
-    db: AsyncSession, candidate_id: UUID
-) -> int:
+async def refresh_resume_embeddings_for_candidate(db: AsyncSession, candidate_id: UUID) -> int:
     """Re-embed all resumes for a candidate. Returns count of successes."""
     resumes = (
         (await db.execute(select(Resume).where(Resume.candidate_id == candidate_id)))

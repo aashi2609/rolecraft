@@ -37,6 +37,7 @@ async def _mk_user_with_sub(db, role=UserRole.candidate, plan="complete"):
         plan=plan,
     )
 
+
 @pytest.mark.asyncio
 class TestSignupCreatesPendingSubscription:
     """Signup should create pending subscriptions, not active."""
@@ -144,9 +145,7 @@ class TestAuditLogging:
         """Manual subscription change can be logged."""
 
         user = await _mk_user_with_sub(db_session)
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub = await db_session.scalar(select(Subscription).where(Subscription.user_id == user.id))
         user_id = user.id
         sub_id = sub.id
 
@@ -351,9 +350,7 @@ class TestNoBackdoorActivation:
         """Direct subscription creation uses pending by default."""
         user = await _mk_user_with_sub(db_session)
         # cancel the signup pending row so our insert is the only live row
-        old = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        old = await db_session.scalar(select(Subscription).where(Subscription.user_id == user.id))
         old.status = SubscriptionStatus.cancelled
         await db_session.flush()
         sub = Subscription(
@@ -387,9 +384,7 @@ class TestAuditLogIntegrity:
     async def test_audit_entry_has_all_fields(self, db_session):
         """Audit log entry includes all trackable fields."""
         user = await _mk_user_with_sub(db_session)
-        sub = await db_session.scalar(
-            select(Subscription).where(Subscription.user_id == user.id)
-        )
+        sub = await db_session.scalar(select(Subscription).where(Subscription.user_id == user.id))
         admin = await _mk_user_with_sub(db_session, role=UserRole.admin, plan="complete")
         admin_id = admin.id
         sub_id = sub.id

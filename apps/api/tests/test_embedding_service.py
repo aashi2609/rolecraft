@@ -16,6 +16,7 @@ def _embedding_response(payload: dict) -> httpx.Response:
     request = httpx.Request("POST", "https://api.openai.com/v1/embeddings")
     return httpx.Response(200, json=payload, request=request)
 
+
 pytestmark = pytest.mark.skip_db_guard
 
 
@@ -41,9 +42,7 @@ def test_fetch_embedding_parses_openai_response(monkeypatch) -> None:
     mock_client = AsyncMock()
     mock_client.is_closed = False
     mock_client.post = AsyncMock(
-        return_value=_embedding_response(
-            {"data": [{"index": 0, "embedding": fake_vector}]}
-        )
+        return_value=_embedding_response({"data": [{"index": 0, "embedding": fake_vector}]})
     )
 
     with patch("services.embedding_client._get_client", return_value=mock_client):
@@ -60,9 +59,7 @@ def test_fetch_embedding_raises_on_empty_data(monkeypatch) -> None:
 
     mock_client = AsyncMock()
     mock_client.is_closed = False
-    mock_client.post = AsyncMock(
-        return_value=_embedding_response({"data": []})
-    )
+    mock_client.post = AsyncMock(return_value=_embedding_response({"data": []}))
 
     with patch("services.embedding_client._get_client", return_value=mock_client):
         with pytest.raises(EmbeddingServiceError):

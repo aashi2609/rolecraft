@@ -101,9 +101,7 @@ class TestDeactivatedUserTokenRevocation:
             f"/candidates/{cand_id}",
             headers={"Authorization": f"Bearer {cand_token}"},
         )
-        assert (
-            r.status_code == 401
-        ), f"post-deactivation: expected 401, got {r.status_code}"
+        assert r.status_code == 401, f"post-deactivation: expected 401, got {r.status_code}"
 
     def test_company_token_revoked_on_deactivation(self, client, admin_token):
         uid = uuid.uuid4().hex[:8]
@@ -125,9 +123,7 @@ class TestDeactivatedUserTokenRevocation:
             "/jobs/mine",
             headers={"Authorization": f"Bearer {comp_token}"},
         )
-        assert (
-            r.status_code == 401
-        ), f"post-deactivation: expected 401, got {r.status_code}"
+        assert r.status_code == 401, f"post-deactivation: expected 401, got {r.status_code}"
 
 
 class TestDeactivatedUserSignin:
@@ -149,9 +145,7 @@ class TestDeactivatedUserSignin:
 
         # Signin must fail — same generic message as wrong credentials
         r = client.post("/auth/signin", json={"email": email, "password": password})
-        assert (
-            r.status_code == 401
-        ), f"post-deactivation signin: expected 401, got {r.status_code}"
+        assert r.status_code == 401, f"post-deactivation signin: expected 401, got {r.status_code}"
         assert r.json()["detail"] == "Invalid email or password"
 
 
@@ -267,13 +261,13 @@ class TestAdminDeactivationAPI:
         )
         assert r.status_code == 200
 
+
 # ── Seeded fixture users (must exist on any DB, incl. fresh CI) ──────────
 _SEED_ADMIN_ID = _ADMIN_ID
 _SEED_CANCELLED_COMPANY_ID = uuid.UUID("5f7f4c5d-6fb3-41e1-8b12-5bb7d1670de1")
 
 
 async def _seed_users() -> None:
-
     from sqlalchemy import select
 
     from core.database import AsyncSessionLocal
@@ -304,9 +298,7 @@ async def _seed_users() -> None:
             db.add(Company(user_id=comp.id, name="Seed Co"))
         subs = (
             await db.scalars(
-                select(Subscription).where(
-                    Subscription.user_id == _SEED_CANCELLED_COMPANY_ID
-                )
+                select(Subscription).where(Subscription.user_id == _SEED_CANCELLED_COMPANY_ID)
             )
         ).all()
         if not subs:
@@ -340,9 +332,7 @@ def _activate_company_search_subscription(user_id: str) -> None:
     async def _act() -> None:
         async with AsyncSessionLocal() as db:
             sub = await db.scalar(
-                select(Subscription).where(
-                    Subscription.user_id == uuid.UUID(user_id)
-                )
+                select(Subscription).where(Subscription.user_id == uuid.UUID(user_id))
             )
             if sub is not None:
                 sub.status = SubscriptionStatus.active
@@ -350,4 +340,3 @@ def _activate_company_search_subscription(user_id: str) -> None:
             await db.commit()
 
     asyncio.run(_act())
-
