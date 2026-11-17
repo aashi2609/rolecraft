@@ -295,22 +295,34 @@ async def improve(
 
 @router.get("/{resume_id}/download")
 @router.get("/{resume_id}/pdf")
-async def download_pdf(resume_id: UUID, user: CurrentUser, db: DbSession):
+@limiter.limit("60/hour", key_func=lambda r: f"co-resume:{get_user_key(r)}")
+async def download_pdf(
+    request: Request, resume_id: UUID, user: CurrentUser, db: DbSession
+):
+    """Download a resume PDF.
+
+    Access rule (Step C): candidates see their own resumes, admins see all,
+    companies see ONLY the resume submitted on an application to their job.
+    Everyone else gets 404 — never 403, never a storage path or URL.
+    """
     row = await db.get(Resume, resume_id)
     if not row:
         raise HTTPException(status_code=404, detail="Resume not found")
 
+    application_id = None
     if user.role == UserRole.company:
-        from models import Application, JobPosting
-
-        app = await db.scalar(
-            select(Application)
-            .join(JobPosting)
-            .where(Application.resume_id == resume_id, JobPosting.company_id == user.id)
+        from services.resume_access import (
+            can_company_view_resume,
+            get_resume_application,
+            log_resume_view,
         )
-        if not app:
-            raise HTTPException(status_code=403, detail="Resume not found")
-    elif row.candidate_id != user.id:
+
+        if not await can_company_view_resume(user.id, resume_id, db):
+            raise HTTPException(status_code=404, detail="Resume not found")
+        app = await get_resume_application(user.id, resume_id, db)
+        application_id = app.id if app else None
+        log_resume_view(user.id, resume_id, application_id)
+    elif user.role != UserRole.admin and row.candidate_id != user.id:
         raise HTTPException(status_code=404, detail="Resume not found")
 
     profile = (

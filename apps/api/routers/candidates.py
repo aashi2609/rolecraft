@@ -9,11 +9,13 @@ from sqlalchemy.orm import selectinload
 
 from core.dependencies import CandidateUser, CompanyUser, CurrentUser, DbSession
 from models import (
+    Application,
     CandidateProfile,
     CandidateSkill,
     Certification,
     Education,
     Experience,
+    JobPosting,
     PlanTier,
     Project,
     Resume,
@@ -434,21 +436,36 @@ async def get_candidate_public_profile(
 async def download_candidate_resume_pdf(
     candidate_id: UUID, user: CompanyUser, db: DbSession
 ):
-    """Employer download of the candidate's latest/default generated resume as PDF."""
-    profile = await _load_profile(db, candidate_id)
-    resume = (
-        await db.execute(
-            select(Resume)
-            .where(Resume.candidate_id == candidate_id)
-            .order_by(Resume.is_default.desc(), Resume.created_at.desc())
-            .limit(1)
-        )
-    ).scalar_one_or_none()
-    if not resume:
-        raise HTTPException(
-            status_code=404, detail="No resume available for this candidate"
-        )
+    """Employer download — ONLY the resume submitted on an application to
+    this company's job (Step C). Latest/default resumes are never exposed."""
+    from services.resume_access import (
+        can_company_view_resume,
+        log_resume_view,
+    )
 
+    # Find the resume the candidate actually applied with to this company.
+    app = await db.scalar(
+        select(Application)
+        .join(JobPosting, Application.job_id == JobPosting.id)
+        .where(
+            JobPosting.company_id == user.id,
+            Application.candidate_id == candidate_id,
+            Application.resume_id.is_not(None),
+        )
+        .order_by(Application.applied_at.desc().nullslast())
+        .limit(1)
+    )
+    if app is None or not await can_company_view_resume(
+        user.id, app.resume_id, db
+    ):
+        raise HTTPException(status_code=404, detail="Resume not found")
+
+    resume = await db.get(Resume, app.resume_id)
+    if not resume:
+        raise HTTPException(status_code=404, detail="Resume not found")
+    log_resume_view(user.id, resume.id, app.id)
+
+    profile = await _load_profile(db, candidate_id)
     email = profile.user.email if profile.user else ""
     weblinks = profile.weblinks or {}
     filename = f"resume_{resume.target_vertical.replace(' ', '_').lower()}.pdf"
