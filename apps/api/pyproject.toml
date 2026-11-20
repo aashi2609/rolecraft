@@ -29,6 +29,8 @@ ignore = [
 "tests/conftest.py" = ["E402", "I001"]
 # alembic/env.py: Load-bearing import order (env must be set before app imports)
 "alembic/env.py" = ["E402"]
+# scripts/: Load-bearing sys.path insert before app imports
+"scripts/*.py" = ["E402"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["core", "models", "routers", "schemas", "services"]

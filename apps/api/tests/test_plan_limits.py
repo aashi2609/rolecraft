@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import check_plan_limit, get_user_plan
+from core.embedding_config import EMBEDDING_DIM
 from models import (
     CandidateProfile,
     Company,
@@ -124,7 +125,7 @@ async def test_candidate_free_resume_limit_enforced(db_session: AsyncSession):
         candidate_id=user.id,
         target_vertical="Engineering",
         content={"summary": "test"},
-        embedding=[0.0] * 512,  # Step 5B: 512 dims
+        embedding=[0.0] * EMBEDDING_DIM,
     )
     db_session.add(resume)
     await db_session.flush()
@@ -168,7 +169,7 @@ async def test_paid_candidate_unlimited_resumes(db_session: AsyncSession):
             candidate_id=user.id,
             target_vertical=f"Vertical {i}",
             content={"summary": "test"},
-            embedding=[0.0] * 512,  # Step 5B: 512 dims
+            embedding=[0.0] * EMBEDDING_DIM,
         )
         db_session.add(r)
     await db_session.flush()
@@ -225,9 +226,9 @@ def test_check_plan_limit_ast_no_unconditional_return():
     source = inspect.getsource(check_plan_limit)
     # 1. No bypass keywords in source
     for kw in ["bypass", "temporarily", "return none"]:
-        assert kw not in source.lower(), (
-            f"Forbidden short-circuit keyword '{kw}' found in check_plan_limit source!"
-        )
+        assert (
+            kw not in source.lower()
+        ), f"Forbidden short-circuit keyword '{kw}' found in check_plan_limit source!"
 
     # 2. Parse AST: ensure no top-level Return statement precedes plan gating logic
     tree = ast.parse(source)
@@ -238,16 +239,16 @@ def test_check_plan_limit_ast_no_unconditional_return():
         for n in func_def.body
         if not (isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant))
     ]
-    assert not isinstance(body_nodes[0], ast.Return), (
-        "check_plan_limit has an unconditional early return at top of function!"
-    )
+    assert not isinstance(
+        body_nodes[0], ast.Return
+    ), "check_plan_limit has an unconditional early return at top of function!"
 
 
 @pytest.mark.skip_db_guard
 @pytest.mark.asyncio
 async def test_check_plan_limit_unit_enforcement_raises_on_excess():
     """Unit test with mock AsyncSession: asserts check_plan_limit raises 403 and never returns None on excess."""
-    from unittest.mock import AsyncMock, MagicMock
+    from unittest.mock import AsyncMock, MagicMock, patch
 
     from core.dependencies import check_plan_limit
 
@@ -260,16 +261,16 @@ async def test_check_plan_limit_unit_enforcement_raises_on_excess():
         is_active=True,
     )
 
-    # Mock execute for get_user_plan -> None
-    mock_result_sub = MagicMock()
-    mock_result_sub.scalar_one_or_none.return_value = None
-    mock_db.execute = AsyncMock(return_value=mock_result_sub)
-
-    # Mock scalar for existing resume count = 1
+    # get_user_plan -> None: patch the subscription reader directly
+    # (it uses db.scalars(), which a spec'd MagicMock can't satisfy)
     mock_db.scalar = AsyncMock(return_value=1)
 
-    # Must raise HTTPException(403); if short-circuited (returns None), test FAILS
-    with pytest.raises(HTTPException) as exc_info:
-        await check_plan_limit(user, mock_db, "resume_verticals", extra=1)
+    with patch(
+        "services.subscription_service.get_current_subscription",
+        new=AsyncMock(return_value=None),
+    ):
+        # Must raise HTTPException(403); if short-circuited (returns None), test FAILS
+        with pytest.raises(HTTPException) as exc_info:
+            await check_plan_limit(user, mock_db, "resume_verticals", extra=1)
     assert exc_info.value.status_code == 403
     assert "Free plan resume cap reached" in exc_info.value.detail

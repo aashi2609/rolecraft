@@ -19,6 +19,7 @@ from core.security import (
 )
 from models import (
     PasswordResetToken,
+    SubscriptionStatus,
     User,
     UserRole,
 )
@@ -74,9 +75,7 @@ async def signup(request: Request, response: Response, body: SignupRequest, db: 
 @limiter.limit(RATE_LIMITS["signin_ip"])
 async def signin(request: Request, response: Response, body: SigninRequest, db: DbSession):
     email = body.email.lower()
-    result = await db.execute(
-        select(User).options(selectinload(User.subscription)).where(User.email == email)
-    )
+    result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user or not verify_password(body.password, user.password_hash):
         # Per-email failed-attempt budget (does not reveal whether the email exists)
@@ -92,7 +91,10 @@ async def signin(request: Request, response: Response, body: SigninRequest, db: 
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
         )
 
-    plan = user.subscription.plan_tier.value if user.subscription else None
+    from services.subscription_service import get_current_subscription
+
+    _sub = await get_current_subscription(db, user.id)
+    plan = _sub.plan_tier.value if _sub and _sub.status == SubscriptionStatus.active else None
     token = create_access_token(
         user_id=user.id, role=user.role.value, token_version=user.token_version
     )
@@ -121,9 +123,7 @@ async def refresh_access_token(body: RefreshTokenRequest, db: DbSession):
         )
 
     token_version = payload.get("token_version")
-    result = await db.execute(
-        select(User).options(selectinload(User.subscription)).where(User.id == user_id)
-    )
+    result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(
@@ -138,7 +138,10 @@ async def refresh_access_token(body: RefreshTokenRequest, db: DbSession):
         )
 
     # Issue new access and rotated refresh token
-    plan = user.subscription.plan_tier.value if user.subscription else None
+    from services.subscription_service import get_current_subscription
+
+    _sub = await get_current_subscription(db, user.id)
+    plan = _sub.plan_tier.value if _sub and _sub.status == SubscriptionStatus.active else None
     new_token = create_access_token(
         user_id=user.id, role=user.role.value, token_version=user.token_version
     )

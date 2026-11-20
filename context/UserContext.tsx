@@ -254,7 +254,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
       try {
         const sub: any = await subscriptionsApi.me();
-        plan = (sub.plan_tier as PlanId) || plan;
+        plan = (sub.plan || sub.plan_tier) as PlanId || plan;
       } catch {
         /* keep default */
       }

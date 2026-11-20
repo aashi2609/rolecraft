@@ -2,22 +2,25 @@ import uuid as uuid_mod
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import selectinload
 
 from core.dependencies import CandidateUser, CompanyUser, CurrentUser, DbSession
 from models import (
+    Application,
     CandidateProfile,
     CandidateSkill,
     Certification,
     Education,
     Experience,
+    JobPosting,
     PlanTier,
     Project,
     Resume,
     Skill,
+    SubscriptionStatus,
     UserRole,
 )
 from schemas import (
@@ -36,10 +39,12 @@ from schemas import (
     SkillsUpdate,
 )
 from services.candidate_search_service import search_candidates
-from services.embedding_service import refresh_resume_embeddings_for_candidate
+from services.embedding_service import refresh_candidate_embeddings_bg
 from services.pdf_service import build_resume_pdf_response, resolve_candidate_name
 from services.profile_item_service import ProfileItemService, bump_profile_updated_at
-from services.subscription_service import get_active_subscription
+from services.subscription_service import (
+    get_current_subscription,
+)
 
 # Fields on CandidateProfileUpdate that are resume-relevant
 _RESUME_RELEVANT_FIELDS = {
@@ -52,9 +57,9 @@ _RESUME_RELEVANT_FIELDS = {
 router = APIRouter(prefix="/candidates", tags=["candidates"])
 
 
-async def _sync_candidate_embeddings(db: DbSession, candidate_id: UUID) -> None:
-    """Refresh resume vectors after profile/skills change (fitment uses resume embeddings)."""
-    await refresh_resume_embeddings_for_candidate(db, candidate_id)
+def _sync_candidate_embeddings(background_tasks: BackgroundTasks, candidate_id: UUID) -> None:
+    """Schedule resume-vector refresh after the request commits (own session)."""
+    background_tasks.add_task(refresh_candidate_embeddings_bg, candidate_id)
 
 
 # Initialize profile item services
@@ -158,7 +163,12 @@ async def get_me(user: CandidateUser, db: DbSession):
 
 
 @router.put("/me", response_model=CandidateProfileOut)
-async def update_me(body: CandidateProfileUpdate, user: CandidateUser, db: DbSession):
+async def update_me(
+    body: CandidateProfileUpdate,
+    user: CandidateUser,
+    db: DbSession,
+    background_tasks: BackgroundTasks,
+):
     profile = await _load_profile(db, user.id)
     data = body.model_dump(exclude_unset=True)
     links = dict(profile.weblinks or {})
@@ -174,7 +184,7 @@ async def update_me(body: CandidateProfileUpdate, user: CandidateUser, db: DbSes
     changed_fields = set(body.model_dump(exclude_unset=True).keys())
     if changed_fields & _RESUME_RELEVANT_FIELDS:
         await bump_profile_updated_at(db, user.id)
-    await _sync_candidate_embeddings(db, user.id)
+    _sync_candidate_embeddings(background_tasks, user.id)
     return _to_out(await _load_profile(db, user.id))
 
 
@@ -185,23 +195,33 @@ async def list_education(user: CandidateUser, db: DbSession):
 
 
 @router.post("/me/education", response_model=EducationOut)
-async def add_education(body: EducationIn, user: CandidateUser, db: DbSession):
+async def add_education(
+    body: EducationIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     out = await _education_service.create_item(db, user.id, body)
-    await _sync_candidate_embeddings(db, user.id)
+    _sync_candidate_embeddings(background_tasks, user.id)
     return out
 
 
 @router.put("/me/education/{item_id}", response_model=EducationOut)
-async def update_education(item_id: UUID, body: EducationIn, user: CandidateUser, db: DbSession):
+async def update_education(
+    item_id: UUID,
+    body: EducationIn,
+    user: CandidateUser,
+    db: DbSession,
+    background_tasks: BackgroundTasks,
+):
     out = await _education_service.update_item(db, item_id, user.id, body)
-    await _sync_candidate_embeddings(db, user.id)
+    _sync_candidate_embeddings(background_tasks, user.id)
     return out
 
 
 @router.delete("/me/education/{item_id}")
-async def delete_education(item_id: UUID, user: CandidateUser, db: DbSession):
+async def delete_education(
+    item_id: UUID, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     result = await _education_service.delete_item(db, item_id, user.id)
-    await _sync_candidate_embeddings(db, user.id)
+    _sync_candidate_embeddings(background_tasks, user.id)
     return result
 
 
@@ -212,23 +232,33 @@ async def list_certs(user: CandidateUser, db: DbSession):
 
 
 @router.post("/me/certifications", response_model=CertificationOut)
-async def add_cert(body: CertificationIn, user: CandidateUser, db: DbSession):
+async def add_cert(
+    body: CertificationIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     out = await _certification_service.create_item(db, user.id, body)
-    await _sync_candidate_embeddings(db, user.id)
+    _sync_candidate_embeddings(background_tasks, user.id)
     return out
 
 
 @router.put("/me/certifications/{item_id}", response_model=CertificationOut)
-async def update_cert(item_id: UUID, body: CertificationIn, user: CandidateUser, db: DbSession):
+async def update_cert(
+    item_id: UUID,
+    body: CertificationIn,
+    user: CandidateUser,
+    db: DbSession,
+    background_tasks: BackgroundTasks,
+):
     out = await _certification_service.update_item(db, item_id, user.id, body)
-    await _sync_candidate_embeddings(db, user.id)
+    _sync_candidate_embeddings(background_tasks, user.id)
     return out
 
 
 @router.delete("/me/certifications/{item_id}")
-async def delete_cert(item_id: UUID, user: CandidateUser, db: DbSession):
+async def delete_cert(
+    item_id: UUID, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     result = await _certification_service.delete_item(db, item_id, user.id)
-    await _sync_candidate_embeddings(db, user.id)
+    _sync_candidate_embeddings(background_tasks, user.id)
     return result
 
 
@@ -239,23 +269,33 @@ async def list_exp(user: CandidateUser, db: DbSession):
 
 
 @router.post("/me/experience", response_model=ExperienceOut)
-async def add_exp(body: ExperienceIn, user: CandidateUser, db: DbSession):
+async def add_exp(
+    body: ExperienceIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     out = await _experience_service.create_item(db, user.id, body)
-    await _sync_candidate_embeddings(db, user.id)
+    _sync_candidate_embeddings(background_tasks, user.id)
     return out
 
 
 @router.put("/me/experience/{item_id}", response_model=ExperienceOut)
-async def update_exp(item_id: UUID, body: ExperienceIn, user: CandidateUser, db: DbSession):
+async def update_exp(
+    item_id: UUID,
+    body: ExperienceIn,
+    user: CandidateUser,
+    db: DbSession,
+    background_tasks: BackgroundTasks,
+):
     out = await _experience_service.update_item(db, item_id, user.id, body)
-    await _sync_candidate_embeddings(db, user.id)
+    _sync_candidate_embeddings(background_tasks, user.id)
     return out
 
 
 @router.delete("/me/experience/{item_id}")
-async def delete_exp(item_id: UUID, user: CandidateUser, db: DbSession):
+async def delete_exp(
+    item_id: UUID, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     result = await _experience_service.delete_item(db, item_id, user.id)
-    await _sync_candidate_embeddings(db, user.id)
+    _sync_candidate_embeddings(background_tasks, user.id)
     return result
 
 
@@ -266,23 +306,33 @@ async def list_projects(user: CandidateUser, db: DbSession):
 
 
 @router.post("/me/projects", response_model=ProjectOut)
-async def add_project(body: ProjectIn, user: CandidateUser, db: DbSession):
+async def add_project(
+    body: ProjectIn, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     out = await _project_service.create_item(db, user.id, body)
-    await _sync_candidate_embeddings(db, user.id)
+    _sync_candidate_embeddings(background_tasks, user.id)
     return out
 
 
 @router.put("/me/projects/{item_id}", response_model=ProjectOut)
-async def update_project(item_id: UUID, body: ProjectIn, user: CandidateUser, db: DbSession):
+async def update_project(
+    item_id: UUID,
+    body: ProjectIn,
+    user: CandidateUser,
+    db: DbSession,
+    background_tasks: BackgroundTasks,
+):
     out = await _project_service.update_item(db, item_id, user.id, body)
-    await _sync_candidate_embeddings(db, user.id)
+    _sync_candidate_embeddings(background_tasks, user.id)
     return out
 
 
 @router.delete("/me/projects/{item_id}")
-async def delete_project(item_id: UUID, user: CandidateUser, db: DbSession):
+async def delete_project(
+    item_id: UUID, user: CandidateUser, db: DbSession, background_tasks: BackgroundTasks
+):
     result = await _project_service.delete_item(db, item_id, user.id)
-    await _sync_candidate_embeddings(db, user.id)
+    _sync_candidate_embeddings(background_tasks, user.id)
     return result
 
 
@@ -373,8 +423,12 @@ async def search_candidates_endpoint(
         )
 
     if user.role == UserRole.company:
-        sub = await get_active_subscription(db, user.id)
-        if not sub or sub.plan_tier not in _ALLOWED_SEARCH_COMPANY_PLANS:
+        sub = await get_current_subscription(db, user.id)
+        if (
+            not sub
+            or sub.status != SubscriptionStatus.active
+            or sub.plan_tier not in _ALLOWED_SEARCH_COMPANY_PLANS
+        ):
             raise HTTPException(
                 status_code=403,
                 detail="Active company subscription required for candidate search. Please upgrade your plan.",
@@ -405,19 +459,34 @@ async def get_candidate_public_profile(candidate_id: UUID, user: CompanyUser, db
 
 @router.get("/{candidate_id}/resume.pdf")
 async def download_candidate_resume_pdf(candidate_id: UUID, user: CompanyUser, db: DbSession):
-    """Employer download of the candidate's latest/default generated resume as PDF."""
-    profile = await _load_profile(db, candidate_id)
-    resume = (
-        await db.execute(
-            select(Resume)
-            .where(Resume.candidate_id == candidate_id)
-            .order_by(Resume.is_default.desc(), Resume.created_at.desc())
-            .limit(1)
-        )
-    ).scalar_one_or_none()
-    if not resume:
-        raise HTTPException(status_code=404, detail="No resume available for this candidate")
+    """Employer download — ONLY the resume submitted on an application to
+    this company's job (Step C). Latest/default resumes are never exposed."""
+    from services.resume_access import (
+        can_company_view_resume,
+        log_resume_view,
+    )
 
+    # Find the resume the candidate actually applied with to this company.
+    app = await db.scalar(
+        select(Application)
+        .join(JobPosting, Application.job_id == JobPosting.id)
+        .where(
+            JobPosting.company_id == user.id,
+            Application.candidate_id == candidate_id,
+            Application.resume_id.is_not(None),
+        )
+        .order_by(Application.applied_at.desc().nullslast())
+        .limit(1)
+    )
+    if app is None or not await can_company_view_resume(user.id, app.resume_id, db):
+        raise HTTPException(status_code=404, detail="Resume not found")
+
+    resume = await db.get(Resume, app.resume_id)
+    if not resume:
+        raise HTTPException(status_code=404, detail="Resume not found")
+    log_resume_view(user.id, resume.id, app.id)
+
+    profile = await _load_profile(db, candidate_id)
     email = profile.user.email if profile.user else ""
     weblinks = profile.weblinks or {}
     filename = f"resume_{resume.target_vertical.replace(' ', '_').lower()}.pdf"

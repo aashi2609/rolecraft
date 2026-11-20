@@ -8,8 +8,9 @@ from uuid import UUID
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.embedding_config import EMBEDDING_MODEL
 from models import FitmentResult, JobPosting, Resume
-from services.embedding_service import refresh_job_embedding
+from services.embedding_service import EmbeddingError, refresh_job_embedding
 from services.fitment_rationale_service import (
     generate_fitment_rationale,
     template_rationale,
@@ -18,10 +19,12 @@ from services.fitment_rationale_service import (
 logger = logging.getLogger(__name__)
 
 
-async def ensure_job_embedding(db: AsyncSession, job: JobPosting) -> list[float]:
+async def ensure_job_embedding(db: AsyncSession, job: JobPosting) -> list[float] | None:
     if job.embedding is not None:
         return list(job.embedding)
     await refresh_job_embedding(db, job)
+    if job.embedding is None:
+        return None
     return list(job.embedding)
 
 
@@ -37,8 +40,13 @@ async def compute_fitment(
 
     rows = []
 
-    # Try embedding-based ranking if job has a valid embedding
-    if job.embedding is not None and job.embedding_status == "scored":
+    # Try embedding-based ranking only when the job vector exists, is scored,
+    # and was produced by the current model — never compare across models.
+    if (
+        job.embedding is not None
+        and job.embedding_status == "scored"
+        and job.embedding_model == EMBEDDING_MODEL
+    ):
         try:
             rows = (
                 (
@@ -49,21 +57,26 @@ async def compute_fitment(
                         FROM resumes r
                         WHERE r.embedding IS NOT NULL
                           AND r.embedding_status = 'scored'
+                          AND r.embedding_model = :model
                         ORDER BY r.embedding <-> :job_emb
                         LIMIT :lim
                         """),
-                        {"job_emb": str(job.embedding), "lim": limit},
+                        {
+                            "job_emb": str(job.embedding),
+                            "model": EMBEDDING_MODEL,
+                            "lim": limit,
+                        },
                     )
                 )
                 .mappings()
                 .all()
             )
-        except Exception as exc:
-            logger.warning(
-                "Embedding-based fitment query failed: %s. Falling back to heuristic.",
-                exc,
-            )
+        except EmbeddingError:
             rows = []
+        except Exception as exc:
+            # DB/dimension errors must surface, not hide behind the heuristic.
+            logger.error("Embedding-based fitment query failed: %s", type(exc).__name__)
+            raise
 
     results: list[FitmentResult] = []
     if rows:

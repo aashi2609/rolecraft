@@ -34,8 +34,28 @@ _GENERATION_TIERS = {
     PlanTier.elite,
 }
 
-router = APIRouter(prefix="/resumes", tags=["resumes"])
-logger = logging.getLogger(__name__)
+# Non-null columns. Omitting them lets the model default apply; writing None fails the insert.
+_EMBEDDING_META_KEYS = (
+    "embedding_status",
+    "embedding_model",
+    "embedding_source_hash",
+)
+
+
+def _embedding_kwargs(payload: dict) -> dict:
+    """Fields safe to pass into Resume().
+
+    ``embedding`` may be None when generation failed. Status, model, and hash
+    are non-null, so a missing or null value must not override the column default.
+    """
+    fields: dict = {}
+    if "embedding" in payload:
+        fields["embedding"] = payload["embedding"]
+    for key in _EMBEDDING_META_KEYS:
+        value = payload.get(key)
+        if value is not None:
+            fields[key] = value
+    return fields
 
 
 async def _profile_with_skills(db, user_id: UUID) -> CandidateProfile:
@@ -133,9 +153,9 @@ async def generate(
             ats_score=payload["ats_score"],
             ats_breakdown=payload.get("ats_breakdown"),
             generation_metadata=payload.get("generation_metadata"),
-            embedding=payload["embedding"],
             is_default=i == 0,
             generated_from_profile_at=profile.profile_updated_at,
+            **_embedding_kwargs(payload),
         )
         db.add(resume)
         created.append(resume)
@@ -210,10 +230,10 @@ async def regenerate(
             ats_score=payload["ats_score"],
             ats_breakdown=payload.get("ats_breakdown"),
             generation_metadata=payload.get("generation_metadata"),
-            embedding=payload["embedding"],
             version=(old.version or 1) + 1,
             is_default=was_default,
             generated_from_profile_at=profile.profile_updated_at,
+            **_embedding_kwargs(payload),
         )
         db.add(new_resume)
         await db.flush()
@@ -269,7 +289,8 @@ async def improve(
     row.ats_score = payload["ats_score"]
     row.ats_breakdown = payload.get("ats_breakdown")
     row.generation_metadata = payload.get("generation_metadata")
-    row.embedding = payload["embedding"]
+    for key, value in _embedding_kwargs(payload).items():
+        setattr(row, key, value)
     row.version = (row.version or 1) + 1
     row.pdf_path = None
     row.generated_from_profile_at = profile.profile_updated_at
@@ -280,22 +301,32 @@ async def improve(
 
 @router.get("/{resume_id}/download")
 @router.get("/{resume_id}/pdf")
-async def download_pdf(resume_id: UUID, user: CurrentUser, db: DbSession):
+@limiter.limit("60/hour", key_func=lambda r: f"co-resume:{get_user_key(r)}")
+async def download_pdf(request: Request, resume_id: UUID, user: CurrentUser, db: DbSession):
+    """Download a resume PDF.
+
+    Access rule (Step C): candidates see their own resumes, admins see all,
+    companies see ONLY the resume submitted on an application to their job.
+    Everyone else gets 404 — never 403, never a storage path or URL.
+    """
     row = await db.get(Resume, resume_id)
     if not row:
         raise HTTPException(status_code=404, detail="Resume not found")
 
+    application_id = None
     if user.role == UserRole.company:
-        from models import Application, JobPosting
-
-        app = await db.scalar(
-            select(Application)
-            .join(JobPosting)
-            .where(Application.resume_id == resume_id, JobPosting.company_id == user.id)
+        from services.resume_access import (
+            can_company_view_resume,
+            get_resume_application,
+            log_resume_view,
         )
-        if not app:
-            raise HTTPException(status_code=403, detail="Resume not found")
-    elif row.candidate_id != user.id:
+
+        if not await can_company_view_resume(user.id, resume_id, db):
+            raise HTTPException(status_code=404, detail="Resume not found")
+        app = await get_resume_application(user.id, resume_id, db)
+        application_id = app.id if app else None
+        log_resume_view(user.id, resume_id, application_id)
+    elif user.role != UserRole.admin and row.candidate_id != user.id:
         raise HTTPException(status_code=404, detail="Resume not found")
 
     profile = (

@@ -425,10 +425,16 @@ def create_pdf_response(pdf_bytes: bytes, filename: str) -> Any:
         raise HTTPException(status_code=500, detail="Generated file is not a valid PDF")
     if not filename.lower().endswith(".pdf"):
         filename = f"{filename}.pdf"
+    # Sanitize: strip anything that could break the header or inject text
+    safe_name = "".join(c for c in filename if c.isalnum() or c in "._- ")[:120]
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_name}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 

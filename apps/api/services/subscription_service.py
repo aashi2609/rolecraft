@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 
 from models import (
     PlanTier,
@@ -42,8 +43,44 @@ async def log_subscription_change(
         new_status=new_status,
         reason=reason,
         payment_transaction_id=payment_transaction_id,
+        # Postgres now() is the transaction start time, so two inserts in one
+        # transaction share a timestamp and "latest" is undefined. Stamp in Python.
+        created_at=datetime.now(timezone.utc),
     )
     db.add(audit)
+
+
+LIVE_STATUSES = (SubscriptionStatus.pending, SubscriptionStatus.active)
+
+
+async def get_current_subscription(db, user_id: UUID) -> Optional[Subscription]:
+    """The user's single live subscription row (pending or active).
+
+    - At most one live row is expected (enforced by partial unique index).
+    - Active rows past ``renews_at`` are expired and yield no entitlement.
+    - Deterministic ordering: newest first, ``id`` as tiebreak; ``.first()``,
+      never ``scalar_one_or_none`` (which would raise on duplicates).
+    """
+    now = datetime.now(timezone.utc)
+    stmt = (
+        select(Subscription)
+        .where(
+            Subscription.user_id == user_id,
+            or_(
+                Subscription.status == SubscriptionStatus.pending,
+                and_(
+                    Subscription.status == SubscriptionStatus.active,
+                    or_(
+                        Subscription.renews_at.is_(None),
+                        Subscription.renews_at > now,
+                    ),
+                ),
+            ),
+        )
+        .order_by(Subscription.started_at.desc().nullslast(), Subscription.id.desc())
+        .limit(1)
+    )
+    return (await db.scalars(stmt)).first()
 
 
 async def get_active_subscription(db, user_id: UUID) -> Optional[Subscription]:
@@ -81,14 +118,17 @@ async def validate_plan_tier(tier_str: str, user_role: UserRole) -> PlanTier:
     return tier
 
 
-async def cancel_active_subscriptions(db, user_id: UUID, admin_id: Optional[UUID] = None) -> None:
-    """Cancel all active subscriptions for a user."""
+async def cancel_live_subscriptions(db, user_id: UUID, admin_id: Optional[UUID] = None) -> None:
+    """Cancel all live (pending/active) subscriptions for a user.
+
+    Cancelled rows are never reactivated; a new row is created instead.
+    """
     existing = (
         (
             await db.execute(
                 select(Subscription).where(
                     Subscription.user_id == user_id,
-                    Subscription.status == SubscriptionStatus.active,
+                    Subscription.status.in_(LIVE_STATUSES),
                 )
             )
         )
@@ -161,8 +201,8 @@ async def upsert_subscription(
     # Validate and convert plan tier
     tier = await validate_plan_tier(body.plan_tier, user_role)
 
-    # Cancel existing active subscriptions
-    await cancel_active_subscriptions(db, user_id, admin_id=admin_id)
+    # Cancel existing live subscriptions (pending or active)
+    await cancel_live_subscriptions(db, user_id, admin_id=admin_id)
 
     # Create new subscription
     sub = await create_subscription(

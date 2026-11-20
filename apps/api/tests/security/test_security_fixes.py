@@ -11,12 +11,35 @@ from __future__ import annotations
 import uuid
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from core.config import get_settings
+from core.embedding_config import EMBEDDING_DIM
 
 settings = get_settings()
+
+
+def _activate_subscription(user_id: str, plan: str = "growth") -> None:
+    """Give a freshly signed-up user an active subscription so plan-gated
+    endpoints work (signup only creates a pending subscription)."""
+    import asyncio
+
+    from sqlalchemy import select
+
+    from core.database import AsyncSessionLocal
+    from models import PlanTier, Subscription, SubscriptionStatus
+
+    async def _act() -> None:
+        async with AsyncSessionLocal() as db:
+            sub = await db.scalar(
+                select(Subscription).where(Subscription.user_id == uuid.UUID(user_id))
+            )
+            if sub is not None:
+                sub.status = SubscriptionStatus.active
+                sub.plan_tier = PlanTier(plan)
+            await db.commit()
+
+    asyncio.run(_act())
 
 
 def _signup(client: TestClient, email: str, role: str, password: str = "testpass123A") -> dict:
@@ -52,6 +75,9 @@ def test_idor_candidates_and_jobs(client: TestClient) -> None:
     token_co = company_a["access_token"]
     id_a = cand_a["user_id"]
     id_b = cand_b["user_id"]
+
+    # Company needs an active plan to create job postings
+    _activate_subscription(company_a["user_id"])
 
     client.put(
         "/candidates/me",
@@ -92,8 +118,6 @@ def test_idor_candidates_and_jobs(client: TestClient) -> None:
             "max_salary": 100,
         },
     )
-    if job.status_code == 402:
-        pytest.skip(f"draft job creation unavailable (plan limit: {job.status_code})")
     assert job.status_code == 200, f"{job.status_code} {job.text[:500]}"
     job_id = job.json()["id"]
 
@@ -128,8 +152,11 @@ def test_plan_limit_before_groq(client: TestClient) -> None:
         headers={"Authorization": f"Bearer {token}"},
         json={"target_verticals": ["software"]},
     )
-    if gen.status_code not in (200, 402, 403):
-        pytest.skip(f"initial generate failed ({gen.status_code})")
+    assert gen.status_code in (
+        200,
+        402,
+        403,
+    ), f"initial generate failed unexpectedly: {gen.status_code} {gen.text[:300]}"
 
     with patch("services.ai_client.generate_content", new_callable=AsyncMock) as mock_groq:
         with patch(
@@ -143,7 +170,9 @@ def test_plan_limit_before_groq(client: TestClient) -> None:
                 mock_resume.return_value = {
                     "content": {"summary": "x"},
                     "ats_score": 80,
-                    "embedding": [0.0] * 512,  # Step 5B: 512 dims
+                    "embedding": [0.0] * EMBEDDING_DIM,
+                    "embedding_status": "pending",
+                    "embedding_model": "text-embedding-3-small",
                     "generation_metadata": {},
                 }
                 mock_parse.return_value = {"ok": True}

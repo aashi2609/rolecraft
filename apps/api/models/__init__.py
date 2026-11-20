@@ -11,16 +11,19 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.database import Base
+from core.embedding_config import EMBEDDING_MODEL
 
 
 class UserRole(str, enum.Enum):
@@ -111,6 +114,7 @@ class User(Base):
     subscription: Mapped[Optional["Subscription"]] = relationship(
         back_populates="user",
         uselist=False,
+        lazy="raise",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
@@ -136,6 +140,14 @@ class User(Base):
 
 class Subscription(Base):
     __tablename__ = "subscriptions"
+    __table_args__ = (
+        Index(
+            "idx_user_live_subscription",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status IN ('pending', 'active')"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -379,12 +391,15 @@ class Resume(Base):
         default=ATSScoreStatus.unavailable.value,
     )
     ats_breakdown: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
-    embedding = mapped_column(Vector(512), nullable=True)  # OpenAI text-embedding-3-small: 512 dims
+    embedding = mapped_column(
+        Vector(1536), nullable=True
+    )  # OpenAI text-embedding-3-small native dim
     embedding_status: Mapped[str] = mapped_column(
         Enum(EmbeddingStatus, name="embedding_status", create_constraint=False),
         default=EmbeddingStatus.pending.value,
     )
-    embedding_model: Mapped[str] = mapped_column(String(64), default="text-embedding-3-small")
+    embedding_model: Mapped[str] = mapped_column(String(64), default=EMBEDDING_MODEL)
+    embedding_source_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     generation_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     version: Mapped[int] = mapped_column(Integer, default=1)
     gcs_path: Mapped[Optional[str]] = mapped_column(String(1024))
@@ -420,6 +435,20 @@ class Company(Base):
 
 class JobPosting(Base):
     __tablename__ = "job_postings"
+    __table_args__ = (
+        Index(
+            "ix_job_postings_status_created",
+            "status",
+            text("created_at DESC"),
+            postgresql_where=text("status = 'live'"),
+        ),
+        Index(
+            "ix_job_postings_company_live",
+            "company_id",
+            text("created_at DESC"),
+            postgresql_where=text("status = 'live'"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     company_id: Mapped[uuid.UUID] = mapped_column(
@@ -451,12 +480,15 @@ class JobPosting(Base):
     status: Mapped[JobStatus] = mapped_column(
         Enum(JobStatus, name="job_status"), default=JobStatus.draft
     )
-    embedding = mapped_column(Vector(512), nullable=True)  # OpenAI text-embedding-3-small: 512 dims
+    embedding = mapped_column(
+        Vector(1536), nullable=True
+    )  # OpenAI text-embedding-3-small native dim
     embedding_status: Mapped[str] = mapped_column(
         Enum(EmbeddingStatus, name="embedding_status", create_constraint=False),
         default=EmbeddingStatus.pending.value,
     )
-    embedding_model: Mapped[str] = mapped_column(String(64), default="text-embedding-3-small")
+    embedding_model: Mapped[str] = mapped_column(String(64), default=EMBEDDING_MODEL)
+    embedding_source_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     company: Mapped["Company"] = relationship(back_populates="jobs")
@@ -467,7 +499,15 @@ class JobPosting(Base):
 
 class Application(Base):
     __tablename__ = "applications"
-    __table_args__ = (UniqueConstraint("candidate_id", "job_id", name="uq_application"),)
+    __table_args__ = (
+        UniqueConstraint("candidate_id", "job_id", name="uq_application"),
+        Index("ix_applications_job_status", "job_id", "status"),
+        Index(
+            "ix_applications_candidate_applied",
+            "candidate_id",
+            text("applied_at DESC"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     candidate_id: Mapped[uuid.UUID] = mapped_column(
@@ -591,6 +631,13 @@ class Conversation(Base):
 
 class Message(Base):
     __tablename__ = "messages"
+    __table_args__ = (
+        Index(
+            "ix_messages_conversation_sent",
+            "conversation_id",
+            text("sent_at DESC"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     conversation_id: Mapped[uuid.UUID] = mapped_column(
@@ -614,6 +661,14 @@ class Message(Base):
 
 class Notification(Base):
     __tablename__ = "notifications"
+    __table_args__ = (
+        Index(
+            "ix_notifications_user_read_created",
+            "user_id",
+            "is_read",
+            text("created_at DESC"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -727,6 +782,47 @@ class PricePoint(Base):
         return self.amount_paise / 100.0
 
 
+class WebhookEvent(Base):
+    """Step E4: Webhook event idempotency tracking.
+
+    Stores Razorpay webhook event IDs to prevent duplicate processing.
+    Each event from Razorpay has a unique X-Razorpay-Event-Id header.
+    If we receive the same event ID twice, we skip processing to ensure idempotency.
+    """
+
+    __tablename__ = "webhook_events"
+    __table_args__ = (
+        UniqueConstraint("provider_event_id", name="uq_webhook_event_provider_event_id"),
+        Index("ix_webhook_events_provider_event_id", "provider_event_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider_event_id: Mapped[str] = mapped_column(
+        String(255), nullable=False
+    )  # X-Razorpay-Event-Id; uniqueness via uq_webhook_event_provider_event_id
+    provider: Mapped[str] = mapped_column(
+        String(50), default="razorpay", nullable=False
+    )  # Provider name
+    event_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, index=True
+    )  # e.g. payment.authorized
+    processed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    payment_transaction_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("payment_transactions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    # Raw event data for audit
+    event_data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+
+    # Timestamps
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class PaymentTransaction(Base):
     """Step 6D: Payment transactions with full audit trail.
 
@@ -738,6 +834,13 @@ class PaymentTransaction(Base):
     """
 
     __tablename__ = "payment_transactions"
+    __table_args__ = (
+        UniqueConstraint("razorpay_order_id", name="uq_razorpay_order_id"),
+        UniqueConstraint("razorpay_payment_id", name="uq_razorpay_payment_id"),
+        UniqueConstraint("idempotency_key", name="uq_idempotency_key"),
+        Index("ix_payment_transactions_razorpay_order_id", "razorpay_order_id"),
+        Index("ix_payment_transactions_razorpay_payment_id", "razorpay_payment_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
@@ -762,12 +865,8 @@ class PaymentTransaction(Base):
     )  # Snapshot at transaction time
 
     # Razorpay integration
-    razorpay_order_id: Mapped[str] = mapped_column(
-        String(255), nullable=False, unique=True, index=True
-    )
-    razorpay_payment_id: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True, unique=True, index=True
-    )
+    razorpay_order_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    razorpay_payment_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     razorpay_signature: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Status and audit
@@ -789,8 +888,8 @@ class PaymentTransaction(Base):
 
     # Idempotency and replay protection
     idempotency_key: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True, unique=True, index=True
-    )  # Client-provided for replay protection
+        String(255), nullable=True
+    )  # Client-provided for replay protection; uniqueness via uq_idempotency_key
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

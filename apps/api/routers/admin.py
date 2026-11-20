@@ -219,7 +219,6 @@ async def get_all_users(
     limit: int = 100,
 ) -> Any:
     query = select(User).options(
-        selectinload(User.subscription),
         selectinload(User.company),
         selectinload(User.candidate_profile),
     )
@@ -230,6 +229,28 @@ async def get_all_users(
     query = query.order_by(User.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     users = result.scalars().all()
+
+    # Batch-load each user's live subscription (single reader) - no N+1
+    from services.subscription_service import LIVE_STATUSES
+
+    user_ids = [u.id for u in users]
+    subs_by_user: dict = {}
+    if user_ids:
+        sub_rows = (
+            await db.scalars(
+                select(Subscription)
+                .where(
+                    Subscription.user_id.in_(user_ids),
+                    Subscription.status.in_(LIVE_STATUSES),
+                )
+                .order_by(
+                    Subscription.started_at.desc().nullslast(),
+                    Subscription.id.desc(),
+                )
+            )
+        ).all()
+        for s in sub_rows:
+            subs_by_user.setdefault(s.user_id, s)
 
     out = []
     for u in users:
@@ -249,16 +270,17 @@ async def get_all_users(
                 name = u.email.split("@")[0].replace(".", " ").replace("_", " ").title()
         plan_tier = None
         sub_status = None
-        if u.subscription:
+        current_sub = subs_by_user.get(u.id)
+        if current_sub:
             plan_tier = str(
-                u.subscription.plan_tier.value
-                if hasattr(u.subscription.plan_tier, "value")
-                else u.subscription.plan_tier
+                current_sub.plan_tier.value
+                if hasattr(current_sub.plan_tier, "value")
+                else current_sub.plan_tier
             )
             sub_status = str(
-                u.subscription.status.value
-                if hasattr(u.subscription.status, "value")
-                else u.subscription.status
+                current_sub.status.value
+                if hasattr(current_sub.status, "value")
+                else current_sub.status
             )
         out.append(
             AdminUserOut(
@@ -423,6 +445,15 @@ async def update_subscription(
                 status_code=403,
                 detail="Cannot manually activate subscription. Use payment gateway webhook instead.",
             )
+        # Cancelled rows are never reactivated — create a new subscription
+        if (
+            old_status == SubscriptionStatus.cancelled.value
+            and new_status != SubscriptionStatus.cancelled
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Cancelled subscriptions cannot be reactivated. Create a new subscription instead.",
+            )
         sub.status = new_status
 
     if update_data.plan_tier is not None:
@@ -465,9 +496,19 @@ async def create_subscription(
 
     - Always creates with status=pending (default in SubCreate)
     - Must transition to active via payment gateway webhook only
+    - At most one live (pending/active) row per user: 409 otherwise
     """
+    from services.subscription_service import get_current_subscription
+
+    target_user_id = UUID(create_data.user_id)
+    if await get_current_subscription(db, target_user_id) is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="User already has a live subscription (pending or active). Cancel it before creating a new one.",
+        )
+
     sub = Subscription(
-        user_id=UUID(create_data.user_id),
+        user_id=target_user_id,
         role=coerce_enum(UserRole, create_data.role, "role", allow_none=False),
         plan_tier=coerce_enum(PlanTier, create_data.plan_tier, "plan_tier", allow_none=False),
         status=coerce_enum(SubscriptionStatus, create_data.status, "status", allow_none=False),
@@ -518,25 +559,45 @@ async def grant_subscription(
 
     plan_tier = await validate_plan_tier(grant_data.plan_tier.value, user.role)
 
-    # Cancel any existing active subscriptions
-    from services.subscription_service import cancel_active_subscriptions
-
-    await cancel_active_subscriptions(db, user.id, admin_id=current_admin.id)
-
     # Set default dates
     started_at = grant_data.started_at or datetime.now(timezone.utc)
     ends_at = grant_data.ends_at or (started_at + timedelta(days=30))
 
-    # Create active subscription directly (grant bypasses payment)
-    sub = Subscription(
-        user_id=user.id,
-        role=user.role,
-        plan_tier=plan_tier,
-        status=SubscriptionStatus.active,  # Step 6C: Granted subscriptions are immediately active
-        started_at=started_at,
-        renews_at=ends_at,
-    )
-    db.add(sub)
+    # One subscription per user: activate the existing (e.g. pending) row in
+    # place and cancel any other non-cancelled rows, instead of stacking a
+    # second subscription.
+    subs = (
+        await db.scalars(
+            select(Subscription)
+            .where(Subscription.user_id == user.id)
+            .order_by(Subscription.started_at.desc().nullslast())
+        )
+    ).all()
+
+    target: Optional[Subscription] = None
+    for existing in subs:
+        if existing.status == SubscriptionStatus.cancelled:
+            continue
+        if target is None:
+            target = existing
+        else:
+            existing.status = SubscriptionStatus.cancelled
+
+    old_status = target.status.value if target else None
+    old_plan = target.plan_tier.value if target else None
+
+    if target is None:
+        target = Subscription(user_id=user.id)
+        db.add(target)
+
+    target.role = user.role
+    target.plan_tier = plan_tier
+    target.status = (
+        SubscriptionStatus.active
+    )  # Step 6C: Granted subscriptions are immediately active
+    target.started_at = started_at
+    target.renews_at = ends_at
+    sub = target
     await db.flush()
 
     # Log the grant with admin_id
@@ -546,8 +607,10 @@ async def grant_subscription(
         user_id=user.id,
         admin_id=current_admin.id,
         action="grant",  # Special action type
-        new_plan_tier=plan_tier.value,
+        old_status=old_status,
         new_status=SubscriptionStatus.active.value,
+        old_plan_tier=old_plan,
+        new_plan_tier=plan_tier.value,
         reason=grant_data.reason,  # Admin-provided reason
     )
 
@@ -630,12 +693,12 @@ async def get_all_jobs(
                 country=j.country,
                 state=j.state,
                 city=j.city,
-                job_type=str(j.job_type.value) if hasattr(j.job_type, "value") else j.job_type,
+                job_type=(str(j.job_type.value) if hasattr(j.job_type, "value") else j.job_type),
                 required_skills=j.required_skills,
                 num_openings=j.num_openings,
-                application_deadline=j.application_deadline.isoformat()
-                if j.application_deadline
-                else None,
+                application_deadline=(
+                    j.application_deadline.isoformat() if j.application_deadline else None
+                ),
                 description=j.description,
                 responsibilities=j.responsibilities,
                 requirements=j.requirements,

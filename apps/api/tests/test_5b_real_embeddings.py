@@ -2,7 +2,7 @@
 Test Suite for Step 5B: REAL EMBEDDINGS OR NONE
 
 Comprehensive tests to verify:
-1. embed_text() returns real 512-dim vectors from OpenAI or raises EmbeddingError
+1. embed_text() returns real EMBEDDING_DIM-dim vectors from OpenAI or raises EmbeddingError
 2. embed_text() NEVER returns fake/mock vectors
 3. Validation rejects: wrong dimension, NaN, inf, all-zero vectors, empty text
 4. Embedding failures store NULL + status='failed'
@@ -17,6 +17,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.embedding_config import EMBEDDING_DIM
 
 pytestmark = pytest.mark.skip_db_guard
 
@@ -45,7 +47,7 @@ class TestEmbedTextNoMockVectors:
 
         with (
             patch("services.embedding_service.settings") as mock_settings,
-            patch("services.embedding_service.fetch_embedding") as mock_fetch,
+            patch("services.embedding_service.fetch_embeddings") as mock_fetch,
         ):
             mock_settings.embedding_api_key = "test-key"
             mock_fetch.side_effect = EmbeddingServiceError("API timeout")
@@ -57,21 +59,23 @@ class TestEmbedTextNoMockVectors:
 
     @pytest.mark.asyncio
     async def test_embed_text_returns_real_512_dim_vector(self):
-        """When API succeeds, embed_text returns real 512-dim vector."""
+        """When API succeeds, embed_text returns real EMBEDDING_DIM-dim vector."""
         from services.embedding_service import embed_text
 
-        fake_vector = [0.1 * (i % 10) for i in range(512)]  # Real-looking 512-dim vector
+        fake_vector = [
+            0.1 * (i % 10) for i in range(EMBEDDING_DIM)
+        ]  # Real-looking EMBEDDING_DIM-dim vector
 
         with (
             patch("services.embedding_service.settings") as mock_settings,
-            patch("services.embedding_service.fetch_embedding") as mock_fetch,
+            patch("services.embedding_service.fetch_embeddings") as mock_fetch,
         ):
             mock_settings.embedding_api_key = "test-key"
-            mock_fetch.return_value = fake_vector
+            mock_fetch.return_value = [fake_vector]
 
             result = await embed_text("software engineer")
 
-            assert len(result) == 512
+            assert len(result) == EMBEDDING_DIM
             assert result == fake_vector
 
 
@@ -79,10 +83,10 @@ class TestEmbeddingValidation:
     """Test that validate_embedding rejects bad vectors."""
 
     def test_validate_embedding_accepts_valid_vector(self):
-        """Valid 512-dim vector with finite values passes."""
+        """Valid EMBEDDING_DIM-dim vector with finite values passes."""
         from services.embedding_service import validate_embedding
 
-        vector = [0.1] * 512
+        vector = [0.1] * EMBEDDING_DIM
         # Should not raise
         validate_embedding(vector, "test text")
 
@@ -90,7 +94,7 @@ class TestEmbeddingValidation:
         """Vector with wrong dimension raises EmbeddingError."""
         from services.embedding_service import EmbeddingError, validate_embedding
 
-        vector = [0.1] * 1536  # Wrong! Should be 512
+        vector = [0.1] * (EMBEDDING_DIM - 1)  # Wrong length
 
         with pytest.raises(EmbeddingError) as exc_info:
             validate_embedding(vector, "test")
@@ -101,7 +105,7 @@ class TestEmbeddingValidation:
         """Vector containing NaN raises EmbeddingError."""
         from services.embedding_service import EmbeddingError, validate_embedding
 
-        vector = [0.1] * 511 + [float("nan")]
+        vector = [0.1] * (EMBEDDING_DIM - 1) + [float("nan")]
 
         with pytest.raises(EmbeddingError) as exc_info:
             validate_embedding(vector, "test")
@@ -112,7 +116,7 @@ class TestEmbeddingValidation:
         """Vector containing inf raises EmbeddingError."""
         from services.embedding_service import EmbeddingError, validate_embedding
 
-        vector = [0.1] * 511 + [float("inf")]
+        vector = [0.1] * (EMBEDDING_DIM - 1) + [float("inf")]
 
         with pytest.raises(EmbeddingError) as exc_info:
             validate_embedding(vector, "test")
@@ -123,7 +127,7 @@ class TestEmbeddingValidation:
         """All-zero vector (zero norm) raises EmbeddingError."""
         from services.embedding_service import EmbeddingError, validate_embedding
 
-        vector = [0.0] * 512
+        vector = [0.0] * EMBEDDING_DIM
 
         with pytest.raises(EmbeddingError) as exc_info:
             validate_embedding(vector, "test")
@@ -134,7 +138,7 @@ class TestEmbeddingValidation:
         """Empty or whitespace-only text raises EmbeddingError."""
         from services.embedding_service import EmbeddingError, validate_embedding
 
-        vector = [0.1] * 512
+        vector = [0.1] * EMBEDDING_DIM
 
         with pytest.raises(EmbeddingError):
             validate_embedding(vector, "")
@@ -156,7 +160,7 @@ class TestFitmentExcludesNullEmbeddings:
         mock_db = AsyncMock(spec=AsyncSession)
         mock_job = MagicMock(spec=JobPosting)
         mock_job.id = uuid.uuid4()
-        mock_job.embedding = [0.1] * 512
+        mock_job.embedding = [0.1] * EMBEDDING_DIM
         mock_job.embedding_status = "scored"
         mock_job.required_skills = ["Python", "React"]
 
@@ -272,14 +276,15 @@ class TestRefreshEmbeddingHandlesFailure:
             embedding_status=EmbeddingStatus.pending.value,
         )
 
-        # Mock query to return resumes
-        mock_result = AsyncMock()
+        # Mock query to return resumes (MagicMock: attribute chains must not
+        # produce coroutines — AsyncMock().scalars() returns a coroutine)
+        mock_result = MagicMock()
         mock_result.scalars.return_value.all.return_value = [resume1, resume2]
         mock_db.execute.return_value = mock_result
 
-        # Mock embed_text to succeed
-        with patch("services.embedding_service.embed_text") as mock_embed:
-            mock_embed.return_value = [0.1] * 512
+        # Mock embed_text to succeed (1536-dim per EMBEDDING_DIM)
+        with patch("services.embedding_service.embed_text", new=AsyncMock()) as mock_embed:
+            mock_embed.return_value = [0.1] * 1536
 
             success_count = await refresh_resume_embeddings_for_candidate(
                 mock_db, resume1.candidate_id
@@ -310,14 +315,14 @@ class TestFitmentScoringMethodTracking:
 
 
 class TestEmbeddingDimensionMatch:
-    """Test that embeddings use correct 512-dim size."""
+    """Test that embeddings use correct EMBEDDING_DIM-dim size."""
 
     def test_openai_small_embedding_dimension(self):
-        """text-embedding-3-small produces 512-dim vectors."""
+        """text-embedding-3-small produces EMBEDDING_DIM-dim vectors."""
         # This is a factual check of the OpenAI API
-        # In real deployment, the API would return 512-dim vectors
-        EXPECTED_DIM = 512
-        assert EXPECTED_DIM == 512
+        # In real deployment, the API would return EMBEDDING_DIM-dim vectors
+        EXPECTED_DIM = EMBEDDING_DIM
+        assert EXPECTED_DIM == EMBEDDING_DIM
 
 
 class TestNoMockEmbedding:
@@ -328,6 +333,6 @@ class TestNoMockEmbedding:
         from services import embedding_service
 
         # The module should not have mock_embedding anymore
-        assert not hasattr(embedding_service, "mock_embedding"), (
-            "mock_embedding should be completely removed from embedding_service"
-        )
+        assert not hasattr(
+            embedding_service, "mock_embedding"
+        ), "mock_embedding should be completely removed from embedding_service"

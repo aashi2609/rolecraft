@@ -32,7 +32,8 @@ _ADMIN_ID = uuid.UUID("b55c77e8-1a01-4f9c-a1ff-4568879121c7")
 
 @pytest.fixture
 def admin_token() -> str:
-    """JWT token for the seeded admin user."""
+    """JWT token for the seeded admin user (created on demand for fresh DBs)."""
+    _ensure_seed_users()
     return create_access_token(user_id=_ADMIN_ID, role="admin")
 
 
@@ -259,3 +260,83 @@ class TestAdminDeactivationAPI:
             headers={"Authorization": f"Bearer {cand_b['access_token']}"},
         )
         assert r.status_code == 200
+
+
+# ── Seeded fixture users (must exist on any DB, incl. fresh CI) ──────────
+_SEED_ADMIN_ID = _ADMIN_ID
+_SEED_CANCELLED_COMPANY_ID = uuid.UUID("5f7f4c5d-6fb3-41e1-8b12-5bb7d1670de1")
+
+
+async def _seed_users() -> None:
+    from sqlalchemy import select
+
+    from core.database import AsyncSessionLocal
+    from models import Company, PlanTier, Subscription, SubscriptionStatus, User, UserRole
+
+    async with AsyncSessionLocal() as db:
+        if await db.get(User, _SEED_ADMIN_ID) is None:
+            db.add(
+                User(
+                    id=_SEED_ADMIN_ID,
+                    email="seed_admin@test.com",
+                    password_hash="!",
+                    role=UserRole.admin,
+                    is_active=True,
+                )
+            )
+        comp = await db.get(User, _SEED_CANCELLED_COMPANY_ID)
+        if comp is None:
+            comp = User(
+                id=_SEED_CANCELLED_COMPANY_ID,
+                email="seed_cancelled_co@test.com",
+                password_hash="!",
+                role=UserRole.company,
+                is_active=True,
+            )
+            db.add(comp)
+            await db.flush()
+            db.add(Company(user_id=comp.id, name="Seed Co"))
+        subs = (
+            await db.scalars(
+                select(Subscription).where(Subscription.user_id == _SEED_CANCELLED_COMPANY_ID)
+            )
+        ).all()
+        if not subs:
+            db.add(
+                Subscription(
+                    user_id=_SEED_CANCELLED_COMPANY_ID,
+                    role=UserRole.company,
+                    plan_tier=PlanTier.growth,
+                    status=SubscriptionStatus.cancelled,
+                )
+            )
+        await db.commit()
+
+
+def _ensure_seed_users() -> None:
+    import asyncio
+
+    asyncio.run(_seed_users())
+
+
+def _activate_company_search_subscription(user_id: str) -> None:
+    """Give a freshly signed-up company an active growth plan so candidate
+    search entitlement checks pass (signup only creates pending)."""
+    import asyncio
+
+    from sqlalchemy import select
+
+    from core.database import AsyncSessionLocal
+    from models import PlanTier, Subscription, SubscriptionStatus
+
+    async def _act() -> None:
+        async with AsyncSessionLocal() as db:
+            sub = await db.scalar(
+                select(Subscription).where(Subscription.user_id == uuid.UUID(user_id))
+            )
+            if sub is not None:
+                sub.status = SubscriptionStatus.active
+                sub.plan_tier = PlanTier.growth
+            await db.commit()
+
+    asyncio.run(_act())

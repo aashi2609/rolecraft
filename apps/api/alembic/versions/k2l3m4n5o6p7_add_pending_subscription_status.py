@@ -23,20 +23,16 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # PostgreSQL doesn't support removing enum values, so we use a workaround:
-    # Create a new type without 'pending', then swap
+    # Create a new type without 'pending', then swap.
+    # NOTE: asyncpg rejects multi-statement strings in one execute — split them.
+    op.execute("CREATE TYPE subscription_status_new AS ENUM ('active', 'cancelled')")
     op.execute("""
-        -- Create new enum without 'pending'
-        CREATE TYPE subscription_status_new AS ENUM ('active', 'cancelled');
-        
-        -- Update columns to use new enum (convert pending to active)
-        ALTER TABLE subscriptions 
-            ALTER COLUMN status TYPE subscription_status_new 
-            USING CASE 
-                WHEN status = 'pending'::text THEN 'active'::subscription_status_new
-                ELSE status::subscription_status_new
-            END;
-        
-        -- Drop old enum and rename new one
-        DROP TYPE subscription_status;
-        ALTER TYPE subscription_status_new RENAME TO subscription_status;
+        ALTER TABLE subscriptions
+            ALTER COLUMN status TYPE subscription_status_new
+            USING CASE
+                WHEN status::text = 'pending' THEN 'active'::subscription_status_new
+                ELSE status::text::subscription_status_new
+            END
     """)
+    op.execute("DROP TYPE subscription_status")
+    op.execute("ALTER TYPE subscription_status_new RENAME TO subscription_status")

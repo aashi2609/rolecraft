@@ -4,7 +4,9 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useUser } from '@/context/UserContext';
 import { Button } from '@/components/ui/Button';
 import { Send, MessageSquare, Search } from 'lucide-react';
-import { messagesApi } from '@/lib/api';
+import { messagesApi, ApiError } from '@/lib/api';
+import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { useToast } from '@/components/ui/Toast';
 
 type Thread = {
   thread_id: string;
@@ -93,10 +95,11 @@ export default function MessagesPage() {
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [_error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileShowChat, setMobileShowChat] = useState(false);
+  const { showToast } = useToast();
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -108,12 +111,14 @@ export default function MessagesPage() {
 
   const loadThreads = useCallback(async () => {
     try {
-      setError(null);
+      setLoadError(null);
       const data = await messagesApi.threads();
       setThreads(data);
     } catch (e) {
       console.error(e);
-      setError('Failed to load messages. Please try again.');
+      setLoadError(
+        e instanceof ApiError ? e.getUserMessage() : 'Failed to load messages. Please try again.'
+      );
       setThreads([]);
     } finally {
       setLoading(false);
@@ -193,12 +198,16 @@ export default function MessagesPage() {
       );
       await loadThreads();
       scrollToBottom();
-    } catch {
+    } catch (e) {
       setChat((prev) => prev.filter((m) => m.id !== tmpId));
+      showToast(
+        'error',
+        e instanceof ApiError ? e.getUserMessage() : 'Failed to send message. Please try again.'
+      );
     } finally {
       setSending(false);
     }
-  }, [activeThread, newMessage, userId, loadThreads, scrollToBottom]);
+  }, [activeThread, newMessage, userId, loadThreads, scrollToBottom, showToast]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -229,6 +238,23 @@ export default function MessagesPage() {
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <span>Loading messages…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center bg-surface-soft p-6">
+        <div className="w-full max-w-md">
+          <ErrorBanner
+            message={loadError}
+            onRetry={() => {
+              setLoading(true);
+              loadThreads();
+            }}
+            onDismiss={() => setLoadError(null)}
+          />
         </div>
       </div>
     );

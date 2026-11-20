@@ -12,6 +12,7 @@ from typing import Any
 from uuid import UUID
 
 from core.config import get_settings
+from core.embedding_config import EMBEDDING_MODEL
 from models import (
     ATSScoreStatus,
     CandidateProfile,
@@ -22,7 +23,7 @@ from models import (
 from services.ai_client import AIServiceError, generate_content
 from services.ats_scorer import ATSResult, score_resume
 from services.data_cleaner import CleanedProfile, clean_profile
-from services.embedding_service import embed_text
+from services.embedding_service import content_hash, embed_text
 from services.vertical_prompts import classify_vertical, get_vertical_prompt
 
 logger = logging.getLogger(__name__)
@@ -123,6 +124,7 @@ async def _generate_deterministic(
         "ats_breakdown": None,
         "embedding": embedding,
         "embedding_status": embedding_status,
+        "embedding_source_hash": (content_hash(embedding_text) if embedding is not None else None),
         "generation_metadata": {"method": "deterministic", "model": None},
     }
 
@@ -570,7 +572,8 @@ async def generate_with_autofix(
         "ats_breakdown": best_breakdown,
         "embedding": embedding,
         "embedding_status": embedding_status,
-        "embedding_model": "text-embedding-3-small",
+        "embedding_model": EMBEDDING_MODEL,
+        "embedding_source_hash": (content_hash(embedding_text) if embedding is not None else None),
         "generation_metadata": {
             "method": "ai",
             "model": settings.groq_model,
@@ -635,6 +638,9 @@ async def get_or_generate_resume(
             ats_breakdown=payload.get("ats_breakdown"),
             generation_metadata=payload.get("generation_metadata"),
             embedding=payload["embedding"],
+            embedding_status=payload.get("embedding_status"),
+            embedding_model=payload.get("embedding_model"),
+            embedding_source_hash=payload.get("embedding_source_hash"),
             is_default=False,
         )
         db.add(resume)

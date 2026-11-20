@@ -5,10 +5,17 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 
 from services.embedding_client import EmbeddingServiceError, fetch_embedding
 from services.embedding_service import EmbeddingError
+
+
+def _embedding_response(payload: dict) -> httpx.Response:
+    request = httpx.Request("POST", "https://api.openai.com/v1/embeddings")
+    return httpx.Response(200, json=payload, request=request)
+
 
 pytestmark = pytest.mark.skip_db_guard
 
@@ -31,15 +38,14 @@ def test_fetch_embedding_parses_openai_response(monkeypatch) -> None:
     monkeypatch.setattr(ec.settings, "embedding_model", "text-embedding-3-small")
     monkeypatch.setattr(ec.settings, "embedding_api_base", "https://api.openai.com/v1")
 
-    fake_vector = [0.1] * 512  # text-embedding-3-small is 512-dim
-    mock_response = AsyncMock()
-    mock_response.raise_for_status = lambda: None
-    mock_response.json = lambda: {"data": [{"embedding": fake_vector}]}
-
+    fake_vector = [0.1] * 512
     mock_client = AsyncMock()
-    mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
+    mock_client.is_closed = False
+    mock_client.post = AsyncMock(
+        return_value=_embedding_response({"data": [{"index": 0, "embedding": fake_vector}]})
+    )
 
-    with patch("services.embedding_client.httpx.AsyncClient", return_value=mock_client):
+    with patch("services.embedding_client._get_client", return_value=mock_client):
         result = asyncio.run(fetch_embedding("backend engineer"))
 
     assert result == fake_vector
@@ -51,13 +57,10 @@ def test_fetch_embedding_raises_on_empty_data(monkeypatch) -> None:
 
     monkeypatch.setattr(ec.settings, "embedding_api_key", "test-key")
 
-    mock_response = AsyncMock()
-    mock_response.raise_for_status = lambda: None
-    mock_response.json = lambda: {"data": []}
-
     mock_client = AsyncMock()
-    mock_client.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
+    mock_client.is_closed = False
+    mock_client.post = AsyncMock(return_value=_embedding_response({"data": []}))
 
-    with patch("services.embedding_client.httpx.AsyncClient", return_value=mock_client):
+    with patch("services.embedding_client._get_client", return_value=mock_client):
         with pytest.raises(EmbeddingServiceError):
             asyncio.run(fetch_embedding("test"))

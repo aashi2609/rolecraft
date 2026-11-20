@@ -64,7 +64,9 @@ async def upload_file(
         is_logo = object_name.startswith(LOGO_PREFIX + "/")
         fr = FileRecord(
             owner_id=owner_id,
-            category=FileCategory.logo if is_logo else cat_map.get(category, FileCategory.document),
+            category=(
+                FileCategory.logo if is_logo else cat_map.get(category, FileCategory.document)
+            ),
             storage_path=object_name,
             original_filename=file.filename,
             mime_type=detected_mime,

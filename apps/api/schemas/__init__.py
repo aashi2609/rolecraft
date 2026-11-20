@@ -494,7 +494,7 @@ class FitmentCandidateOut(BaseModel):
     rationale_source: Optional[Literal["llm", "template"]] = None
     skills: list[str] = []
     location: Optional[str] = None
-    experience_years: Optional[int] = None
+    experience_years: Optional[float] = None
 
 
 # ── Applications ──────────────────────────────────────────────────────────────
@@ -595,7 +595,7 @@ class CandidateSearchOut(ORMModel):
     id: UUID
     name: Optional[str] = None
     title: Optional[str] = None
-    experience_years: Optional[int] = None
+    experience_years: Optional[float] = None
     location: Optional[str] = None
     skills: list[str] = []
     match_percent: float = 0.0

@@ -5,13 +5,11 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from core.database import get_db
 from core.security import decode_access_token
 from models import (
     PlanTier,
-    Subscription,
     SubscriptionStatus,
     User,
     UserRole,
@@ -34,9 +32,7 @@ async def get_current_user(
 
     token_version = payload.get("token_version")
 
-    result = await db.execute(
-        select(User).options(selectinload(User.subscription)).where(User.id == user_id)
-    )
+    result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
@@ -62,9 +58,7 @@ async def get_optional_current_user(
 
     token_version = payload.get("token_version")
 
-    result = await db.execute(
-        select(User).options(selectinload(User.subscription)).where(User.id == user_id)
-    )
+    result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         return None
@@ -87,22 +81,10 @@ FREE_COMPANY_PLANS = {PlanTier.starter, PlanTier.free, PlanTier.basic, None}
 
 
 async def get_user_plan(user: User, db: AsyncSession) -> Optional[PlanTier]:
-    # Check if subscription relationship is already loaded in instance dict without triggering IO
-    if "subscription" in user.__dict__ and user.__dict__["subscription"] is not None:
-        sub = user.__dict__["subscription"]
-        if sub.status == SubscriptionStatus.active:
-            return sub.plan_tier
-    # Otherwise query the database asynchronously
-    result = await db.execute(
-        select(Subscription)
-        .where(
-            Subscription.user_id == user.id,
-            Subscription.status == SubscriptionStatus.active,
-        )
-        .order_by(Subscription.started_at.desc())
-    )
-    sub = result.scalar_one_or_none()
-    if sub:
+    from services.subscription_service import get_current_subscription
+
+    sub = await get_current_subscription(db, user.id)
+    if sub and sub.status == SubscriptionStatus.active:
         return sub.plan_tier
     return None
 

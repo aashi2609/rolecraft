@@ -61,4 +61,21 @@ async def create_user_with_profile(
         db.add(Company(user_id=user.id, name=name or "", industry=industry))
 
     await db.flush()
+
+    from services.subscription_service import log_subscription_change
+
+    await log_subscription_change(
+        db=db,
+        subscription_id=sub.id,
+        user_id=user.id,
+        action="create",
+        new_plan_tier=sub.plan_tier.value,
+        new_status=sub.status.value,
+        reason="User registration",
+    )
+    await db.flush()
+
+    # Eagerly load the lazy="raise" subscription relationship so callers
+    # (signup response, tests) can read user.subscription without a lazy load.
+    await db.refresh(user, attribute_names=["subscription"])
     return user

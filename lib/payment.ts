@@ -1,99 +1,220 @@
 /**
- * Payment service for RoleCraft
- * Currently supports mock payment processing for development
- * Can be extended with real payment providers (Stripe, Razorpay, etc.)
+ * Payment Processing Client
+ *
+ * This module handles client-side payment processing by communicating with the backend
+ * Razorpay integration (STEP E - Payment Verification).
+ *
+ * Flow:
+ * 1. Client collects payment details on checkout form
+ * 2. Client calls processPayment() → backend creates Razorpay order
+ * 3. Client opens Razorpay Checkout modal
+ * 4. User completes payment in Razorpay
+ * 5. Razorpay redirects with payment details
+ * 6. Backend webhook verifies signature + activates subscription
  */
 
+export type PlanId = 'basic' | 'complete' | 'job_search' | 'resume_builder' | 'corporate_annual' | 'corporate_lifetime';
+
 export interface PaymentDetails {
-  planId: string;
+  planId: PlanId;
   amount: number;
   currency: string;
   isAnnual: boolean;
-  paymentMethod: 'card' | 'upi' | 'netbanking' | 'wallet';
-  paymentData?: Record<string, unknown>;
+  paymentMethod: string;
+  paymentData: Record<string, any>;
 }
 
 export interface PaymentResult {
   success: boolean;
-  transactionId?: string;
   error?: string;
+  orderId?: string;
+  checkoutUrl?: string;
 }
 
 /**
- * Process payment (mock implementation)
- * In production, this would integrate with Stripe, Razorpay, or similar
- */
-export async function processPayment(_details: PaymentDetails): Promise<PaymentResult> {
-  // Simulate payment processing delay
-  await new Promise((resolve) => setTimeout(resolve, 1500));
-
-  // Mock success for development
-  // In production, this would call actual payment gateway APIs
-  const mockSuccess = Math.random() > 0.1; // 90% success rate for testing
-
-  if (mockSuccess) {
-    return {
-      success: true,
-      transactionId: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    };
-  }
-
-  return {
-    success: false,
-    error: 'Payment failed. Please try again or use a different payment method.',
-  };
-}
-
-/**
- * Validate payment details before processing
+ * Validates payment details before submission
  */
 export function validatePaymentDetails(details: PaymentDetails): string | null {
   if (!details.planId) {
-    return 'Plan ID is required';
+    return 'Plan selection is required';
   }
 
-  if (details.amount <= 0) {
-    return 'Invalid amount';
+  if (!details.amount || details.amount <= 0) {
+    return 'Invalid payment amount';
   }
 
-  if (!details.paymentMethod) {
-    return 'Payment method is required';
+  if (!details.currency) {
+    return 'Currency is required';
   }
 
-  // Additional validation based on payment method
-  if (details.paymentMethod === 'card') {
-    const cardData = details.paymentData as Record<string, string> | undefined;
-    if (!cardData?.cardNumber || !cardData.expiry || !cardData.cvv) {
-      return 'Card details are incomplete';
-    }
+  // Validate based on payment method
+  switch (details.paymentMethod) {
+    case 'card':
+      return validateCardDetails(details.paymentData);
+    case 'upi':
+      return validateUpiDetails(details.paymentData);
+    case 'netbanking':
+      return validateNetbankingDetails(details.paymentData);
+    case 'wallet':
+      return validateWalletDetails(details.paymentData);
+    default:
+      return 'Invalid payment method';
+  }
+}
+
+function validateCardDetails(data: Record<string, any>): string | null {
+  if (!data.cardNumber || !/^\d{13,19}$/.test(data.cardNumber.replace(/\s/g, ''))) {
+    return 'Please enter a valid card number';
   }
 
-  if (details.paymentMethod === 'upi') {
-    const upiData = details.paymentData as Record<string, string> | undefined;
-    if (!upiData?.upiId || !upiData.upiId.includes('@')) {
-      return 'Invalid UPI ID';
-    }
+  if (!data.expiry || !/^\d{2}\/\d{2}$/.test(data.expiry)) {
+    return 'Please enter expiry in MM/YY format';
+  }
+
+  if (!data.cvv || !/^\d{3,4}$/.test(data.cvv)) {
+    return 'Please enter a valid CVV';
+  }
+
+  if (!data.name || data.name.trim().length < 3) {
+    return 'Please enter valid name on card';
   }
 
   return null;
 }
 
-/**
- * Format amount for display
- */
-export function formatPaymentAmount(amount: number, currency: string): string {
-  if (currency === 'INR') {
-    return `₹${amount.toLocaleString('en-IN')}`;
+function validateUpiDetails(data: Record<string, any>): string | null {
+  if (!data.upiId || !/^[a-zA-Z0-9._-]+@[a-zA-Z]+$/.test(data.upiId)) {
+    return 'Please enter a valid UPI ID (e.g., username@upi)';
   }
-  return `$${amount.toLocaleString('en-US')}`;
+  return null;
+}
+
+function validateNetbankingDetails(data: Record<string, any>): string | null {
+  if (!data.bank || data.bank.trim().length === 0) {
+    return 'Please select a bank';
+  }
+  return null;
+}
+
+function validateWalletDetails(data: Record<string, any>): string | null {
+  if (!data.wallet || data.wallet.trim().length === 0) {
+    return 'Please select a wallet';
+  }
+  return null;
 }
 
 /**
- * Get supported payment methods
+ * Process payment through backend Razorpay integration
+ *
+ * This function:
+ * 1. Sends payment details to backend
+ * 2. Backend creates Razorpay order
+ * 3. Opens Razorpay Checkout modal (client-side)
+ * 4. Webhook handles signature verification + subscription activation
  */
-export const SUPPORTED_PAYMENT_METHODS = [
-  { id: 'card', label: 'Credit/Debit Card', icon: 'CreditCard' },
-  { id: 'upi', label: 'UPI', icon: 'Smartphone' },
-  { id: 'netbanking', label: 'Net Banking', icon: 'Landmark' },
-  { id: 'wallet', label: 'Wallet', icon: 'Wallet' },
-] as const;
+export async function processPayment(details: PaymentDetails): Promise<PaymentResult> {
+  try {
+    // Step 1: Create payment order via backend
+    const orderResponse = await fetch('/api/payments/create-order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+      body: JSON.stringify({
+        planId: details.planId,
+        billingPeriod: details.isAnnual ? 'annual' : 'monthly',
+      }),
+    });
+
+    if (!orderResponse.ok) {
+      const error = await orderResponse.json();
+      return {
+        success: false,
+        error: error.message || 'Failed to create payment order',
+      };
+    }
+
+    const orderData = await orderResponse.json();
+    const { razorpay_order_id, razorpay_key_id, amount, currency, email, user_name } = orderData;
+
+    // Step 2: Open Razorpay Checkout
+    return new Promise((resolve) => {
+      const options = {
+        key: razorpay_key_id,
+        amount: amount, // in paise
+        currency: currency,
+        name: 'RoleCraft',
+        description: `${details.planId} plan subscription`,
+        order_id: razorpay_order_id,
+        prefill: {
+          name: user_name || '',
+          email: email || '',
+          contact: '', // User can fill if needed
+        },
+        handler: async (response: any) => {
+          // Step 3: Verify payment on backend (webhook)
+          // Note: Signature verification happens in webhook handler
+          // No client-side verification needed (happens server-side for security)
+
+          resolve({
+            success: true,
+            orderId: razorpay_order_id,
+          });
+        },
+        modal: {
+          onclosed: () => {
+            resolve({
+              success: false,
+              error: 'Payment was cancelled by user',
+            });
+          },
+        },
+      };
+
+      // Load Razorpay script if not already loaded
+      if (!(window as any).Razorpay) {
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.onload = () => {
+          const rzp = new (window as any).Razorpay(options);
+          rzp.open();
+        };
+        script.onerror = () => {
+          resolve({
+            success: false,
+            error: 'Failed to load payment gateway',
+          });
+        };
+        document.body.appendChild(script);
+      } else {
+        const rzp = new (window as any).Razorpay(options);
+        rzp.open();
+      }
+    });
+  } catch (error) {
+    console.error('Payment processing error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'An unexpected error occurred',
+    };
+  }
+}
+
+/**
+ * Get authentication token from localStorage
+ */
+function getAuthToken(): string {
+  if (typeof window === 'undefined') return '';
+  const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+  return token || '';
+}
+
+/**
+ * Razorpay type declaration
+ */
+declare global {
+  interface Window {
+    Razorpay?: any;
+  }
+}
