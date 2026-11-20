@@ -111,10 +111,11 @@ async def create_job(
         title=body.title,
         department=body.department,
         employment_type=(
-            coerce_enum(EmploymentType, body.employment_type, "employment_type").value
-            if body.employment_type
-            else None
-        ),
+            (_et := coerce_enum(EmploymentType, body.employment_type, "employment_type"))
+            and _et.value
+        )
+        if body.employment_type
+        else None,
         experience_range=body.experience_range,
         min_salary=body.min_salary,
         max_salary=body.max_salary,
@@ -274,7 +275,9 @@ async def update_job(
         if k == "job_type":
             job.job_type = coerce_enum(JobType, v, "job_type")
         elif k == "status":
-            job.status = coerce_enum(JobStatus, v, "status", allow_none=False)
+            _js3 = coerce_enum(JobStatus, v, "status", allow_none=False)
+            assert _js3 is not None
+            job.status = _js3
         elif k == "employment_type":
             emp = coerce_enum(EmploymentType, v, "employment_type")
             job.employment_type = emp.value if emp else None
@@ -295,7 +298,9 @@ async def patch_status(job_id: UUID, body: JobStatusUpdate, user: CompanyUser, d
     job = await db.get(JobPosting, job_id)
     if not job or job.company_id != user.id:
         raise HTTPException(status_code=404, detail="Not found")
-    job.status = coerce_enum(JobStatus, body.status, "status", allow_none=False)
+    _js = coerce_enum(JobStatus, body.status, "status", allow_none=False)
+    assert _js is not None
+    job.status = _js
     await db.flush()
     await db.refresh(job, ["company"])
 

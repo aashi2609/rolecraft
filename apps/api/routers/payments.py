@@ -11,6 +11,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
+from sqlalchemy import select
 
 from core.config import get_settings
 from core.dependencies import DbSession, get_current_user
@@ -43,12 +44,16 @@ class OrderCreateRequest(BaseModel):
     @field_validator("plan_tier", mode="before")
     @classmethod
     def validate_plan_tier(cls, v: Any) -> PlanTier:
-        return coerce_enum(PlanTier, v, "plan_tier", allow_none=False)
+        result = coerce_enum(PlanTier, v, "plan_tier", allow_none=False)
+        assert result is not None
+        return result
 
     @field_validator("billing_period", mode="before")
     @classmethod
     def validate_billing_period(cls, v: Any) -> BillingPeriod:
-        return coerce_enum(BillingPeriod, v, "billing_period", allow_none=False)
+        result = coerce_enum(BillingPeriod, v, "billing_period", allow_none=False)
+        assert result is not None
+        return result
 
 
 class OrderCreateResponse(BaseModel):
@@ -208,7 +213,7 @@ async def verify_payment(
 
         # Find transaction
         transaction = await db.scalar(
-            db.select(PaymentTransaction).where(
+            select(PaymentTransaction).where(
                 PaymentTransaction.razorpay_order_id == request.order_id,
                 PaymentTransaction.user_id == current_user.id,
             )

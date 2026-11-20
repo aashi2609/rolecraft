@@ -17,6 +17,7 @@ from typing import Optional
 
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class RequestProfiler:
         self.queries = []  # List of (statement, duration_ms, params)
         self.enabled = True
 
-    def add_query(self, statement: str, duration_ms: float, params: dict = None):
+    def add_query(self, statement: str, duration_ms: float, params: Optional[dict] = None):
         """Record a query."""
         if not self.enabled:
             return
@@ -74,7 +75,7 @@ def set_current_profiler(profiler: Optional[RequestProfiler]):
     _profiler_context.set(profiler)
 
 
-def install_profiler(engine: Engine, enabled: bool = True) -> None:
+def install_profiler(engine: "Engine | AsyncEngine", enabled: bool = True) -> None:
     """Install profiling listeners on a SQLAlchemy engine.
 
     Args:

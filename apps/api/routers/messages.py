@@ -151,6 +151,7 @@ async def list_threads(user: CurrentUser, db: DbSession):
                 avatar_url = None
                 subtitle = None
             else:
+                assert company is not None
                 label = company.name if company.name else "Unknown"
                 avatar_url = company.logo_url
                 subtitle = company.industry
@@ -166,6 +167,7 @@ async def list_threads(user: CurrentUser, db: DbSession):
                 subtitle = None
             else:
                 # Build participant label
+                assert profile is not None
                 if profile.weblinks and profile.weblinks.get("display_name"):
                     label = profile.weblinks["display_name"]
                 elif profile.weblinks and profile.weblinks.get("full_name"):
@@ -389,6 +391,8 @@ async def reply_thread(
         raise HTTPException(status_code=404, detail=reason)
 
     conv = await db.get(Conversation, id)
+    if conv is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Threads with a deleted or deactivated participant are read-only.
     other_id = conv.candidate_id if user.role == UserRole.company else conv.company_id

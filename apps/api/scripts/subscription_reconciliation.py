@@ -45,7 +45,7 @@ logging.basicConfig(
 async def get_subscription_stats(db) -> dict[str, Any]:
     """Get comprehensive subscription statistics and health report."""
 
-    report = {}
+    report: dict[str, Any] = {}
 
     # 1. Total subscriptions by status
     status_counts = {}
@@ -250,7 +250,7 @@ async def cleanup_expired_subscriptions(db, dry_run: bool = True) -> dict[str, A
     )
 
     expired_list = expired_subs.all()
-    result = {
+    result: dict[str, Any] = {
         "dry_run": dry_run,
         "expired_found": len(expired_list),
         "processed": 0,
@@ -412,7 +412,7 @@ async def cleanup_duplicate_live_subscriptions(db, dry_run: bool = True) -> dict
     for s in live_rows:
         by_user.setdefault(s.user_id, []).append(s)
 
-    result = {
+    result: dict[str, Any] = {
         "dry_run": dry_run,
         "users_with_multiple_live_rows": 0,
         "cancelled": 0,

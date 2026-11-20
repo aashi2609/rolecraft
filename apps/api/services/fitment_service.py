@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from uuid import UUID
 
-from sqlalchemy import select, text
+from sqlalchemy import RowMapping, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.embedding_config import EMBEDDING_MODEL
@@ -38,7 +39,7 @@ async def compute_fitment(
     """
     await ensure_job_embedding(db, job)
 
-    rows = []
+    rows: "Sequence[RowMapping]" = []
 
     # Try embedding-based ranking only when the job vector exists, is scored,
     # and was produced by the current model — never compare across models.
@@ -111,12 +112,12 @@ async def compute_fitment(
 
     # Heuristic fallback: use skill overlap and vertical matching when embeddings unavailable
     resumes = (await db.execute(select(Resume))).scalars().all()
-    job_skills = {s.lower() for s in (job.required_skills or [])}
+    h_job_skills = {s.lower() for s in (job.required_skills or [])}
     scored: list[tuple[UUID, float, str]] = []
     for resume in resumes:
         content = resume.content or {}
-        cand_skills = {s.lower() for s in content.get("highlightedSkills", [])}
-        overlap = job_skills & cand_skills if job_skills else set()
+        h_cand_skills = {s.lower() for s in content.get("highlightedSkills", [])}
+        overlap = h_job_skills & h_cand_skills if h_job_skills else set()
         base = 55 + 10 * len(overlap)
         if (
             resume.target_vertical

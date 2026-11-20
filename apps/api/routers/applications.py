@@ -1,8 +1,10 @@
 import logging
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, WebSocket
-from sqlalchemy import exc, select
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from core.dependencies import (
@@ -41,11 +43,11 @@ router = APIRouter(tags=["applications"])
 
 async def _app_out(
     app: Application,
-    job: JobPosting = None,
-    company: Company = None,
-    user: User = None,
-    profile: CandidateProfile = None,
-    resume: Resume = None,
+    job: Optional[JobPosting] = None,
+    company: Optional[Company] = None,
+    user: Optional[User] = None,
+    profile: Optional[CandidateProfile] = None,
+    resume: Optional[Resume] = None,
 ) -> ApplicationOut:
     """
     Serialize application to ApplicationOut.
@@ -137,7 +139,7 @@ async def apply(body: ApplicationCreate, user: CandidateUser, db: DbSession):
     db.add(app)
     try:
         await db.flush()
-    except exc.IntegrityError:
+    except IntegrityError:
         raise HTTPException(status_code=400, detail="You have already applied for this job")
 
     # Refresh to load relationships and convert to output
@@ -301,7 +303,9 @@ async def update_status(
     job = await db.get(JobPosting, app.job_id)
     if not job or job.company_id != user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
-    app.status = coerce_enum(ApplicationStatus, body.status, "status", allow_none=False)
+    _st = coerce_enum(ApplicationStatus, body.status, "status", allow_none=False)
+    assert _st is not None
+    app.status = _st
     await db.flush()
 
     # Batch load related data for serialization

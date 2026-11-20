@@ -45,10 +45,13 @@ async def send_password_reset_email(user_email: str, reset_token: str) -> bool:
             import smtplib
             from email.mime.text import MIMEText
 
-            smtp_host = os.getenv("SMTP_HOST")
+            smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
             smtp_port = int(os.getenv("SMTP_PORT", "587"))
             smtp_user = os.getenv("SMTP_USER")
             smtp_pass = os.getenv("SMTP_PASSWORD")
+            if not smtp_user or not smtp_pass:
+                logger.error("SMTP_USER/SMTP_PASSWORD not configured")
+                return False
 
             msg = MIMEText(
                 f"Reset link: {reset_link}\n\nExpires in 1 hour. Ignore if not requested."

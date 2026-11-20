@@ -480,7 +480,7 @@ async def generate_with_autofix(
     best_breakdown = ats_result.breakdown
     best_status = "scored"
 
-    iterations = [
+    iterations: list[dict] = [
         {
             "iteration": 1,
             "score": ats_result.overall_score,

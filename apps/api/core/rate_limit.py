@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 import time
 
-from fastapi import Request
+from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from limits import parse
 from limits.storage import storage_from_string
@@ -165,7 +165,7 @@ class RateLimited(Exception):
         super().__init__(GENERIC_429_DETAIL)
 
 
-def rate_limit_exceeded_handler(request: Request, exc: Exception) -> JSONResponse:
+def rate_limit_exceeded_handler(request: Request, exc: Exception) -> Response:
     """Unified 429 handler — generic body, Retry-After header, no email leakage."""
     retry_after = 60
     if isinstance(exc, RateLimited):

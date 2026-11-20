@@ -201,7 +201,7 @@ async def get_job_stats(db, job_ids: list) -> dict:
     return stats
 
 
-async def enrich_job(job: JobPosting, *, company: Company, stats: dict = None) -> JobOut:
+async def enrich_job(job: JobPosting, *, company: Company, stats: Optional[dict] = None) -> JobOut:
     """Enrich job with company name and application pipeline counts.
 
     matched     = total applications for this job (pipeline size)
