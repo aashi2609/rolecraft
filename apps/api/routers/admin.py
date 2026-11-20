@@ -163,12 +163,28 @@ class SubCreate(BaseModel):
     @field_validator("role", mode="before")
     @classmethod
     def validate_role(cls, v: Any) -> UserRole:
-        return coerce_enum(UserRole, v, "role", allow_none=False)
+        _ce = coerce_enum(UserRole, v, "role", allow_none=False)
+
+        assert _ce is not None
+
+        _res = _ce
+
+        assert _res is not None
+
+        return _res
 
     @field_validator("plan_tier", mode="before")
     @classmethod
     def validate_plan_tier(cls, v: Any) -> PlanTier:
-        return coerce_enum(PlanTier, v, "plan_tier", allow_none=False)
+        _ce = coerce_enum(PlanTier, v, "plan_tier", allow_none=False)
+
+        assert _ce is not None
+
+        _res = _ce
+
+        assert _res is not None
+
+        return _res
 
     @field_validator("status", mode="before")
     @classmethod
@@ -189,7 +205,15 @@ class SubscriptionGrant(BaseModel):
     @field_validator("plan_tier", mode="before")
     @classmethod
     def validate_plan_tier(cls, v: Any) -> PlanTier:
-        return coerce_enum(PlanTier, v, "plan_tier", allow_none=False)
+        _ce = coerce_enum(PlanTier, v, "plan_tier", allow_none=False)
+
+        assert _ce is not None
+
+        _res = _ce
+
+        assert _res is not None
+
+        return _res
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -307,7 +331,11 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if update_data.role is not None:
-        user.role = coerce_enum(UserRole, update_data.role, "role", allow_none=False)
+        _ce = coerce_enum(UserRole, update_data.role, "role", allow_none=False)
+
+        assert _ce is not None
+
+        user.role = _ce
     if update_data.is_active is not None:
         user.is_active = update_data.is_active
     if update_data.email is not None:
@@ -327,7 +355,11 @@ async def create_user(
     db: DbSession,
     current_admin: User = Depends(get_current_admin),
 ) -> Any:
-    role = coerce_enum(UserRole, create_data.role, "role", allow_none=False)
+    _ce = coerce_enum(UserRole, create_data.role, "role", allow_none=False)
+
+    assert _ce is not None
+
+    role = _ce
     user = await create_user_with_profile(
         db=db,
         email=create_data.email,
@@ -438,7 +470,9 @@ async def update_subscription(
 
     # If changing status to active, require explicit reason with payment proof
     if update_data.status is not None:
-        new_status = coerce_enum(SubscriptionStatus, update_data.status, "status", allow_none=False)
+        _ce_status = coerce_enum(SubscriptionStatus, update_data.status, "status", allow_none=False)
+        assert _ce_status is not None
+        new_status = _ce_status
         if new_status == SubscriptionStatus.active and old_status != "active":
             # Reject: must go through payment verification flow
             raise HTTPException(
@@ -457,16 +491,20 @@ async def update_subscription(
         sub.status = new_status
 
     if update_data.plan_tier is not None:
-        sub.plan_tier = coerce_enum(PlanTier, update_data.plan_tier, "plan_tier", allow_none=False)
+        _ce_plan = coerce_enum(PlanTier, update_data.plan_tier, "plan_tier", allow_none=False)
+        assert _ce_plan is not None
+        sub.plan_tier = _ce_plan
 
     if update_data.role is not None:
-        sub.role = coerce_enum(UserRole, update_data.role, "role", allow_none=False)
+        _ce_role = coerce_enum(UserRole, update_data.role, "role", allow_none=False)
+        assert _ce_role is not None
+        sub.role = _ce_role
 
     await db.flush()
 
     # Log the change
-    new_plan_tier = sub.plan_tier.value if sub.plan_tier else None
-    new_status = sub.status.value if sub.status else None
+    new_plan_tier_val = sub.plan_tier.value if sub.plan_tier else None
+    new_status_val = sub.status.value if sub.status else None
 
     await log_subscription_change(
         db,
@@ -475,9 +513,9 @@ async def update_subscription(
         admin_id=current_admin.id,
         action="update",
         old_plan_tier=old_plan_tier,
-        new_plan_tier=new_plan_tier,
+        new_plan_tier=new_plan_tier_val,
         old_status=old_status,
-        new_status=new_status,
+        new_status=new_status_val,
         reason="Admin override (manual update)",
     )
 
@@ -693,7 +731,7 @@ async def get_all_jobs(
                 country=j.country,
                 state=j.state,
                 city=j.city,
-                job_type=(str(j.job_type.value) if hasattr(j.job_type, "value") else j.job_type),
+                job_type=(str(j.job_type.value) if j.job_type is not None else None),
                 required_skills=j.required_skills,
                 num_openings=j.num_openings,
                 application_deadline=(
@@ -723,7 +761,11 @@ async def update_job_status(
     update_dict = update_data.model_dump(exclude_unset=True)
     for key, value in update_dict.items():
         if key == "status":
-            job.status = coerce_enum(JobStatus, value, "status", allow_none=False)
+            _ce = coerce_enum(JobStatus, value, "status", allow_none=False)
+
+            assert _ce is not None
+
+            job.status = _ce
         elif key == "job_type":
             job.job_type = coerce_enum(JobType, value, "job_type")
         elif key == "employment_type":

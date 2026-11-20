@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 from core.dependencies import CurrentUser, DbSession
 from core.rate_limit import (
@@ -251,9 +250,7 @@ async def reset_password(
 
     # Look up by hash
     reset_token = await db.scalar(
-        select(PasswordResetToken)
-        .where(PasswordResetToken.token_hash == token_hash)
-        .options(selectinload(PasswordResetToken.user))
+        select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash)
     )
 
     if not reset_token or reset_token.used_at or reset_token.expires_at < datetime.utcnow():

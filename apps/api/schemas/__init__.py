@@ -442,7 +442,9 @@ class JobStatusUpdate(BaseModel):
     @field_validator("status", mode="before")
     @classmethod
     def validate_status(cls, v: Any) -> JobStatus:
-        return coerce_enum(JobStatus, v, "status", allow_none=False)
+        result = coerce_enum(JobStatus, v, "status", allow_none=False)
+        assert result is not None
+        return result
 
 
 class JobOut(ORMModel):
@@ -511,7 +513,9 @@ class ApplicationStatusUpdate(BaseModel):
     @field_validator("status", mode="before")
     @classmethod
     def validate_status(cls, v: Any) -> ApplicationStatus:
-        return coerce_enum(ApplicationStatus, v, "status", allow_none=False)
+        result = coerce_enum(ApplicationStatus, v, "status", allow_none=False)
+        assert result is not None
+        return result
 
 
 class ApplicationOut(ORMModel):

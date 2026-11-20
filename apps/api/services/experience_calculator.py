@@ -43,6 +43,7 @@ def total_experience_years(
             continue  # Skip rows with no usable from_date
 
         # Determine to_date
+        to_dt: date | None
         if exp.is_current or exp.to_date is None:
             to_dt = as_of
         else:
@@ -183,6 +184,7 @@ def experience_in_role(
         if target_job_role.lower() not in role_text.lower():
             continue
 
+        to_dt: date | None
         if exp.is_current or exp.to_date is None:
             to_dt = as_of
         else:

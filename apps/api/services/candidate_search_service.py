@@ -64,7 +64,7 @@ def apply_skills_filter(query, skills: Optional[str]):
         return query
 
     skill_list = [s.strip().lower() for s in skills.split(",") if s.strip()]
-    skill_conditions = []
+    skill_conditions: list = []
     for skill_name in skill_list:
         skill_conditions.append(
             select(CandidateSkill.candidate_id)
@@ -75,7 +75,7 @@ def apply_skills_filter(query, skills: Optional[str]):
         # Use OR for skills (candidates with at least one matching skill)
         skills_union = skill_conditions[0]
         for sc in skill_conditions[1:]:
-            skills_union = skills_union.union(sc)
+            skills_union = skills_union.union(sc)  # type: ignore[assignment]
         return query.where(CandidateProfile.user_id.in_(skills_union))
     return query
 
@@ -85,7 +85,7 @@ def apply_experience_filter(query, experience_min: Optional[int], experience_max
     if experience_min is None and experience_max is None:
         return query
 
-    exp_conditions = []
+    exp_conditions: list = []
     if experience_min is not None:
         if experience_min >= 5:
             exp_conditions.append(CandidateProfile.career_level.in_(["Experienced", "Senior"]))

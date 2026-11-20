@@ -30,6 +30,8 @@ class MessagingDenial(str):
     ``X-Error-Code`` response header.
     """
 
+    code: str
+
     def __new__(cls, message: str, code: str = "messaging_denied"):
         obj = super().__new__(cls, message)
         obj.code = code

@@ -159,7 +159,7 @@ async def get_company_analytics(user: User, db: AsyncSession, days: int = 30) ->
             Application.status != ApplicationStatus.applied,
         )
     )
-    response_rate = (responded_count / total_applications * 100) if total_applications else 0
+    response_rate = ((responded_count or 0) / total_applications * 100) if total_applications else 0
 
     application_trend = await db.execute(
         select(

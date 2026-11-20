@@ -344,7 +344,12 @@ async def get_skills(user: CandidateUser, db: DbSession):
 
 
 @router.put("/me/skills")
-async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
+async def put_skills(
+    body: SkillsUpdate,
+    user: CandidateUser,
+    db: DbSession,
+    background_tasks: BackgroundTasks,
+):
     candidate_id = user.id
     unique_names: list[str] = []
     seen: set[str] = set()
@@ -383,7 +388,7 @@ async def put_skills(body: SkillsUpdate, user: CandidateUser, db: DbSession):
     await db.flush()
     # Skills are resume-relevant
     await bump_profile_updated_at(db, candidate_id)
-    await _sync_candidate_embeddings(db, candidate_id)
+    _sync_candidate_embeddings(background_tasks, candidate_id)
     return {"skills": unique_names}
 
 
@@ -478,7 +483,11 @@ async def download_candidate_resume_pdf(candidate_id: UUID, user: CompanyUser, d
         .order_by(Application.applied_at.desc().nullslast())
         .limit(1)
     )
-    if app is None or not await can_company_view_resume(user.id, app.resume_id, db):
+    if (
+        app is None
+        or app.resume_id is None
+        or not await can_company_view_resume(user.id, app.resume_id, db)
+    ):
         raise HTTPException(status_code=404, detail="Resume not found")
 
     resume = await db.get(Resume, app.resume_id)
