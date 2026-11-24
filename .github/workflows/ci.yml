@@ -82,12 +82,10 @@ jobs:
           cd apps/api
           ruff format --check .
 
-      - name: Type check with mypy (reporting only — non-blocking)
-        # mypy: reporting only — continue-on-error is intentional; type
-        # coverage is advisory until the codebase is fully annotated.
+      - name: Type check with mypy
+        # Blocking: codebase is at 0 mypy errors — keep it that way.
         # tests/ excluded: duplicate conftest module names break mypy's
         # module mapping (tests/conftest.py vs tests/security/conftest.py).
-        continue-on-error: true
         run: |
           cd apps/api
           mypy core services routers models schemas scripts main.py --ignore-missing-imports
