@@ -16,7 +16,7 @@ function resolveApiUrl(): string {
   );
 }
 
-const API_URL = resolveApiUrl();
+export const API_URL = resolveApiUrl();
 
 // Build-time validation: DISABLED locally, will be checked in CI on Linux with proper production env
 // In CI/production, ensure API URL is configured and not localhost

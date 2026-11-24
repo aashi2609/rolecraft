@@ -5,13 +5,17 @@
  * Razorpay integration (STEP E - Payment Verification).
  *
  * Flow:
- * 1. Client collects payment details on checkout form
- * 2. Client calls processPayment() → backend creates Razorpay order
- * 3. Client opens Razorpay Checkout modal
- * 4. User completes payment in Razorpay
- * 5. Razorpay redirects with payment details
- * 6. Backend webhook verifies signature + activates subscription
+ * 1. Client calls processPayment() → backend creates a payment order
+ *    (POST /payments/orders) and reports PAYMENTS_MODE.
+ * 2. PAYMENTS_MODE=test (mock/demo): client calls POST /payments/mock-complete —
+ *    no Razorpay checkout, no real charge; backend marks the transaction `mock_*`
+ *    and activates through the same path as the verified webhook.
+ * 3. PAYMENTS_MODE=live: client opens Razorpay Checkout, then POST /payments/verify
+ *    confirms the signature; the server-to-server webhook activates the subscription.
+ * 4. PAYMENTS_MODE=disabled: order creation returns 503 — no checkout at all.
  */
+
+import { API_URL, getToken } from './api';
 
 export type PlanId = 'basic' | 'complete' | 'job_search' | 'resume_builder' | 'corporate_annual' | 'corporate_lifetime';
 
@@ -20,8 +24,10 @@ export interface PaymentDetails {
   amount: number;
   currency: string;
   isAnnual: boolean;
-  paymentMethod: string;
-  paymentData: Record<string, any>;
+  /** @deprecated Payment method/details are handled by the backend/provider;
+   *  kept optional for backward compatibility. */
+  paymentMethod?: string;
+  paymentData?: Record<string, any>;
 }
 
 export interface PaymentResult {
@@ -29,6 +35,8 @@ export interface PaymentResult {
   error?: string;
   orderId?: string;
   checkoutUrl?: string;
+  /** True when the payment was completed via the PAYMENTS_MODE=test mock path. */
+  mock?: boolean;
 }
 
 /**
@@ -50,13 +58,13 @@ export function validatePaymentDetails(details: PaymentDetails): string | null {
   // Validate based on payment method
   switch (details.paymentMethod) {
     case 'card':
-      return validateCardDetails(details.paymentData);
+      return validateCardDetails(details.paymentData ?? {});
     case 'upi':
-      return validateUpiDetails(details.paymentData);
+      return validateUpiDetails(details.paymentData ?? {});
     case 'netbanking':
-      return validateNetbankingDetails(details.paymentData);
+      return validateNetbankingDetails(details.paymentData ?? {});
     case 'wallet':
-      return validateWalletDetails(details.paymentData);
+      return validateWalletDetails(details.paymentData ?? {});
     default:
       return 'Invalid payment method';
   }
@@ -114,53 +122,101 @@ function validateWalletDetails(data: Record<string, any>): string | null {
  */
 export async function processPayment(details: PaymentDetails): Promise<PaymentResult> {
   try {
-    // Step 1: Create payment order via backend
-    const orderResponse = await fetch('/api/payments/create-order', {
+    const billingPeriod =
+      details.planId === 'corporate_lifetime'
+        ? 'lifetime'
+        : details.isAnnual
+          ? 'annual'
+          : 'monthly';
+
+    // Step 1: Create payment order via backend (POST /payments/orders)
+    const orderResponse = await fetch(`${API_URL}/payments/orders`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${getAuthToken()}`,
       },
       body: JSON.stringify({
-        planId: details.planId,
-        billingPeriod: details.isAnnual ? 'annual' : 'monthly',
+        plan_tier: details.planId,
+        billing_period: billingPeriod,
       }),
     });
 
     if (!orderResponse.ok) {
-      const error = await orderResponse.json();
+      const error = await orderResponse.json().catch(() => ({}));
       return {
         success: false,
-        error: error.message || 'Failed to create payment order',
+        error: error.detail || error.message || 'Failed to create payment order',
       };
     }
 
     const orderData = await orderResponse.json();
-    const { razorpay_order_id, razorpay_key_id, amount, currency, email, user_name } = orderData;
+    const { order_id, key, amount, email, mode } = orderData;
 
-    // Step 2: Open Razorpay Checkout
+    // Step 2a: TEST/MOCK MODE — complete via the explicit mock endpoint.
+    // No Razorpay checkout, no real charge; backend marks it mock_* and
+    // activates through the same verified path as the real webhook.
+    if (mode === 'test') {
+      const mockResponse = await fetch(`${API_URL}/payments/mock-complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+        body: JSON.stringify({ order_id }),
+      });
+
+      if (!mockResponse.ok) {
+        const error = await mockResponse.json().catch(() => ({}));
+        return {
+          success: false,
+          error: error.detail || 'Mock payment completion failed',
+        };
+      }
+
+      return { success: true, orderId: order_id, mock: true };
+    }
+
+    // Step 2b: LIVE MODE — open Razorpay Checkout
     return new Promise((resolve) => {
       const options = {
-        key: razorpay_key_id,
+        key: key,
         amount: amount, // in paise
-        currency: currency,
+        currency: 'INR',
         name: 'RoleCraft',
         description: `${details.planId} plan subscription`,
-        order_id: razorpay_order_id,
+        order_id: order_id,
         prefill: {
-          name: user_name || '',
           email: email || '',
-          contact: '', // User can fill if needed
         },
         handler: async (response: any) => {
-          // Step 3: Verify payment on backend (webhook)
-          // Note: Signature verification happens in webhook handler
-          // No client-side verification needed (happens server-side for security)
+          // Step 3: Verify payment signature on backend
+          try {
+            const verifyResponse = await fetch(`${API_URL}/payments/verify`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getAuthToken()}`,
+              },
+              body: JSON.stringify({
+                order_id: response.razorpay_order_id,
+                payment_id: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+              }),
+            });
 
-          resolve({
-            success: true,
-            orderId: razorpay_order_id,
-          });
+            if (verifyResponse.ok) {
+              resolve({ success: true, orderId: order_id });
+            } else {
+              const error = await verifyResponse.json().catch(() => ({}));
+              resolve({
+                success: false,
+                error: error.detail || 'Payment verification failed',
+              });
+            }
+          } catch {
+            resolve({ success: false, error: 'Payment verification failed' });
+          }
         },
         modal: {
           onclosed: () => {
@@ -202,12 +258,11 @@ export async function processPayment(details: PaymentDetails): Promise<PaymentRe
 }
 
 /**
- * Get authentication token from localStorage
+ * Get authentication token — same key the API client uses.
  */
 function getAuthToken(): string {
   if (typeof window === 'undefined') return '';
-  const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
-  return token || '';
+  return getToken() || '';
 }
 
 /**

@@ -112,6 +112,7 @@ def test_production_boots_with_strong_secret():
             "jwt_secret": strong,
             "database_url": "postgresql+asyncpg://user:pass@host/db",
             "cors_origins": "https://example.com",
+            "storage_backend": "gcs",
         }
     )
     assert s.jwt_secret == strong
@@ -121,6 +122,20 @@ def test_production_boots_with_strong_secret():
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # 5. Development: no secret set â†’ auto-generates random one, boots fine
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
+def test_production_fails_with_local_storage_backend():
+    strong = "a" * 64
+    with pytest.raises(ValidationError, match="STORAGE_BACKEND=local"):
+        _make_settings(
+            {
+                "environment": "production",
+                "jwt_secret": strong,
+                "database_url": "postgresql+asyncpg://user:pass@host/db",
+                "cors_origins": "https://example.com",
+                "storage_backend": "local",
+            }
+        )
 
 
 def test_dev_generates_random_secret_when_unset():

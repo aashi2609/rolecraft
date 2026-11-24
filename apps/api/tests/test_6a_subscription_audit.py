@@ -356,7 +356,15 @@ class TestSubscriptionTransitions:
         await db_session.commit()
         await db_session.refresh(user, attribute_names=["subscription"])
 
-        assert user.subscription.status == SubscriptionStatus.cancelled
+        # user.subscription is scoped to live (pending/active) rows — a
+        # cancelled-only user has no current subscription. Verify the
+        # historical row directly instead.
+        assert user.subscription is None
+        cancelled_sub = await db_session.scalar(
+            select(Subscription).where(Subscription.user_id == user.id)
+        )
+        assert cancelled_sub is not None
+        assert cancelled_sub.status == SubscriptionStatus.cancelled
 
 
 @pytest.mark.asyncio
