@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Not app code:
+    "deploy/**",
+    // Python virtualenvs (flat config does not read .gitignore):
+    "**/.venv*/**",
+    "**/venv/**",
   ]),
   {
     // Existing app code predates Next 16's stricter React Compiler / TS rules.

@@ -150,6 +150,18 @@ class Settings(BaseSettings):
             if not self.cors_origins:
                 self.cors_origins = "http://localhost:3000,http://127.0.0.1:3000"
 
+        # ---- STORAGE_BACKEND ----
+        # Local disk is ephemeral on container/serverless hosts — permanent
+        # production storage must use an object-storage backend (gcs today,
+        # s3 via the same abstraction in the AWS phase).
+        if self.is_production and self.storage_backend == "local":
+            errors.append(
+                "STORAGE_BACKEND=local is not allowed in production — "
+                "uploaded files would be lost on ephemeral disk. "
+                "Set STORAGE_BACKEND=gcs (or the future s3 backend) with "
+                "the corresponding bucket/project env vars."
+            )
+
         # ---- Fail hard ----
         if errors:
             msg = (

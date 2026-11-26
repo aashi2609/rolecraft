@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useUser } from '@/context/UserContext';
 import { useToast } from '@/components/ui/Toast';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Bookmark, BookmarkCheck, MapPin, Briefcase, IndianRupee, Clock, TrendingUp, X } from 'lucide-react';
@@ -39,8 +39,9 @@ function mapJobFromApi(j: any) {
   };
 }
 
-export default function JobDetailPage() {
-  const { jobId } = useParams();
+function JobDetailContent() {
+  const searchParams = useSearchParams();
+  const jobId = searchParams.get('jobId');
   const { jobs, savedJobs, toggleSavedJob, applications, applyToJob, resumes } = useUser();
   const { showToast } = useToast();
   const router = useRouter();
@@ -60,15 +61,18 @@ export default function JobDetailPage() {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
-    const id = String(jobId);
-    const cached = jobs.find((j) => String(j.id) === id);
+    if (!jobId) {
+      setLoading(false);
+      return;
+    }
+    const cached = jobs.find((j) => String(j.id) === jobId);
     if (cached) {
       setJob(cached);
       setLoading(false);
       return;
     }
     jobsApi
-      .get(id)
+      .get(jobId)
       .then((raw) => setJob(mapJobFromApi(raw)))
       .catch(() => setJob(null))
       .finally(() => setLoading(false));
@@ -87,7 +91,7 @@ export default function JobDetailPage() {
 
   const handleApplyClick = () => {
     if (resumes.length === 0) {
-      router.push('/onboarding/generate?redirect=/jobs/' + job.id);
+      router.push('/onboarding/generate?redirect=/jobs/detail?jobId=' + job.id);
     } else {
       setIsApplyModalOpen(true);
     }
@@ -226,7 +230,7 @@ export default function JobDetailPage() {
                 {bestResume.is_stale && <span className="bg-yellow-100 text-yellow-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase whitespace-nowrap">Outdated</span>}
               </p>
             ) : null}
-            
+
             {/* Show a warning if the selected resume is stale */}
             {(() => {
               const selectedId = selectedResumeId || bestResume?.id;
@@ -248,5 +252,13 @@ export default function JobDetailPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function JobDetailPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[80vh] flex items-center justify-center text-ink-muted">Loading job…</div>}>
+      <JobDetailContent />
+    </Suspense>
   );
 }

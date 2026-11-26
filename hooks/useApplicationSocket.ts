@@ -16,13 +16,13 @@ import { getToken } from '@/lib/api';
 
 /** WS must be an absolute URL — relative /backend rewrites don't apply to WebSockets. */
 function resolveWsBase(): string {
-  const api = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (api && /^https?:\/\//i.test(api)) {
-    return api.replace(/^http/, 'ws').replace(/\/$/, '');
-  }
   const configured = process.env.NEXT_PUBLIC_WS_URL?.trim();
   if (configured) {
     return configured.replace(/^http/, 'ws').replace(/\/$/, '');
+  }
+  const api = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (api && /^https?:\/\//i.test(api)) {
+    return api.replace(/^http/, 'ws').replace(/\/$/, '');
   }
   // In browser, use relative protocol-relative URL for same origin
   if (typeof window !== 'undefined') {

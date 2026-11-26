@@ -646,16 +646,88 @@ async def test_no_admin_direct_activation_in_update(
 
 @pytest.mark.asyncio
 async def test_payments_mode_disabled_blocks_orders(
-    db_session: AsyncSession,
-    test_user: User,
+    candidate_client,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test that PAYMENTS_MODE=disabled returns 503 for order endpoints.
+    """PAYMENTS_MODE=disabled returns 503 for order endpoints.
 
     When payments are disabled, checkout should not be available.
     """
-    # This test would require a monkeypatch of settings to test
-    # In production, the startup check ensures PAYMENTS_MODE is valid
-    # and the routers check the mode before processing orders
+    from routers import payments as payments_router
+
+    monkeypatch.setattr(payments_router.settings, "payments_mode", "disabled")
+
+    resp = await candidate_client.post(
+        "/payments/orders",
+        json={"plan_tier": "complete", "billing_period": "annual"},
+    )
+    assert resp.status_code == 503
+
+    resp = await candidate_client.post(
+        "/payments/verify",
+        json={"order_id": "order_x", "payment_id": "pay_x", "signature": "sig"},
+    )
+    assert resp.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_mock_complete_rejected_when_payments_disabled(
+    candidate_client,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mock completion must be hard-disabled outside PAYMENTS_MODE=test."""
+    from routers import payments as payments_router
+
+    monkeypatch.setattr(payments_router.settings, "payments_mode", "disabled")
+
+    resp = await candidate_client.post(
+        "/payments/mock-complete", json={"order_id": "order_anything"}
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_mock_complete_activates_subscription_in_test_mode(
+    candidate_client,
+    candidate_user: User,
+    db_session: AsyncSession,
+    price_point: PricePoint,
+    payment_service: PaymentService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PAYMENTS_MODE=test: mock-complete marks the transaction completed and
+    activates the subscription through the same path as the real webhook."""
+    from routers import payments as payments_router
+
+    monkeypatch.setattr(payments_router.settings, "payments_mode", "test")
+
+    transaction = await payment_service.create_order(
+        db_session,
+        candidate_user,
+        price_point.plan_tier,
+        price_point.billing_period,
+    )
+    await db_session.commit()
+
+    resp = await candidate_client.post(
+        "/payments/mock-complete",
+        json={"order_id": transaction.razorpay_order_id},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["mock"] is True
+    assert body["subscription_id"] is not None
+
+    sub = await db_session.get(Subscription, uuid.UUID(body["subscription_id"]))
+    assert sub is not None
+    assert sub.status == SubscriptionStatus.active
+    assert sub.plan_tier == price_point.plan_tier
+    # Mock payment id must be clearly marked — never a real Razorpay payment id.
+    # The endpoint committed via its own session; expire our stale copy first.
+    await db_session.refresh(transaction)
+    assert transaction.razorpay_payment_id is not None
+    assert transaction.razorpay_payment_id.startswith("mock_")
 
 
 @pytest.mark.asyncio

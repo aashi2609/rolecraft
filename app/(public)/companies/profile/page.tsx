@@ -1,21 +1,22 @@
 "use client";
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useUser } from '@/context/UserContext';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { MapPin, Briefcase, Users, Link as LinkIcon } from 'lucide-react';
 import Link from 'next/link';
 
-export default function CompanyPublicProfilePage() {
-  const { companyId } = useParams();
+function CompanyPublicProfileContent() {
+  const searchParams = useSearchParams();
+  const companyId = searchParams.get('companyId');
   const { jobs } = useUser();
   const router = useRouter();
 
   // Mock company details based on the jobs we have
-  const companyJobs = jobs.filter(j => j.companyId === Number(companyId) && j.status === 'Live');
-  
+  const companyJobs = jobs.filter(j => String(j.companyId) === String(companyId) && j.status === 'Live');
+
   if (companyJobs.length === 0) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center text-ink-muted">
@@ -37,7 +38,7 @@ export default function CompanyPublicProfilePage() {
   return (
     <div className="min-h-screen bg-surface-soft py-10">
       <div className="max-w-4xl mx-auto px-4">
-        
+
         <button onClick={() => router.back()} className="text-sm text-ink-muted hover:text-primary mb-6 inline-block">
           ← Back
         </button>
@@ -84,7 +85,7 @@ export default function CompanyPublicProfilePage() {
                         <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" /> {job.employmentType}</span>
                       </div>
                     </div>
-                    <Link href={`/jobs/${job.id}`}>
+                    <Link href={`/jobs/detail?jobId=${job.id}`}>
                       <Button variant="outline">View Job</Button>
                     </Link>
                   </Card>
@@ -111,5 +112,13 @@ export default function CompanyPublicProfilePage() {
 
       </div>
     </div>
+  );
+}
+
+export default function CompanyPublicProfilePage() {
+  return (
+    <Suspense fallback={<div className="min-h-[80vh] flex items-center justify-center text-ink-muted">Loading…</div>}>
+      <CompanyPublicProfileContent />
+    </Suspense>
   );
 }

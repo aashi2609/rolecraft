@@ -488,24 +488,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const switchRole = useCallback((role: Role) => setState((prev) => ({ ...prev, role })), []);
 
   const setPlan = useCallback(async (plan: PlanId) => {
-    try {
-      await subscriptionsApi.set(plan);
-      setState((prev) => ({
-        ...prev,
-        plan,
-        pendingPlan: null,
-        planValidTill: defaultValidTill(),
-      }));
-    } catch (error) {
-      console.error('Failed to update subscription:', error);
-      // Still update local state for UX, API call might be optional during checkout
-      setState((prev) => ({
-        ...prev,
-        plan,
-        pendingPlan: null,
-        planValidTill: defaultValidTill(),
-      }));
-    }
+    // Only update local state after the backend confirms — a failed API call
+    // must never present a paid plan that the server did not grant.
+    await subscriptionsApi.set(plan);
+    setState((prev) => ({
+      ...prev,
+      plan,
+      pendingPlan: null,
+      planValidTill: defaultValidTill(),
+    }));
   }, []);
 
   const setPendingPlan = useCallback((plan: PlanId | null) =>

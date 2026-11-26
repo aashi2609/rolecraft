@@ -3,34 +3,23 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { FormField, Input } from '@/components/ui/FormField';
-import { CreditCard, Wallet, Smartphone, Landmark, CheckCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUser } from '@/context/UserContext';
 import { getPlanById, formatPlanPrice, type PlanId } from '@/lib/plans';
 import { Logo } from '@/components/Logo';
-import { processPayment, validatePaymentDetails, type PaymentDetails } from '@/lib/payment';
+import { processPayment, type PaymentDetails } from '@/lib/payment';
 
 function CheckoutForm() {
-  const [activeTab, setActiveTab] = useState('card');
   const [isAnnual, setIsAnnual] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState('');
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
-  // Form state
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
-  const [cardName, setCardName] = useState('');
-  const [upiId, setUpiId] = useState('');
-  const [selectedBank, setSelectedBank] = useState('');
-  const [selectedWallet, setSelectedWallet] = useState('');
-
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated, setPlan, role: ctxRole } = useUser();
+  const { isAuthenticated, refreshSession, role: ctxRole } = useUser();
   const roleParam = searchParams.get('role');
   const next = searchParams.get('next');
   const role = roleParam === 'company' || roleParam === 'candidate' ? roleParam : ctxRole;
@@ -55,27 +44,7 @@ function CheckoutForm() {
       amount,
       currency,
       isAnnual,
-      paymentMethod: activeTab as any,
-      paymentData: {
-        ...(activeTab === 'card' && {
-          cardNumber,
-          expiry: cardExpiry,
-          cvv: cardCvv,
-          name: cardName,
-        }),
-        ...(activeTab === 'upi' && { upiId }),
-        ...(activeTab === 'netbanking' && { bank: selectedBank }),
-        ...(activeTab === 'wallet' && { wallet: selectedWallet }),
-      },
     };
-
-    // Validate payment details
-    const validationError = validatePaymentDetails(paymentDetails);
-    if (validationError) {
-      setPaymentError(validationError);
-      setIsProcessing(false);
-      return;
-    }
 
     try {
       // Process payment
@@ -83,8 +52,11 @@ function CheckoutForm() {
 
       if (result.success) {
         setPaymentSuccess(true);
-        // Update subscription
-        await setPlan(planId);
+        // Re-fetch subscription state — the backend (mock-complete or
+        // verify+webhook) is the only authority on the activated plan.
+        // Never call setPlan() here: POST /subscriptions would cancel the
+        // just-activated paid row and replace it with a pending one.
+        await refreshSession().catch(() => {});
 
         // Redirect after successful payment
         setTimeout(() => {
@@ -179,119 +151,11 @@ function CheckoutForm() {
             </Card>
 
             <Card>
-              <h3 className="text-lg font-bold text-foreground mb-6">Payment Method</h3>
-
-              <div className="flex border-b border-border mb-6 overflow-x-auto">
-                {[
-                  { id: 'card', label: 'Credit/Debit Card', icon: CreditCard },
-                  { id: 'upi', label: 'UPI', icon: Smartphone },
-                  { id: 'netbanking', label: 'Net Banking', icon: Landmark },
-                  { id: 'wallet', label: 'Wallet', icon: Wallet },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2 px-4 py-3 font-semibold text-sm whitespace-nowrap border-b-2 transition-colors ${
-                      activeTab === tab.id
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <tab.icon className="w-4 h-4" /> {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              {activeTab === 'card' && (
-                <div className="space-y-4">
-                  <FormField label="Card Number">
-                    <Input
-                      placeholder="0000 0000 0000 0000"
-                      value={cardNumber}
-                      onChange={(e) => setCardNumber(e.target.value)}
-                      disabled={isProcessing}
-                    />
-                  </FormField>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField label="Expiry Date">
-                      <Input
-                        placeholder="MM/YY"
-                        value={cardExpiry}
-                        onChange={(e) => setCardExpiry(e.target.value)}
-                        disabled={isProcessing}
-                      />
-                    </FormField>
-                    <FormField label="CVV">
-                      <Input
-                        type="password"
-                        placeholder="123"
-                        value={cardCvv}
-                        onChange={(e) => setCardCvv(e.target.value)}
-                        disabled={isProcessing}
-                      />
-                    </FormField>
-                  </div>
-                  <FormField label="Name on Card">
-                    <Input
-                      placeholder="John Doe"
-                      value={cardName}
-                      onChange={(e) => setCardName(e.target.value)}
-                      disabled={isProcessing}
-                    />
-                  </FormField>
-                </div>
-              )}
-              {activeTab === 'upi' && (
-                <div className="space-y-4 py-4 text-center">
-                  <p className="text-muted-foreground mb-4">Enter your UPI ID to receive a payment request.</p>
-                  <FormField label="UPI ID">
-                    <Input
-                      placeholder="username@upi"
-                      value={upiId}
-                      onChange={(e) => setUpiId(e.target.value)}
-                      disabled={isProcessing}
-                    />
-                  </FormField>
-                </div>
-              )}
-              {activeTab === 'netbanking' && (
-                <div className="space-y-4 py-4">
-                  <FormField label="Select Bank">
-                    <select
-                      className="w-full px-3 py-2 bg-white border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      value={selectedBank}
-                      onChange={(e) => setSelectedBank(e.target.value)}
-                      disabled={isProcessing}
-                    >
-                      <option value="">Select a bank</option>
-                      <option>HDFC Bank</option>
-                      <option>SBI</option>
-                      <option>ICICI Bank</option>
-                      <option>Axis Bank</option>
-                      <option>Kotak Mahindra Bank</option>
-                    </select>
-                  </FormField>
-                </div>
-              )}
-              {activeTab === 'wallet' && (
-                <div className="space-y-4 py-4">
-                  <FormField label="Wallet">
-                    <select
-                      className="w-full px-3 py-2 bg-white border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
-                      value={selectedWallet}
-                      onChange={(e) => setSelectedWallet(e.target.value)}
-                      disabled={isProcessing}
-                    >
-                      <option value="">Select a wallet</option>
-                      <option>Amazon Pay</option>
-                      <option>Paytm</option>
-                      <option>PhonePe</option>
-                      <option>Google Pay</option>
-                    </select>
-                  </FormField>
-                </div>
-              )}
+              <h3 className="text-lg font-bold text-foreground mb-4">Payment</h3>
+              <p className="text-sm text-muted-foreground">
+                You will complete payment securely on our payment partner&apos;s
+                checkout. No card details are collected on this page.
+              </p>
             </Card>
 
             <Button

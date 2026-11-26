@@ -111,12 +111,19 @@ class User(Base):
     token_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    # Scoped to live rows (pending/active) so historical cancelled rows do not
+    # trigger MultipleRowsFound. Full history remains in the subscriptions table
+    # and is reachable via Subscription.user_id / get_current_subscription().
     subscription: Mapped[Optional["Subscription"]] = relationship(
         back_populates="user",
         uselist=False,
         lazy="raise",
         cascade="all, delete-orphan",
         passive_deletes=True,
+        primaryjoin=(
+            "and_(User.id == Subscription.user_id, "
+            "Subscription.status.in_(['pending', 'active']))"
+        ),
     )
     candidate_profile: Mapped[Optional["CandidateProfile"]] = relationship(
         back_populates="user",

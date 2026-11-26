@@ -180,7 +180,7 @@ export default function CandidateDashboardPage() {
                     <h4 className="font-bold text-foreground text-sm line-clamp-1">{job.title}</h4>
                     <div className="flex justify-between items-center mt-1">
                       <span className="text-xs text-muted-foreground">{job.companyName}</span>
-                      <Link href={`/jobs/${job.id}`} className="text-xs text-primary hover:underline">
+                      <Link href={`/jobs/detail?jobId=${job.id}`} className="text-xs text-primary hover:underline">
                         Apply
                       </Link>
                     </div>

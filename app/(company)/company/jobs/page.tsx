@@ -89,7 +89,7 @@ export default function MyJobsPage() {
               </div>
 
               <div className="relative flex items-center gap-2">
-                <Link href={`/company/jobs/${job.id}/applications`}>
+                <Link href={`/company/jobs/applications?jobId=${job.id}`}>
                   <Button variant="outline" size="sm">
                     View Candidates
                   </Button>

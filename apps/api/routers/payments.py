@@ -7,6 +7,7 @@ Endpoints:
 """
 
 import logging
+import uuid
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -64,6 +65,7 @@ class OrderCreateResponse(BaseModel):
     amount: int  # in paise
     email: str
     currency: str = "INR"
+    mode: str = "live"  # disabled | test | live — lets the client pick the mock path
 
 
 class PaymentVerifyRequest(BaseModel):
@@ -145,6 +147,12 @@ async def create_order(
     new Razorpay(options).open();
     ```
     """
+    if settings.payments_mode == "disabled":
+        raise HTTPException(
+            status_code=503,
+            detail="Online payments are disabled (PAYMENTS_MODE=disabled)",
+        )
+
     try:
         # Create payment order
         transaction = await payment_service.create_order(
@@ -170,6 +178,7 @@ async def create_order(
             amount=payload["amount"],
             email=payload["email"],
             currency="INR",
+            mode=settings.payments_mode,
         )
 
     except ValueError as e:
@@ -200,6 +209,12 @@ async def verify_payment(
     2. Marks the transaction as completed
     3. Activates the user's subscription
     """
+    if settings.payments_mode == "disabled":
+        raise HTTPException(
+            status_code=503,
+            detail="Online payments are disabled (PAYMENTS_MODE=disabled)",
+        )
+
     try:
         # Verify signature
         is_valid = payment_service.verify_payment_signature(
@@ -256,6 +271,76 @@ async def verify_payment(
     except Exception as e:
         logger.error(f"Error verifying payment: {e}")
         raise HTTPException(status_code=500, detail="Failed to verify payment")
+
+
+class MockCompleteRequest(BaseModel):
+    """Request body for the mock (test-mode) payment completion endpoint."""
+
+    order_id: str
+
+
+class MockCompleteResponse(BaseModel):
+    """Response for mock payment completion — clearly not a real payment."""
+
+    ok: bool
+    mock: bool = True
+    transaction_id: str
+    subscription_id: Optional[str] = None
+    status: str
+    message: str
+
+
+@router.post("/mock-complete", response_model=MockCompleteResponse)
+async def mock_complete_payment(
+    request: MockCompleteRequest,
+    db: DbSession,
+    current_user: User = Depends(get_current_user),
+    payment_service: PaymentService = Depends(get_payment_service),
+) -> Any:
+    """Complete a payment in PAYMENTS_MODE=test without a real Razorpay webhook.
+
+    This is the DEMO/MOCK path: it simulates a successful provider callback so
+    the checkout flow can be exercised end-to-end before real Razorpay
+    credentials exist. It is hard-disabled unless PAYMENTS_MODE=test, uses a
+    clearly-marked `mock_` payment id, and goes through the exact same
+    activate_subscription() path as the verified webhook — no shortcuts.
+    """
+    if settings.payments_mode != "test":
+        raise HTTPException(
+            status_code=403,
+            detail="Mock payments are only available when PAYMENTS_MODE=test",
+        )
+
+    transaction = await db.scalar(
+        select(PaymentTransaction).where(
+            PaymentTransaction.razorpay_order_id == request.order_id,
+            PaymentTransaction.user_id == current_user.id,
+        )
+    )
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    if transaction.status not in (PaymentStatus.pending, PaymentStatus.completed):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Transaction cannot be completed (status={transaction.status.value})",
+        )
+
+    if transaction.status == PaymentStatus.pending:
+        transaction.status = PaymentStatus.completed
+        transaction.razorpay_payment_id = f"mock_{uuid.uuid4().hex[:16]}"
+        await db.flush()
+
+    subscription = await payment_service.activate_subscription(db, transaction)
+    await db.commit()
+
+    return MockCompleteResponse(
+        ok=True,
+        transaction_id=str(transaction.id),
+        subscription_id=str(subscription.id) if subscription else None,
+        status="completed",
+        message="Mock payment completed (PAYMENTS_MODE=test — not a real charge)",
+    )
 
 
 @router.post("/webhook", response_model=WebhookResponse)
