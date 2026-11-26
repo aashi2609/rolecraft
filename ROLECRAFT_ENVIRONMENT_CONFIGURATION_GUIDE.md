@@ -6,9 +6,8 @@ No real credentials appear in this document or in any committed file.
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `NEXT_PUBLIC_API_URL` | **Production: yes** | Browser-side API base. Same-origin `/backend` proxy is used when unset (dev). Production builds **fail** if unset or pointing at localhost (`lib/api.ts`). |
+| `NEXT_PUBLIC_API_URL` | **Production: yes** | Browser-side API base (absolute URL). Unset in dev defaults to `http://127.0.0.1:8000`. Production builds **fail** if unset or pointing at localhost (`lib/api.ts`). There is no `/backend` proxy — the frontend is a static export. |
 | `NEXT_PUBLIC_WS_URL` | Recommended | WebSocket base (`hooks/useApplicationSocket.ts`). Falls back to `NEXT_PUBLIC_API_URL`. Must be `wss://` in production. |
-| `API_PROXY_TARGET` | **Production build: yes** | Server-side rewrite target for `/backend/*` (`next.config.ts` throws at build time if unset in production). |
 
 Files: `.env.local.example` (dev), `.env.production.example` (prod template), `.env.production` (committed, public URLs only).
 
@@ -17,7 +16,6 @@ Production example:
 ```bash
 NEXT_PUBLIC_API_URL=https://api.rolecraft.example.com
 NEXT_PUBLIC_WS_URL=wss://api.rolecraft.example.com
-API_PROXY_TARGET=https://api.rolecraft.example.com
 ```
 
 ## Backend (`apps/api`)
@@ -60,7 +58,7 @@ Copy `.env.example` → `.env`. Key groups:
 
 | Concern | Mechanism |
 |---|---|
-| API URL | `NEXT_PUBLIC_API_URL` / `API_PROXY_TARGET` → ALB/CloudFront domain |
+| API URL | `NEXT_PUBLIC_API_URL` → ALB/CloudFront API domain; frontend itself on S3+CloudFront |
 | Database | `DATABASE_URL` → RDS PostgreSQL 18 + pgvector |
 | Storage | `STORAGE_BACKEND` → add `s3` branch in `storage_service.py` (same `object_name` contract) |
 | Secrets | AWS Secrets Manager → env vars at deploy time |

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { applicationsApi, jobsApi } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -66,10 +66,10 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export default function JobApplicationsPage() {
-  const params = useParams();
+function JobApplicationsContent() {
+  const searchParams = useSearchParams();
+  const jobId = searchParams.get('jobId') as string;
   const router = useRouter();
-  const jobId = params.id as string;
 
   const [job, setJob] = useState<Job | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
@@ -81,6 +81,10 @@ export default function JobApplicationsPage() {
   const [messageName, setMessageName] = useState('');
 
   const loadData = useCallback(async () => {
+    if (!jobId) {
+      setLoading(false);
+      return;
+    }
     try {
       const [jobData, appsData] = await Promise.all([
         jobsApi.get(jobId),
@@ -196,5 +200,13 @@ export default function JobApplicationsPage() {
         candidateName={messageName}
       />
     </div>
+  );
+}
+
+export default function JobApplicationsPage() {
+  return (
+    <Suspense fallback={<div className="py-8 px-4 text-center">Loading applications...</div>}>
+      <JobApplicationsContent />
+    </Suspense>
   );
 }

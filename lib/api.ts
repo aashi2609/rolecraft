@@ -1,26 +1,28 @@
 /**
  * RoleCraft API client — JWT in localStorage, Bearer on every request.
  *
- * Browser default: same-origin `/backend` (Next.js rewrite → FastAPI) to avoid
- * CORS / Chrome local-network blocks on 127.0.0.1 cross-origin calls.
- * Override with NEXT_PUBLIC_API_URL for production or direct API access.
+ * All calls go to the absolute API origin from NEXT_PUBLIC_API_URL.
+ * The old same-origin `/backend` Next.js rewrite is gone (static export has
+ * no server), so production builds REQUIRE NEXT_PUBLIC_API_URL and the
+ * backend's CORS_ORIGINS must include the CloudFront domain.
+ * Development falls back to the local FastAPI default (http://127.0.0.1:8000).
  */
 
 function resolveApiUrl(): string {
   const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (configured) return configured.replace(/\/$/, "");
-  if (typeof window !== "undefined") return "/backend";
-  // Server-side: no fallback; will error if NEXT_PUBLIC_API_URL not set at build time
-  throw new Error(
-    "API URL not configured. Set NEXT_PUBLIC_API_URL environment variable."
-  );
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "API URL not configured. Set NEXT_PUBLIC_API_URL environment variable."
+    );
+  }
+  return "http://127.0.0.1:8000";
 }
 
 export const API_URL = resolveApiUrl();
 
-// Build-time validation: DISABLED locally, will be checked in CI on Linux with proper production env
-// In CI/production, ensure API URL is configured and not localhost
-if (process.env.NODE_ENV === "production" && process.env.CI === "true") {
+// Build-time validation: production builds must target a real, non-localhost API.
+if (process.env.NODE_ENV === "production") {
   const url = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!url) {
     throw new Error(

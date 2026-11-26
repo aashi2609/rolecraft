@@ -56,7 +56,7 @@ export default function CompanyApplicationsPage() {
                     {job.matched ?? 0} matched · {job.shortlisted ?? 0} shortlisted
                   </p>
                 </div>
-                <Link href={`/company/jobs/${job.id}/applications`}>
+                <Link href={`/company/jobs/applications?jobId=${job.id}`}>
                   <Button variant="outline" size="sm">
                     Review candidates
                   </Button>

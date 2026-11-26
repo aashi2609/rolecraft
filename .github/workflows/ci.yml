@@ -281,7 +281,6 @@ jobs:
       - name: Build with Next.js
         env:
           NEXT_PUBLIC_API_URL: https://api.example.com
-          API_PROXY_TARGET: https://api.example.com
         run: npm run build
 
       - name: Security audit with npm audit (production deps — blocking)

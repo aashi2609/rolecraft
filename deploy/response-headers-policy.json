@@ -1,0 +1,22 @@
+{
+  "Name": "rolecraft-security-headers",
+  "Comment": "Security headers formerly served by next.config.ts headers(). Attach to the CloudFront default cache behavior. Replace API_ORIGIN placeholders with the real API domain (Render now, ALB/CloudFront later).",
+  "SecurityHeadersConfig": {
+    "XContentTypeOptions": { "Override": true },
+    "XFrameOptions": { "FrameOption": "DENY", "Override": true },
+    "ReferrerPolicy": { "ReferrerPolicy": "strict-origin-when-cross-origin", "Override": true },
+    "PermissionsPolicy": {
+      "PermissionsPolicy": "camera=(), microphone=(), geolocation=()",
+      "Override": true
+    }
+  },
+  "CustomHeadersConfig": {
+    "Items": [
+      {
+        "Header": "Content-Security-Policy",
+        "Value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://API_HOST wss://API_HOST; frame-ancestors 'none';",
+        "Override": true
+      }
+    ]
+  }
+}

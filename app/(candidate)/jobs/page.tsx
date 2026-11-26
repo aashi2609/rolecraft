@@ -442,7 +442,7 @@ export default function JobSearchPage() {
                     <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
                       <div>
                         <Link
-                          href={`/jobs/${job.id}`}
+                          href={`/jobs/detail?jobId=${job.id}`}
                           className="text-lg font-bold text-foreground hover:text-primary"
                         >
                           {job.title}
@@ -500,7 +500,7 @@ export default function JobSearchPage() {
                             Applied
                           </Button>
                         ) : (
-                          <Link href={`/jobs/${job.id}`}>
+                          <Link href={`/jobs/detail?jobId=${job.id}`}>
                             <Button size="sm">
                               Apply Now
                             </Button>

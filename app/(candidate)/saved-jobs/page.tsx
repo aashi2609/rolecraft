@@ -74,7 +74,7 @@ export default function SavedJobsPage() {
                         </div>
                         <div>
                           <h3 className="font-bold text-ink line-clamp-1">{job.title}</h3>
-                          <Link href={`/companies/${job.companyId}`} className="text-sm text-primary hover:underline" onClick={e => e.stopPropagation()}>
+                          <Link href={`/companies/profile?companyId=${job.companyId}`} className="text-sm text-primary hover:underline" onClick={e => e.stopPropagation()}>
                             {job.companyName}
                           </Link>
                         </div>
@@ -97,7 +97,7 @@ export default function SavedJobsPage() {
                       {job.description}
                     </p>
                     
-                    <Link href={`/jobs/${job.id}`} className="mt-auto block">
+                    <Link href={`/jobs/detail?jobId=${job.id}`} className="mt-auto block">
                       <Button variant="outline" className="w-full group-hover:bg-primary group-hover:text-white transition-colors">
                         View Job
                       </Button>
